@@ -8,42 +8,100 @@
 </head>
 <body>
 
-<!-- ══════ หน้าเข้าสู่ระบบ ══════ -->
-<div id="login" class="loginwrap">
+<!-- ═══════ หน้า LOGIN (ยกโครง + สไตล์จาก STT NOVA ทั้งหมด) ═══════ -->
+<div id="loginScreen">
+  <div id="loginVer" style="position:absolute;bottom:14px;left:0;right:0;text-align:center;color:rgba(255,255,255,.62);font-size:12px;letter-spacing:.4px;z-index:3;font-weight:600">STT CLAIM HUB</div>
   <div class="loginbox">
-    <div class="lgleft">
-      <div class="lgbrand">
-        <div class="lgname">STT CLAIM</div>
-        <div class="lgsub">งานเคลม &amp; ตรวจรับสินค้า</div>
-      </div>
-      <div class="lgfoot">SUTEE TANKERS AND SPECIAL TRUCK</div>
+    <div class="lg-left">
+      <div class="lg-brandline">Sutee Tankers and Special Trucks Co.,Ltd.</div>
+      <div class="lg-big"><span>STT CLAIM</span><span>HUB</span></div>
+      <div class="lg-sub">ระบบงานเคลม · ตรวจรับสินค้า · เรียกเก็บค่าเสียหาย แบบครบวงจร</div>
+<div class="lg-truck">
+          <svg width="440" height="150" viewBox="0 0 520 176" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="poly" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#f4f6f8"/><stop offset="0.13" stop-color="#dcdfe4"/><stop offset="0.27" stop-color="#b0b5bb"/><stop offset="0.40" stop-color="#f6f8fa"/><stop offset="0.50" stop-color="#c9cdd3"/><stop offset="0.63" stop-color="#6f727a"/><stop offset="0.74" stop-color="#a8adb4"/><stop offset="0.88" stop-color="#d9dce1"/><stop offset="1" stop-color="#5f6268"/>
+              </linearGradient>
+              <radialGradient id="head" cx="0.34" cy="0.3" r="0.9"><stop offset="0" stop-color="#eef0f3"/><stop offset="0.55" stop-color="#b7bcc2"/><stop offset="1" stop-color="#686b71"/></radialGradient>
+              <linearGradient id="cabg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6b5e"/><stop offset="0.45" stop-color="#E2231A"/><stop offset="1" stop-color="#8f110a"/></linearGradient>
+              <radialGradient id="rim" cx="0.4" cy="0.35" r="0.75"><stop offset="0" stop-color="#e2e5e9"/><stop offset="0.6" stop-color="#9a9ea4"/><stop offset="1" stop-color="#42454a"/></radialGradient>
+              <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e2f3fb"/><stop offset="1" stop-color="#7fb6d6"/></linearGradient>
+            </defs>
+            <ellipse cx="262" cy="160" rx="242" ry="9" fill="#000" opacity="0.42"/>
+            <rect x="150" y="112" width="330" height="10" rx="2" fill="#E2231A"/><rect x="150" y="112" width="330" height="3" fill="#ff6b5e" opacity="0.7"/>
+            <path d="M372 112 q40 -20 92 0 z" fill="#8f110a"/>
+            <rect x="214" y="122" width="7" height="20" fill="#1b1b1e"/><rect x="223" y="122" width="7" height="20" fill="#1b1b1e"/>
+            <rect x="176" y="50" width="278" height="64" rx="30" fill="url(#poly)" stroke="#5c5f65" stroke-width="1"/>
+            <rect x="190" y="57" width="252" height="5" rx="2.5" fill="#ffffff" opacity="0.6"/>
+            <path d="M236 50 v64" stroke="#63666c" stroke-width="2.4"/><path d="M239 50 v64" stroke="#fafbfc" stroke-width="1" opacity="0.7"/><path d="M298 50 v64" stroke="#63666c" stroke-width="2.4"/><path d="M301 50 v64" stroke="#fafbfc" stroke-width="1" opacity="0.7"/><path d="M360 50 v64" stroke="#63666c" stroke-width="2.4"/><path d="M363 50 v64" stroke="#fafbfc" stroke-width="1" opacity="0.7"/>
+            <ellipse cx="454" cy="82" rx="11" ry="32" fill="url(#head)" stroke="#5c5f65" stroke-width="1"/><ellipse cx="454" cy="82" rx="5" ry="20" fill="#8b8f95" opacity="0.5"/>
+            <ellipse cx="176" cy="82" rx="7" ry="32" fill="#c7cbd0" opacity="0.5"/>
+            <rect x="206" y="46" width="164" height="4" rx="2" fill="#83868c"/>
+            <ellipse cx="252" cy="48" rx="12" ry="5" fill="url(#head)" stroke="#6a6d73" stroke-width="1"/><ellipse cx="314" cy="48" rx="12" ry="5" fill="url(#head)" stroke="#6a6d73" stroke-width="1"/><ellipse cx="376" cy="48" rx="12" ry="5" fill="url(#head)" stroke="#6a6d73" stroke-width="1"/>
+            <rect x="404" y="70" width="34" height="26" rx="2" fill="#ff8a1e" stroke="#5a2c00" stroke-width="1.5"/><line x1="404" y1="83" x2="438" y2="83" stroke="#5a2c00" stroke-width="1.2"/>
+            <text x="421" y="80" font-size="9" fill="#3a1c00" font-weight="900" text-anchor="middle">80</text><text x="421" y="93" font-size="9" fill="#3a1c00" font-weight="900" text-anchor="middle">1830</text>
+            <text x="205" y="94" font-size="21" fill="#E2231A" font-weight="900" font-family="Segoe UI">SUTEE</text>
+            <rect x="150" y="104" width="36" height="10" rx="2" fill="#2f2f33"/>
+            <path d="M56 60 q4 -16 24 -16 h42 v70 h-90 v-36 q0 -10 8 -18 z" fill="url(#cabg)" stroke="#7c0f09" stroke-width="1"/>
+            <path d="M82 44 h32 v-8 q-17 -2 -32 8 z" fill="#ff6b5e"/><path d="M90 50 h28 v24 h-46 q2 -16 18 -24 z" fill="url(#glass)"/>
+            <path d="M58 74 v42" stroke="#8f110a" stroke-width="1.4"/><rect x="62" y="90" width="10" height="3" rx="1" fill="#ffb3ac"/>
+            <rect x="42" y="80" width="10" height="28" rx="2" fill="#2a2a2e"/><rect x="38" y="108" width="18" height="10" rx="2" fill="#c9ccd1"/><circle cx="47" cy="100" r="4" fill="#fff3c4"/><rect x="120" y="38" width="6" height="52" rx="2" fill="#b8bbc0"/>
+            <circle cx="90" cy="128" r="17" fill="#151517" stroke="#3a3a3e" stroke-width="1.5"/><circle cx="90" cy="128" r="8" fill="url(#rim)"/>
+            <circle cx="392" cy="128" r="16" fill="#151517" stroke="#3a3a3e" stroke-width="1.5"/><circle cx="392" cy="128" r="7.5" fill="url(#rim)"/>
+            <circle cx="424" cy="128" r="16" fill="#151517" stroke="#3a3a3e" stroke-width="1.5"/><circle cx="424" cy="128" r="7.5" fill="url(#rim)"/>
+            <circle cx="456" cy="128" r="16" fill="#151517" stroke="#3a3a3e" stroke-width="1.5"/><circle cx="456" cy="128" r="7.5" fill="url(#rim)"/>
+            <rect x="466" y="112" width="8" height="26" rx="2" fill="#E2231A"/><circle cx="470" cy="120" r="2.4" fill="#ffd24a"/><circle cx="470" cy="130" r="2.4" fill="#ff5a4d"/>
+          </svg>
+        </div>
     </div>
-    <div class="lgright">
+    <div class="lg-right">
       <h2>เข้าสู่ระบบ</h2>
-      <p class="lghint">ใช้รหัสพนักงานและ PIN ชุดเดียวกับ STT NOVA</p>
-      <label>รหัสพนักงาน</label>
-      <input id="lgEmp" type="text" autocomplete="off" inputmode="numeric">
-      <label>PIN 6 หลัก</label>
-      <input id="lgPin" type="password" autocomplete="off" inputmode="numeric">
-      <button id="lgBtn" class="btn primary block">เข้าสู่ระบบ</button>
-      <div id="lgMsg" class="lgmsg"></div>
+      <div class="sub">ใช้รหัสพนักงาน + PIN ลับส่วนตัวของคุณ (ชุดเดียวกับ STT NOVA)</div>
+      <div class="lgtabs">
+        <button class="lrole on" id="tabLogin" onclick="loginTab('login')">🔑 มี PIN แล้ว</button>
+        <button class="lrole" id="tabReg" onclick="loginTab('reg')">📝 ยังไม่มี PIN</button>
+      </div>
+      <div id="loginPin">
+        <label class="lglabel">รหัสพนักงาน</label>
+        <input type="text" id="empInput" class="pininput" placeholder="เช่น 6406013" onkeydown="if(event.key==='Enter')document.getElementById('pinInput').focus()">
+        <label class="lglabel">PIN ลับ (6 หลัก)</label>
+        <input type="password" inputmode="numeric" id="pinInput" class="pininput pin" placeholder="● ● ● ● ● ●" onkeydown="if(event.key==='Enter')submitLogin()">
+        <button class="lbtn" onclick="submitLogin()">เข้าสู่ระบบ →</button>
+        <div class="lerr" id="loginErr"></div>
+        <div class="muted" style="font-size:12px;margin-top:10px">ระบบจะจำว่าคุณคือใคร (บันทึกประวัติ) · ลืม PIN → ติดต่อผู้ดูแล</div>
+      </div>
+      <div id="loginReg" style="display:none">
+        <div class="muted" style="font-size:13.5px;line-height:1.7">
+          <b style="color:#fff">ลงทะเบียนที่ STT NOVA ที่เดียว</b><br>
+          ทะเบียนผู้ใช้กับ PIN ใช้ร่วมกันทั้ง 2 ระบบ — ระบบเคลม<b>อ่านอย่างเดียว ไม่สร้าง PIN เอง</b>
+          เพื่อไม่ให้มีทะเบียนคนใช้ 2 ชุดที่ไม่ตรงกัน<br><br>
+          ไปที่ STT NOVA → แท็บ <b>“📝 ลงทะเบียนครั้งแรก”</b> → ใส่รหัสพนักงาน + ชื่อ-นามสกุล
+          → ระบบให้ PIN 6 หลัก → กลับมาใช้ PIN นั้นเข้าที่นี่ได้เลย
+        </div>
+        <div class="muted" style="font-size:12px;margin-top:12px">ถ้าลงทะเบียนแล้วยังเข้าไม่ได้ = ยังไม่ได้กำหนดสิทธิ์งานเคลม ติดต่อผู้ดูแล</div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ══════ ตัวโปรแกรม ══════ -->
+<!-- ═══════ ตัวโปรแกรม ═══════ -->
 <div id="app" style="display:none">
-  <div class="topbar noprint">
-    <div class="tbname">STT CLAIM</div>
-    <span class="ver" id="verBadge">v?</span>
-    <a href="#" onclick="go('home');return false" class="tblink">หน้าแรก</a>
-    <a href="#" onclick="go('list');return false" class="tblink">ทะเบียนเอกสาร</a>
-    <span class="sp"></span>
-    <span id="whoami" class="tbwho"></span>
-    <button class="btn ghost sm" onclick="refreshData()">รีเฟรช</button>
-    <button class="btn ghost sm" onclick="logout()">ออกจากระบบ</button>
+  <div class="top noprint">
+    <div class="brand">
+      <img class="logo" alt="SUTEE" src="data:image/png;base64,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">
+      <div class="div"></div>
+      <div class="app"><b>STT CLAIM</b><span>งานเคลม · ตรวจรับสินค้า</span></div>
+    </div>
+    <div class="right">
+      <a href="#" onclick="go('home');return false" class="tblink">หน้าแรก</a>
+      <a href="#" onclick="go('list');return false" class="tblink">ทะเบียนเอกสาร</a>
+      <span class="ver" id="verBadge">v?</span>
+      <span id="whoami" class="who"></span>
+      <button class="btn ghost" onclick="refreshData()">🔄 รีเฟรช</button>
+      <button class="btn ghost" onclick="logout()">🚪 ออกจากระบบ</button>
+    </div>
   </div>
-  <div id="view" class="view"></div>
+  <div id="view" class="wrap"></div>
 </div>
 
 <?!= include('js-core'); ?>

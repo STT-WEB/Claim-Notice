@@ -17,54 +17,45 @@ function newClaimForm(){
 
 function drawForm(title){
   var t = '';
-  t += '<div class="card"><h3>' + esc(title) + '</h3>';
+  t += '<div class="card tight"><div class="cardhd"><h3>' + esc(title) + '</h3>' +
+       '<span class="sub">ใบแจ้งเคลมรอบแรก ไม่มีเรื่องราคา · ราคาจะใส่ทีหลังในใบเรียกเก็บค่าเคลม</span>' +
+       '<button class="btn" id="saveBtn" onclick="submitClaim()">💾 บันทึกใบแจ้งเคลม</button></div>';
   t += '<div id="fmsg"></div>';
-  t += '<div class="grid2">';
-  t += '<div>';
-  t += fld('ประเภทการเคลม', '<select id="f_claimType">' +
-        '<option value="after">หลังส่งมอบ (After-Sales)</option>' +
-        '<option value="pre">ก่อนส่งมอบ (Pre-Delivery)</option></select>');
-  t += fld('พื้นที่', '<select id="f_area" onchange="areaChanged()">' +
-        '<option value="dom">ในประเทศ</option>' +
-        '<option value="for">ต่างประเทศ</option></select>');
-  t += '<div id="f_fkwrap" style="display:none">' + fld('ชนิดงานต่างประเทศ',
-        '<select id="f_foreignKind"><option value="equip">อุปกรณ์ (ผ่านสโตร์)</option>' +
-        '<option value="tanker">Tankers ทั้งใบ (ไม่ผ่านสโตร์)</option></select>') + '</div>';
-  t += fld('เลขที่ JOB <span class="hint">(พิมพ์แล้วกดออกจากช่อง ระบบจะเด้งข้อมูลรถให้)</span>',
-        '<input id="f_jobNo" placeholder="เช่น JT-69/0009" onblur="jobLookup()">');
-  t += fld('ชื่อลูกค้า', '<input id="f_jobName">');
-  t += fld('MODEL', '<input id="f_model">');
-  t += '</div><div>';
-  t += fld('CHASSIS NO. (ฝั่ง STT)', '<input id="f_chassisStt">');
-  t += fld('CHASSIS NO. (ฝั่งผู้ผลิต)', '<input id="f_chassisMaker">');
-  t += fld('SERIAL NO.', '<input id="f_serialNo">');
-  t += fld('JMC ที่ผูก <span class="hint">(เว้นว่างได้ เติมทีหลัง)</span>', '<input id="f_jmc">');
-  t += fld('เลขใบส่งมอบ', '<input id="f_deliveryNote">');
-  t += fld('แผนกที่ขอเคลม', '<input id="f_dept">');
-  t += fld('วันที่ต้องการของ <span class="hint">(DD/MM/YYYY)</span>', '<input id="f_wantDate" placeholder="13/03/2026">');
-  t += '</div></div></div>';
+  t += '<div class="fgrid">';
+  t += fr('ประเภทการเคลม', '<select id="f_claimType"><option value="after">หลังส่งมอบ (After-Sales)</option><option value="pre">ก่อนส่งมอบ (Pre-Delivery)</option></select>');
+  t += fr('เลขที่ JOB', '<input id="f_jobNo" placeholder="JT-69/0009" onblur="jobLookup()">');
+  t += fr('ชื่อลูกค้า', '<input id="f_jobName">');
 
-  t += '<div class="card"><h3>รายการที่เคลม</h3>';
-  t += '<div class="hint" style="margin-bottom:8px">ใบแจ้งเคลมรอบแรก <b>ไม่มีเรื่องราคา</b> — ราคาจะใส่ทีหลังในใบเรียกเก็บค่าเคลม</div>';
+  t += fr('พื้นที่', '<select id="f_area" onchange="areaChanged()"><option value="dom">ในประเทศ</option><option value="for">ต่างประเทศ</option></select>');
+  t += fr('MODEL', '<input id="f_model">');
+  t += fr('SERIAL NO.', '<input id="f_serialNo">');
+
+  t += '<div id="f_fkwrap" style="display:none">' + fr('ชนิดงาน ตปท.', '<select id="f_foreignKind"><option value="equip">อุปกรณ์ (ผ่านสโตร์)</option><option value="tanker">Tankers (ไม่ผ่านสโตร์)</option></select>') + '</div>';
+  t += fr('CHASSIS <i>STT</i>', '<input id="f_chassisStt">');
+  t += fr('CHASSIS <i>ผู้ผลิต</i>', '<input id="f_chassisMaker">');
+
+  t += fr('JMC ที่ผูก', '<input id="f_jmc" placeholder="เว้นว่างได้ เติมทีหลัง">');
+  t += fr('เลขใบส่งมอบ', '<input id="f_deliveryNote">');
+  t += fr('แผนกที่ขอเคลม', '<input id="f_dept">');
+  t += fr('วันที่ต้องการของ', '<input id="f_wantDate" placeholder="DD/MM/YYYY">');
+  t += '</div></div>';
+
+  t += '<div class="card tight"><div class="cardhd"><h3>รายการที่เคลม</h3>' +
+       '<span class="sub">จำนวนใส่มายังไงเก็บตามนั้น ไม่ปัดเอง · วันที่ DD/MM/YYYY</span>' +
+       '<button class="btn ghost" onclick="addRow()">+ เพิ่มแถว</button>' +
+       '<button class="btn ghost" onclick="translateAll()">🌐 แปลไทย → EN</button></div>';
   t += '<div style="overflow-x:auto"><table class="t" id="itab"><thead><tr>' +
-       '<th style="width:34px">ที่</th><th style="width:110px">รหัสสินค้า</th><th style="width:170px">ชื่อสินค้า</th>' +
+       '<th style="width:30px">ที่</th><th style="width:104px">รหัสสินค้า</th><th style="width:160px">ชื่อสินค้า</th>' +
        '<th>รายละเอียดการเคลม (ไทย)</th><th>Claim description (EN)</th>' +
-       '<th style="width:64px">จำนวน</th><th style="width:70px">หน่วย</th>' +
-       '<th style="width:120px">PO</th><th style="width:180px">Supplier</th>' +
-       '<th style="width:104px">วันรับสินค้า</th><th style="width:32px"></th></tr></thead><tbody></tbody></table></div>';
-  t += '<div style="margin-top:9px;display:flex;gap:8px">' +
-       '<button class="btn" onclick="addRow()">+ เพิ่มแถว</button>' +
-       '<button class="btn" onclick="translateAll()">แปลไทย → อังกฤษ ทุกแถว</button>' +
-       '<span class="sp"></span>' +
-       '<button class="btn primary" id="saveBtn" onclick="submitClaim()">บันทึกใบแจ้งเคลม</button></div>';
-  t += '<div class="hint" style="margin-top:6px">กติกา: จำนวนใส่มายังไงเก็บตามนั้น ไม่ปัดเอง · วันที่ DD/MM/YYYY เสมอ</div>';
+       '<th style="width:56px">จำนวน</th><th style="width:62px">หน่วย</th>' +
+       '<th style="width:110px">PO</th><th style="width:170px">Supplier</th>' +
+       '<th style="width:98px">วันรับสินค้า</th><th style="width:28px"></th></tr></thead><tbody></tbody></table></div>';
   t += '</div>';
   $('view').innerHTML = t;
   renderRows();
 }
-function fld(label, ctrl){
-  return '<div class="fld"><label>' + label + '</label>' + ctrl + '</div>';
-}
+function fr(label, ctrl){ return '<div class="frow"><label>' + label + '</label>' + ctrl + '</div>'; }
+function fld(label, ctrl){ return '<div class="fld"><label>' + label + '</label>' + ctrl + '</div>'; }
 function areaChanged(){
   $('f_fkwrap').style.display = ($('f_area').value === 'for') ? '' : 'none';
 }
@@ -153,11 +144,11 @@ function submitClaim(){
   };
   $('saveBtn').disabled = true; $('saveBtn').textContent = 'กำลังบันทึก…';
   srv('createClaim', [h, AUTH], function(r){
-    $('saveBtn').disabled = false; $('saveBtn').textContent = 'บันทึกใบแจ้งเคลม';
+    $('saveBtn').disabled = false; $('saveBtn').textContent = '💾 บันทึกใบแจ้งเคลม';
     if (!r || !r.ok){ $('fmsg').innerHTML = '<div class="msg bad">บันทึกไม่สำเร็จ</div>'; return; }
     go('claim', r.docNo);
   }, function(m){
-    $('saveBtn').disabled = false; $('saveBtn').textContent = 'บันทึกใบแจ้งเคลม';
+    $('saveBtn').disabled = false; $('saveBtn').textContent = '💾 บันทึกใบแจ้งเคลม';
     $('fmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>';
   });
 }
@@ -229,29 +220,22 @@ function openClaim(docNo){
 }
 function row(k, v){ return '<div class="fld"><label>' + esc(k) + '</label><div><b>' + esc(v || '—') + '</b></div></div>'; }
 
-/* ─── ผูกปุ่มเข้าสู่ระบบ ─── */
+/* ─── ตอนเปิดหน้าเว็บ ─── */
 document.addEventListener('DOMContentLoaded', function(){
-  $('lgBtn').addEventListener('click', doLogin);
-  $('lgPin').addEventListener('keydown', function(e){ if (e.key === 'Enter') doLogin(); });
-  $('lgEmp').addEventListener('keydown', function(e){ if (e.key === 'Enter') $('lgPin').focus(); });
+  // โชว์เวอร์ชันตั้งแต่หน้า login — ตรวจได้ว่า deploy เข้าจริงไหมโดยไม่ต้องล็อกอินก่อน
+  google.script.run.withSuccessHandler(function(v){ $('loginVer').textContent = 'STT CLAIM HUB · ' + v; })
+                   .withFailureHandler(function(){ $('loginVer').textContent = 'STT CLAIM HUB'; })
+                   .getVersion();
 
-  // ลองเข้าด้วยบัญชี Google ของบริษัทก่อน (เบียร์/พี่แบล็ค ไม่ต้องมี PIN)
-  $('lgMsg').innerHTML = '<span class="spin"></span> กำลังตรวจบัญชี Google…';
+  // ลองเข้าด้วยบัญชี Google ของบริษัทก่อน (เบียร์/พี่แบล็ค ไม่ต้องใส่ PIN)
+  $('loginErr').innerHTML = '<span class="spin"></span> กำลังตรวจบัญชี Google…';
   google.script.run
     .withSuccessHandler(function(r){
-      if (r && r.ok){
-        AUTH = null;                       // ไม่มี PIN — ฝั่ง server จะรู้จักจากอีเมลเอง
-        ME = { name:r.name, role:r.role };
-        $('login').style.display = 'none';
-        $('app').style.display = '';
-        $('whoami').textContent = r.name + ' · ' + r.role + ' (บัญชี Google)';
-        go('home');
-        return;
-      }
-      $('lgMsg').textContent = '';
-      $('lgEmp').focus();
+      $('loginErr').textContent = '';
+      if (r && r.ok){ AUTH = null; enterApp(r, 'บัญชี Google'); return; }
+      $('empInput').focus();
     })
-    .withFailureHandler(function(){ $('lgMsg').textContent = ''; $('lgEmp').focus(); })
+    .withFailureHandler(function(){ $('loginErr').textContent = ''; $('empInput').focus(); })
     .loginByEmail();
 });
 </script>
