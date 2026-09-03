@@ -151,3 +151,55 @@ table.t textarea{min-height:34px;resize:vertical}
   @page{margin:0}
 }
 </style>
+<style>
+/* ═══ รูปหลักฐาน — ต้องเห็นชัดทุกหน้า ═══ */
+.phwrap{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
+.phcell{position:relative;width:150px;height:112px;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fafafb}
+.phcell img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in;transition:.15s}
+.phcell img:hover{transform:scale(1.05)}
+.phcell.bad::after{content:'โหลดรูปไม่ขึ้น';position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;background:#fdeeed;color:#8f130c;font-size:11.5px}
+.phdel{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;
+  background:rgba(0,0,0,.55);color:#fff;cursor:pointer;font-size:12px;line-height:1;opacity:0;transition:.15s}
+.phcell:hover .phdel{opacity:1}
+.phdel:hover{background:var(--red)}
+.phadd{width:150px;height:112px;border:2px dashed #cfcfd4;border-radius:9px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;color:#aaa;cursor:pointer;transition:.15s;background:#fff}
+.phadd:hover{border-color:var(--red);color:var(--red);background:#fffafa}
+.phadd b{font-size:26px;line-height:1}
+.phadd span{font-size:12px;margin-top:3px}
+.phwarn{margin-top:6px;font-size:12px;color:#8f130c;background:#fdeeed;border:1px solid #e6a9a4;
+  border-radius:8px;padding:4px 10px;display:inline-block}
+.phmsg{font-size:12px;margin-top:5px;min-height:16px;color:var(--muted)}
+.phmsg.good{color:var(--ok)}
+.phmsg.bad{color:var(--red);font-weight:700}
+.phmsg.wait{color:var(--wip)}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9998;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
+.lightbox img{max-width:96%;max-height:88%;object-fit:contain;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+.lbbar{position:absolute;top:14px;right:18px;display:flex;gap:10px;align-items:center}
+.lbbar a{color:#ffd9d6;font-size:13px;text-decoration:none;background:rgba(255,255,255,.1);padding:7px 13px;border-radius:8px}
+.lbbar a:hover{background:rgba(255,255,255,.2)}
+.lbbar button{background:var(--red);color:#fff;border:none;border-radius:8px;padding:7px 15px;
+  font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.itemcard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:#fff}
+.itemcard .ihd{display:flex;gap:10px;align-items:baseline;margin-bottom:6px}
+.itemcard .ino{width:26px;height:26px;border-radius:8px;background:var(--red);color:#fff;font-weight:800;
+  display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.itemcard .inm{font-size:15px;font-weight:800}
+.itemcard .icode{font-size:12px;color:var(--muted)}
+.itemcard .idesc{font-size:13.5px;line-height:1.5;margin:4px 0 10px}
+.itemcard .ien{font-size:12px;color:#888;font-style:italic;border-top:1px dotted #eee;padding-top:4px;margin-top:4px}
+.itemcard .imeta{font-size:12px;color:var(--muted);margin-bottom:9px}
+/* ── v0.2.0 · แถบสรุปความครบของรูป ── */
+.phbar{margin-top:10px;padding:8px 12px;border-radius:9px;font-size:13px;font-weight:600;border:1px solid}
+.phbar.good{background:#eefaf1;border-color:#a9dcb8;color:#14612e}
+.phbar.bad{background:#fdeeed;border-color:#e6a9a4;color:#8f130c}
+.phnote{font-size:12.5px;color:#8f130c;background:#fdeeed;border:1px solid #e6a9a4;border-radius:8px;
+        padding:7px 11px;margin-top:8px;line-height:1.5}
+/* ป้ายสถานะรูปในทะเบียน */
+.pill{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:99px;
+      border:1px solid var(--line);color:var(--muted);background:#fafafb;white-space:nowrap}
+.pill.red{background:#fdeeed;border-color:#e6a9a4;color:#8f130c}
+.pill.green{background:#eefaf1;border-color:#a9dcb8;color:#14612e}
+</style>

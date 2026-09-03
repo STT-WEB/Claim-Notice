@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v0.1.5';
+var VERSION = 'v0.2.0';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -553,7 +553,7 @@ function getClaim(docNo, auth){
     }
   }
   items.sort(function(a,b){ return a.seq - b.seq; });
-  return { head:head, items:items };
+  return { head:head, items:items, photos:listPhotos(docNo, auth) };
 }
 
 /** ทะเบียนเอกสารทั้งหมด */
@@ -564,6 +564,7 @@ function listClaims(filter, auth){
   if (lr < 2) return [];
   var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
   var rows = d.claims.getRange(2,1,lr-1,HDR_CLAIM.length).getDisplayValues();
+  var pho = photoCoverage_();          // v0.2.0 — รูปครบไหม ดูได้ตั้งแต่หน้าทะเบียน
   var out = [];
   for (var i = rows.length - 1; i >= 0; i--){      // ใหม่อยู่บน
     var o = claimRowObj_(hdr, rows[i]);
@@ -578,7 +579,12 @@ function listClaims(filter, auth){
       docNo:o['เลขที่เอกสาร'], docKind:o['ชนิดเอกสาร'], date:o['วันที่'],
       claimType:o['ประเภทการเคลม'], area:o['พื้นที่'],
       jobNo:o['เลขที่ JOB'], jobName:o['ชื่อลูกค้า'], model:o['MODEL'],
-      status:o['สถานะ'], by:o['สร้างโดย']
+      status:o['สถานะ'], by:o['สร้างโดย'],
+      nItem: (pho.item[o['เลขที่เอกสาร']] || 0),
+      nPhoto:(pho.photo[o['เลขที่เอกสาร']] || 0),
+      nNoPhoto:(pho.noPhoto[o['เลขที่เอกสาร']] === undefined
+                  ? (pho.item[o['เลขที่เอกสาร']] || 0)
+                  : pho.noPhoto[o['เลขที่เอกสาร']])
     });
     if (out.length >= 500) break;
   }
@@ -606,4 +612,154 @@ function clearCaches(){
 function getDbLink(auth){
   requireLogin_(auth);
   return 'https://docs.google.com/spreadsheets/d/' + dbId_() + '/edit';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   v0.2.0 — ระบบรูปถ่าย  (รูป = หลักฐาน · ไม่มีรูป เคลมไม่ได้)
+   วิธีทำงาน: ย่อรูปในเครื่องก่อนส่ง → อัปขึ้น Drive โฟลเดอร์
+   "รูป-วิดีโอ / <เลขจ๊อบ> / <เลขที่เอกสาร>" → เก็บทะเบียนไว้ในไฟล์ของเราเอง
+   (ใช้วิธีเดียวกับ saveConsignPhoto ของ NOVA ที่ใช้งานจริงมาแล้ว)
+   ═══════════════════════════════════════════════════════════════ */
+
+var HDR_PHOTO = ['เลขที่เอกสาร','รายการที่','ลำดับรูป','ชื่อไฟล์','file id','ลิงก์รูป','ลิงก์เปิดเต็ม','ใช้งาน','โดย','เมื่อ'];
+
+function photoTab_(){ 
+  var ss = SpreadsheetApp.openById(dbId_());
+  return ensureTab_(ss, 'PHOTOS_' + yearBE_(), HDR_PHOTO);
+}
+
+/** โฟลเดอร์ Drive: รูป-วิดีโอ / <เลขจ๊อบ> / <เลขที่เอกสาร>  (ชื่อโฟลเดอร์ใช้ / ได้ ไม่ต้องแปลง) */
+function mediaFolder_(jobNo, docNo){
+  var root = DriveApp.getFolderById(CFG.FOLDER_MEDIA);
+  var jn = norm_(jobNo) || 'ไม่ระบุจ๊อบ';
+  var it = root.getFoldersByName(jn);
+  var jf = it.hasNext() ? it.next() : root.createFolder(jn);
+  var dn = norm_(docNo) || 'ไม่ระบุเอกสาร';
+  var it2 = jf.getFoldersByName(dn);
+  return it2.hasNext() ? it2.next() : jf.createFolder(dn);
+}
+
+/** ลิงก์โฟลเดอร์ของใบนี้ (ให้กดเปิด Drive ไปอัปวิดีโอใหญ่ ๆ เอง) */
+function getMediaFolderLink(docNo, jobNo, auth){
+  requireLogin_(auth);
+  return 'https://drive.google.com/drive/folders/' + mediaFolder_(jobNo, docNo).getId();
+}
+
+/** บันทึกรูป 1 ใบ — dataUrl มาจากฝั่งเว็บที่ย่อรูปแล้ว */
+function savePhoto(docNo, jobNo, seq, dataUrl, fname, auth){
+  var me = requireLogin_(auth);
+  docNo = norm_(docNo); jobNo = norm_(jobNo); seq = num_(seq);
+  if (!docNo) throw new Error('ยังไม่มีเลขที่เอกสาร — บันทึกใบเคลมก่อนแล้วค่อยแนบรูป');
+
+  var m = String(dataUrl || '').match(/^data:([^;]+);base64,([\s\S]*)$/);
+  if (!m) throw new Error('ไฟล์รูปไม่ถูกต้อง');
+
+  var safe = docNo.replace(/[^\w]+/g,'-') + '_ข้อ' + seq + '_' + new Date().getTime() + '.jpg';
+  var blob = Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], norm_(fname) || safe);
+  var f = mediaFolder_(jobNo, docNo).createFile(blob);
+  try { f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch(e){}
+
+  var id  = f.getId();
+  var thumb = 'https://drive.google.com/thumbnail?id=' + id + '&sz=w1000';
+  var view  = 'https://drive.google.com/file/d/' + id + '/view';
+
+  var sh = photoTab_();
+  var no = 1, lr = sh.getLastRow();
+  if (lr > 1){
+    var v = sh.getRange(2,1,lr-1,3).getDisplayValues();
+    for (var i = 0; i < v.length; i++){
+      if (norm_(v[i][0]) === docNo && num_(v[i][1]) === seq) no = Math.max(no, num_(v[i][2]) + 1);
+    }
+  }
+  sh.appendRow([docNo, seq, no, f.getName(), id, thumb, view, 'Y', me.name, nowStamp_()]);
+  log_('savePhoto', docNo, 'ข้อ ' + seq + ' · ' + f.getName());
+  return { ok:true, id:id, thumb:thumb, view:view, seq:seq, no:no };
+}
+
+/** รูปทั้งหมดของใบนี้ (จัดกลุ่มตามรายการ) */
+function listPhotos(docNo, auth){
+  requireLogin_(auth);
+  docNo = norm_(docNo);
+  var sh = photoTab_(), lr = sh.getLastRow();
+  var out = {};
+  if (lr < 2) return out;
+  var v = sh.getRange(2,1,lr-1,HDR_PHOTO.length).getDisplayValues();
+  for (var i = 0; i < v.length; i++){
+    if (norm_(v[i][0]) !== docNo) continue;
+    if (norm_(v[i][7]).toUpperCase() === 'N') continue;          // ถูกเอาออกแล้ว
+    var s = String(num_(v[i][1]));
+    if (!out[s]) out[s] = [];
+    out[s].push({ id:v[i][4], thumb:v[i][5], view:v[i][6], name:v[i][3], by:v[i][8], at:v[i][9] });
+  }
+  return out;
+}
+
+/** เอารูปออกจากใบ — ไม่ลบไฟล์ทิ้ง แค่ปิดใช้งาน (ข้อมูลห้ามหาย) */
+function removePhoto(docNo, fileId, auth){
+  var me = requireLogin_(auth);
+  docNo = norm_(docNo); fileId = norm_(fileId);
+  var sh = photoTab_(), lr = sh.getLastRow();
+  if (lr < 2) return { ok:false };
+  var v = sh.getRange(2,1,lr-1,HDR_PHOTO.length).getDisplayValues();
+  for (var i = 0; i < v.length; i++){
+    if (norm_(v[i][0]) === docNo && norm_(v[i][4]) === fileId){
+      sh.getRange(i+2, 8).setValue('N');
+      log_('removePhoto', docNo, fileId + ' โดย ' + me.name);
+      return { ok:true };
+    }
+  }
+  return { ok:false };
+}
+
+/** นับรูปต่อรายการ — ใช้ตรวจว่า "ทุกรายการมีรูปครบไหม" ก่อนส่งเคลม */
+function photoCheck(docNo, auth){
+  requireLogin_(auth);
+  var c = getClaim(docNo, auth);
+  if (!c) return { ok:false, msg:'ไม่พบเอกสาร' };
+  var ph = listPhotos(docNo, auth);
+  var missing = [];
+  for (var i = 0; i < c.items.length; i++){
+    var s = String(c.items[i].seq);
+    if (!ph[s] || !ph[s].length) missing.push(c.items[i].seq + '. ' + c.items[i].name);
+  }
+  return {
+    ok: missing.length === 0,
+    missing: missing,
+    msg: missing.length ? ('ยังไม่มีรูปหลักฐาน ' + missing.length + ' รายการ : ' + missing.join(' · ')) : 'มีรูปครบทุกรายการแล้ว'
+  };
+}
+
+/** v0.2.0 — สรุปว่าแต่ละใบมีกี่รายการ กี่รูป และเหลืออีกกี่รายการที่ยังไม่มีรูป
+ *  อ่านทีเดียวทั้งชีต แล้วนับในหน่วยความจำ — ไม่วนอ่านทีละใบ (ช้าและกิน quota) */
+function photoCoverage_(){
+  var res = { item:{}, photo:{}, noPhoto:{} };
+  var seen = {};                                   // docNo -> { seq: true }  (รายการที่มีรูปแล้ว)
+  var d = db_();
+
+  var lrI = d.items.getLastRow();
+  if (lrI >= 2){
+    var vi = d.items.getRange(2,1,lrI-1,2).getDisplayValues();   // A=เลขที่เอกสาร B=ลำดับ
+    for (var i = 0; i < vi.length; i++){
+      var dn = norm_(vi[i][0]); if (!dn) continue;
+      res.item[dn] = (res.item[dn] || 0) + 1;
+    }
+  }
+
+  var pt = photoTab_(), lrP = pt.getLastRow();
+  if (lrP >= 2){
+    var vp = pt.getRange(2,1,lrP-1,HDR_PHOTO.length).getDisplayValues();
+    for (var k = 0; k < vp.length; k++){
+      if (norm_(vp[k][7]).toUpperCase() === 'N') continue;        // ถูกเอาออกแล้ว
+      var dn2 = norm_(vp[k][0]); if (!dn2) continue;
+      res.photo[dn2] = (res.photo[dn2] || 0) + 1;
+      if (!seen[dn2]) seen[dn2] = {};
+      seen[dn2][norm_(vp[k][1])] = true;
+    }
+  }
+
+  for (var dk in res.item){
+    var have = seen[dk] ? Object.keys(seen[dk]).length : 0;
+    res.noPhoto[dk] = Math.max(0, res.item[dk] - have);
+  }
+  return res;
 }
