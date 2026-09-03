@@ -90,5 +90,21 @@ SRC.split('\n').forEach(function(ln){
 TT('ไม่มีคำสั่งเขียนลงไฟล์ NOVA เลย', bad === 0);
 TT('readTab_ ใช้ getDisplayValues (อ่านอย่างเดียว)', /function readTab_[\s\S]{0,400}getDisplayValues/.test(SRC));
 
-console.log('ผ่าน ' + pass + ' · ไม่ผ่าน ' + fail);
+
+/* กติกา 8 — appsscript.json ต้องเป็นเว็บแอปเสมอ
+   🚨 บทเรียนจริง v0.1.3: `clasp create` ดาวน์โหลด appsscript.json ตัวเปล่าจาก Google
+   มาทับไฟล์ของเราในเครื่อง แล้ว push ตัวเปล่ากลับขึ้นไป → deployment ไม่ใช่เว็บแอป
+   → เปิด /exec ขึ้น "Sorry, unable to open the file at this time" ทั้งที่ deploy สำเร็จทุกครั้ง
+   เทสนี้จับได้ก่อน push เสมอ */
+var MANI = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'deploy', 'appsscript.json'), 'utf8'));
+TT('appsscript.json ต้องมีส่วน webapp',        !!MANI.webapp);
+T ('เว็บแอปต้องรันในนามเจ้าของ',                MANI.webapp && MANI.webapp.executeAs, 'USER_DEPLOYING');
+T ('เว็บแอปต้องเปิดให้พนักงานเข้าได้',           MANI.webapp && MANI.webapp.access, 'ANYONE');
+T ('เขตเวลาต้องเป็นไทย',                       MANI.timeZone, 'Asia/Bangkok');
+TT('ต้องเปิดบริการ Sheets',                    JSON.stringify(MANI.dependencies || {}).indexOf('sheets') >= 0);
+['spreadsheets','drive','userinfo.email','script.external_request'].forEach(function(sc){
+  TT('ต้องขอสิทธิ์ ' + sc, (MANI.oauthScopes || []).join(' ').indexOf(sc) >= 0);
+});
+
+console.log('รวมทั้งหมด: ผ่าน ' + pass + ' · ไม่ผ่าน ' + fail);
 process.exit(fail ? 1 : 0);
