@@ -1,0 +1,12 @@
+# ความลับ clasp (ห้าม commit เด็ดขาด)
+.clasprc.json
+.clasp.json
+
+# Node
+node_modules/
+
+# ไฟล์ระบบ / ชั่วคราว
+Thumbs.db
+.DS_Store
+*.tmp
+_scratch/

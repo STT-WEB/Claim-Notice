@@ -1,0 +1,257 @@
+<script>
+/* ═══ ใบแจ้งเคลม: ฟอร์มเปิดใบ · ทะเบียนเอกสาร · เปิดดู ═══ */
+var VENDORS = null;
+var FORM = { docNo:'', items:[] };
+
+function blankItem(){
+  return { code:'', name:'', th:'', en:'', qty:'', unit:'', po:'', supplier:'', recv:'', note:'' };
+}
+
+/* ─────────── ฟอร์มเปิดใบแจ้งเคลม ─────────── */
+function newClaimForm(){
+  FORM = { docNo:'', items:[blankItem(), blankItem()] };
+  drawForm('เปิดใบแจ้งเคลม (ใบใหม่)');
+  if (!VENDORS) srv('listVendors', [], function(v){ VENDORS = v || []; fillVendorList(); });
+  else fillVendorList();
+}
+
+function drawForm(title){
+  var t = '';
+  t += '<div class="card"><h3>' + esc(title) + '</h3>';
+  t += '<div id="fmsg"></div>';
+  t += '<div class="grid2">';
+  t += '<div>';
+  t += fld('ประเภทการเคลม', '<select id="f_claimType">' +
+        '<option value="after">หลังส่งมอบ (After-Sales)</option>' +
+        '<option value="pre">ก่อนส่งมอบ (Pre-Delivery)</option></select>');
+  t += fld('พื้นที่', '<select id="f_area" onchange="areaChanged()">' +
+        '<option value="dom">ในประเทศ</option>' +
+        '<option value="for">ต่างประเทศ</option></select>');
+  t += '<div id="f_fkwrap" style="display:none">' + fld('ชนิดงานต่างประเทศ',
+        '<select id="f_foreignKind"><option value="equip">อุปกรณ์ (ผ่านสโตร์)</option>' +
+        '<option value="tanker">Tankers ทั้งใบ (ไม่ผ่านสโตร์)</option></select>') + '</div>';
+  t += fld('เลขที่ JOB <span class="hint">(พิมพ์แล้วกดออกจากช่อง ระบบจะเด้งข้อมูลรถให้)</span>',
+        '<input id="f_jobNo" placeholder="เช่น JT-69/0009" onblur="jobLookup()">');
+  t += fld('ชื่อลูกค้า', '<input id="f_jobName">');
+  t += fld('MODEL', '<input id="f_model">');
+  t += '</div><div>';
+  t += fld('CHASSIS NO. (ฝั่ง STT)', '<input id="f_chassisStt">');
+  t += fld('CHASSIS NO. (ฝั่งผู้ผลิต)', '<input id="f_chassisMaker">');
+  t += fld('SERIAL NO.', '<input id="f_serialNo">');
+  t += fld('JMC ที่ผูก <span class="hint">(เว้นว่างได้ เติมทีหลัง)</span>', '<input id="f_jmc">');
+  t += fld('เลขใบส่งมอบ', '<input id="f_deliveryNote">');
+  t += fld('แผนกที่ขอเคลม', '<input id="f_dept">');
+  t += fld('วันที่ต้องการของ <span class="hint">(DD/MM/YYYY)</span>', '<input id="f_wantDate" placeholder="13/03/2026">');
+  t += '</div></div></div>';
+
+  t += '<div class="card"><h3>รายการที่เคลม</h3>';
+  t += '<div class="hint" style="margin-bottom:8px">ใบแจ้งเคลมรอบแรก <b>ไม่มีเรื่องราคา</b> — ราคาจะใส่ทีหลังในใบเรียกเก็บค่าเคลม</div>';
+  t += '<div style="overflow-x:auto"><table class="t" id="itab"><thead><tr>' +
+       '<th style="width:34px">ที่</th><th style="width:110px">รหัสสินค้า</th><th style="width:170px">ชื่อสินค้า</th>' +
+       '<th>รายละเอียดการเคลม (ไทย)</th><th>Claim description (EN)</th>' +
+       '<th style="width:64px">จำนวน</th><th style="width:70px">หน่วย</th>' +
+       '<th style="width:120px">PO</th><th style="width:180px">Supplier</th>' +
+       '<th style="width:104px">วันรับสินค้า</th><th style="width:32px"></th></tr></thead><tbody></tbody></table></div>';
+  t += '<div style="margin-top:9px;display:flex;gap:8px">' +
+       '<button class="btn" onclick="addRow()">+ เพิ่มแถว</button>' +
+       '<button class="btn" onclick="translateAll()">แปลไทย → อังกฤษ ทุกแถว</button>' +
+       '<span class="sp"></span>' +
+       '<button class="btn primary" id="saveBtn" onclick="submitClaim()">บันทึกใบแจ้งเคลม</button></div>';
+  t += '<div class="hint" style="margin-top:6px">กติกา: จำนวนใส่มายังไงเก็บตามนั้น ไม่ปัดเอง · วันที่ DD/MM/YYYY เสมอ</div>';
+  t += '</div>';
+  $('view').innerHTML = t;
+  renderRows();
+}
+function fld(label, ctrl){
+  return '<div class="fld"><label>' + label + '</label>' + ctrl + '</div>';
+}
+function areaChanged(){
+  $('f_fkwrap').style.display = ($('f_area').value === 'for') ? '' : 'none';
+}
+
+function renderRows(){
+  var tb = $('itab').getElementsByTagName('tbody')[0];
+  var h = '';
+  for (var i = 0; i < FORM.items.length; i++){
+    var it = FORM.items[i];
+    h += '<tr>' +
+      '<td class="c">' + (i+1) + '</td>' +
+      '<td><input data-k="code" data-i="' + i + '" value="' + esc(it.code) + '" onblur="goodLookup(' + i + ')"></td>' +
+      '<td><input data-k="name" data-i="' + i + '" value="' + esc(it.name) + '"></td>' +
+      '<td><textarea data-k="th" data-i="' + i + '">' + esc(it.th) + '</textarea></td>' +
+      '<td><textarea data-k="en" data-i="' + i + '">' + esc(it.en) + '</textarea></td>' +
+      '<td><input data-k="qty" data-i="' + i + '" class="r" value="' + esc(it.qty) + '"></td>' +
+      '<td><input data-k="unit" data-i="' + i + '" value="' + esc(it.unit) + '"></td>' +
+      '<td><input data-k="po" data-i="' + i + '" value="' + esc(it.po) + '"></td>' +
+      '<td><input data-k="supplier" data-i="' + i + '" list="vlist" value="' + esc(it.supplier) + '"></td>' +
+      '<td><input data-k="recv" data-i="' + i + '" value="' + esc(it.recv) + '" placeholder="DD/MM/YYYY"></td>' +
+      '<td class="c"><button class="rowbtn" onclick="delRow(' + i + ')" title="ลบแถวนี้">&#10005;</button></td>' +
+      '</tr>';
+  }
+  tb.innerHTML = h;
+  var ins = tb.querySelectorAll('input,textarea');
+  for (var k = 0; k < ins.length; k++){
+    ins[k].addEventListener('change', function(){
+      FORM.items[+this.getAttribute('data-i')][this.getAttribute('data-k')] = this.value;
+    });
+  }
+  fillVendorList();
+}
+function fillVendorList(){
+  var old = $('vlist'); if (old) old.parentNode.removeChild(old);
+  if (!VENDORS || !VENDORS.length) return;
+  var dl = document.createElement('datalist'); dl.id = 'vlist';
+  var lim = Math.min(VENDORS.length, 400), h = '';
+  for (var i = 0; i < lim; i++) h += '<option value="' + esc(VENDORS[i]) + '"></option>';
+  dl.innerHTML = h;
+  document.body.appendChild(dl);
+}
+function collect(){
+  var tb = $('itab').getElementsByTagName('tbody')[0];
+  var ins = tb.querySelectorAll('input,textarea');
+  for (var k = 0; k < ins.length; k++){
+    FORM.items[+ins[k].getAttribute('data-i')][ins[k].getAttribute('data-k')] = ins[k].value;
+  }
+}
+function addRow(){ collect(); FORM.items.push(blankItem()); renderRows(); }
+function delRow(i){ collect(); FORM.items.splice(i,1); if (!FORM.items.length) FORM.items.push(blankItem()); renderRows(); }
+
+function jobLookup(){
+  var j = $('f_jobNo').value.trim();
+  if (!j) return;
+  srv('lookupJob', [j], function(r){
+    if (!r || !r.found){ $('fmsg').innerHTML = '<div class="msg bad">ไม่พบเลขจ๊อบ ' + esc(j) + ' ในทะเบียนงาน — กรอกข้อมูลรถเองได้</div>'; return; }
+    $('fmsg').innerHTML = '<div class="msg good">พบจ๊อบ ' + esc(r.jobNo) + ' แล้ว — เด้งข้อมูลให้อัตโนมัติ</div>';
+    if (r.jobName) $('f_jobName').value = r.jobName;
+    if (r.model)   $('f_model').value   = r.model;
+    if (r.loc && String(r.loc).indexOf('ต่าง') >= 0){ $('f_area').value = 'for'; areaChanged(); }
+  }, function(m){ $('fmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; });
+}
+function goodLookup(i){ /* รอบถัดไป: ใส่รหัสแล้วเด้งชื่อ/หน่วยจาก Data Good Code */ }
+function translateAll(){ alert('ตัวแปลภาษาจะเปิดใช้ในรอบถัดไปครับ'); }
+
+function submitClaim(){
+  collect();
+  var jobNo = $('f_jobNo').value.trim();
+  if (!jobNo){ $('fmsg').innerHTML = '<div class="msg bad">ต้องระบุเลขที่ JOB ก่อน</div>'; return; }
+  var any = false;
+  for (var i = 0; i < FORM.items.length; i++){
+    if (String(FORM.items[i].name).trim() || String(FORM.items[i].code).trim()) any = true;
+  }
+  if (!any){ $('fmsg').innerHTML = '<div class="msg bad">ต้องมีรายการที่เคลมอย่างน้อย 1 รายการ</div>'; return; }
+
+  var h = {
+    claimType : $('f_claimType').value,
+    area      : $('f_area').value,
+    foreignKind : ($('f_area').value === 'for') ? $('f_foreignKind').value : '',
+    jobNo:jobNo, jobName:$('f_jobName').value, model:$('f_model').value,
+    chassisStt:$('f_chassisStt').value, chassisMaker:$('f_chassisMaker').value,
+    serialNo:$('f_serialNo').value, jmc:$('f_jmc').value,
+    deliveryNote:$('f_deliveryNote').value, dept:$('f_dept').value,
+    wantDate:$('f_wantDate').value,
+    items: FORM.items
+  };
+  $('saveBtn').disabled = true; $('saveBtn').textContent = 'กำลังบันทึก…';
+  srv('createClaim', [h, AUTH], function(r){
+    $('saveBtn').disabled = false; $('saveBtn').textContent = 'บันทึกใบแจ้งเคลม';
+    if (!r || !r.ok){ $('fmsg').innerHTML = '<div class="msg bad">บันทึกไม่สำเร็จ</div>'; return; }
+    go('claim', r.docNo);
+  }, function(m){
+    $('saveBtn').disabled = false; $('saveBtn').textContent = 'บันทึกใบแจ้งเคลม';
+    $('fmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>';
+  });
+}
+
+/* ─────────── ทะเบียนเอกสาร ─────────── */
+function loadList(){
+  busy(true, 'กำลังโหลดทะเบียนเอกสาร…');
+  srv('listClaims', [{}, AUTH], function(rows){
+    var t = '<div class="card"><h3>ทะเบียนเอกสาร</h3>';
+    t += '<div style="margin-bottom:10px"><button class="btn primary" onclick="go(\'newclaim\')">+ เปิดใบแจ้งเคลมใหม่</button></div>';
+    if (!rows || !rows.length){
+      t += '<div class="hint">ยังไม่มีเอกสารในระบบ</div></div>';
+      $('view').innerHTML = t; return;
+    }
+    t += '<table class="t"><thead><tr><th style="width:120px">เลขที่เอกสาร</th><th style="width:92px">วันที่</th>' +
+         '<th style="width:120px">ประเภท</th><th style="width:120px">เลขที่ JOB</th><th>ชื่อลูกค้า</th>' +
+         '<th style="width:96px">สถานะ</th><th style="width:120px">ผู้เปิด</th></tr></thead><tbody>';
+    for (var i = 0; i < rows.length; i++){
+      var r = rows[i];
+      t += '<tr style="cursor:pointer" onclick="go(\'claim\',\'' + r.docNo + '\')">' +
+        '<td><b>' + esc(r.docNo) + '</b></td><td class="c">' + esc(r.date) + '</td>' +
+        '<td>' + (r.claimType === 'pre' ? 'ก่อนส่งมอบ' : 'หลังส่งมอบ') + ' · ' + (r.area === 'for' ? 'ต่างประเทศ' : 'ในประเทศ') + '</td>' +
+        '<td>' + esc(r.jobNo) + '</td><td>' + esc(r.jobName) + '</td>' +
+        '<td class="c">' + esc(r.status) + '</td><td>' + esc(r.by) + '</td></tr>';
+    }
+    t += '</tbody></table></div>';
+    $('view').innerHTML = t;
+  });
+}
+
+/* ─────────── เปิดดูใบเคลม ─────────── */
+function openClaim(docNo){
+  busy(true, 'กำลังเปิด ' + docNo + '…');
+  srv('getClaim', [docNo, AUTH], function(c){
+    if (!c){ $('view').innerHTML = '<div class="msg bad">ไม่พบเอกสาร ' + esc(docNo) + '</div>'; return; }
+    var h = c.head;
+    var t = '<div class="card noprint"><h3>' + esc(h['เลขที่เอกสาร']) + ' — ใบแจ้งเคลมสินค้า</h3>' +
+      '<div class="grid2"><div>' +
+      row('เลขที่ JOB', h['เลขที่ JOB']) + row('ชื่อลูกค้า', h['ชื่อลูกค้า']) +
+      row('MODEL', h['MODEL']) + row('CHASSIS NO. (STT)', h['CHASSIS NO. (STT)']) +
+      row('CHASSIS NO. (ผู้ผลิต)', h['CHASSIS NO. (ผู้ผลิต)']) +
+      '</div><div>' +
+      row('วันที่', h['วันที่']) +
+      row('ประเภทการเคลม', h['ประเภทการเคลม'] === 'pre' ? 'ก่อนส่งมอบ' : 'หลังส่งมอบ') +
+      row('พื้นที่', h['พื้นที่'] === 'for' ? 'ต่างประเทศ' : 'ในประเทศ') +
+      row('SERIAL NO.', h['SERIAL NO.']) + row('JMC ที่ผูก', h['JMC ที่ผูก'] || '— ยังไม่ผูก —') +
+      '</div></div>' +
+      '<div style="margin-top:10px;display:flex;gap:8px">' +
+      '<button class="btn" onclick="go(\'list\')">← กลับทะเบียน</button>' +
+      '<button class="btn dark" onclick="window.print()">🖨️ ปริ้น / บันทึกเป็น PDF</button></div>' +
+      '<div class="hint" style="margin-top:6px">แบบฟอร์มปริ้นเต็มรูปแบบ (หัวกระดาษ SUTEE · แยกใบตาม Supplier · เลขหน้า x/y) จะต่อในรอบถัดไป</div>' +
+      '</div>';
+
+    t += '<div class="card"><h3>รายการที่เคลม (' + c.items.length + ' รายการ)</h3>' +
+      '<table class="t"><thead><tr><th style="width:34px">ที่</th><th style="width:110px">รหัส</th>' +
+      '<th style="width:170px">ชื่อสินค้า</th><th>รายละเอียดการเคลม</th>' +
+      '<th style="width:60px">จำนวน</th><th style="width:60px">หน่วย</th>' +
+      '<th style="width:120px">PO</th><th style="width:170px">Supplier</th><th style="width:96px">วันรับ</th></tr></thead><tbody>';
+    for (var i = 0; i < c.items.length; i++){
+      var it = c.items[i];
+      t += '<tr><td class="c">' + it.seq + '</td><td>' + esc(it.code) + '</td><td><b>' + esc(it.name) + '</b></td>' +
+        '<td>' + esc(it.th) + (it.en ? '<div class="hint"><i>' + esc(it.en) + '</i></div>' : '') + '</td>' +
+        '<td class="r">' + esc(it.qty) + '</td><td class="c">' + esc(it.unit) + '</td>' +
+        '<td>' + esc(it.po) + '</td><td>' + esc(it.supplier) + '</td><td class="c">' + esc(it.recv) + '</td></tr>';
+    }
+    t += '</tbody></table></div>';
+    $('view').innerHTML = t;
+  });
+}
+function row(k, v){ return '<div class="fld"><label>' + esc(k) + '</label><div><b>' + esc(v || '—') + '</b></div></div>'; }
+
+/* ─── ผูกปุ่มเข้าสู่ระบบ ─── */
+document.addEventListener('DOMContentLoaded', function(){
+  $('lgBtn').addEventListener('click', doLogin);
+  $('lgPin').addEventListener('keydown', function(e){ if (e.key === 'Enter') doLogin(); });
+  $('lgEmp').addEventListener('keydown', function(e){ if (e.key === 'Enter') $('lgPin').focus(); });
+
+  // ลองเข้าด้วยบัญชี Google ของบริษัทก่อน (เบียร์/พี่แบล็ค ไม่ต้องมี PIN)
+  $('lgMsg').innerHTML = '<span class="spin"></span> กำลังตรวจบัญชี Google…';
+  google.script.run
+    .withSuccessHandler(function(r){
+      if (r && r.ok){
+        AUTH = null;                       // ไม่มี PIN — ฝั่ง server จะรู้จักจากอีเมลเอง
+        ME = { name:r.name, role:r.role };
+        $('login').style.display = 'none';
+        $('app').style.display = '';
+        $('whoami').textContent = r.name + ' · ' + r.role + ' (บัญชี Google)';
+        go('home');
+        return;
+      }
+      $('lgMsg').textContent = '';
+      $('lgEmp').focus();
+    })
+    .withFailureHandler(function(){ $('lgMsg').textContent = ''; $('lgEmp').focus(); })
+    .loginByEmail();
+});
+</script>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STT CLAIM</title>
+<?!= include('styles'); ?>
+</head>
+<body>
+
+<!-- ══════ หน้าเข้าสู่ระบบ ══════ -->
+<div id="login" class="loginwrap">
+  <div class="loginbox">
+    <div class="lgleft">
+      <div class="lgbrand">
+        <div class="lgname">STT CLAIM</div>
+        <div class="lgsub">งานเคลม &amp; ตรวจรับสินค้า</div>
+      </div>
+      <div class="lgfoot">SUTEE TANKERS AND SPECIAL TRUCK</div>
+    </div>
+    <div class="lgright">
+      <h2>เข้าสู่ระบบ</h2>
+      <p class="lghint">ใช้รหัสพนักงานและ PIN ชุดเดียวกับ STT NOVA</p>
+      <label>รหัสพนักงาน</label>
+      <input id="lgEmp" type="text" autocomplete="off" inputmode="numeric">
+      <label>PIN 6 หลัก</label>
+      <input id="lgPin" type="password" autocomplete="off" inputmode="numeric">
+      <button id="lgBtn" class="btn primary block">เข้าสู่ระบบ</button>
+      <div id="lgMsg" class="lgmsg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ ตัวโปรแกรม ══════ -->
+<div id="app" style="display:none">
+  <div class="topbar noprint">
+    <div class="tbname">STT CLAIM</div>
+    <span class="ver" id="verBadge">v?</span>
+    <a href="#" onclick="go('home');return false" class="tblink">หน้าแรก</a>
+    <a href="#" onclick="go('list');return false" class="tblink">ทะเบียนเอกสาร</a>
+    <span class="sp"></span>
+    <span id="whoami" class="tbwho"></span>
+    <button class="btn ghost sm" onclick="refreshData()">รีเฟรช</button>
+    <button class="btn ghost sm" onclick="logout()">ออกจากระบบ</button>
+  </div>
+  <div id="view" class="view"></div>
+</div>
+
+<?!= include('js-core'); ?>
+<?!= include('js-claim'); ?>
+</body>
+</html>

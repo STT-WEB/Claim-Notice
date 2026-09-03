@@ -1,0 +1,90 @@
+<script>
+/* ═══ แกนกลาง: เข้าสู่ระบบ · เมนู · เรียก server ═══ */
+var AUTH = null;        // {emp, pin} — เก็บในหน่วยความจำหน้าเว็บเท่านั้น ไม่เก็บลงเครื่อง
+var ME   = null;        // {name, role}
+var CURVIEW = 'home';
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function money(v){
+  var n = Number(String(v == null ? '' : v).replace(/,/g,''));
+  if (isNaN(n) || String(v).trim() === '') return '';
+  return n.toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function busy(on, msg){
+  var v = $('view'); if (!v) return;
+  if (on) v.innerHTML = '<div class="card"><span class="spin"></span> ' + esc(msg || 'กำลังทำงาน…') + '</div>';
+}
+function srv(fn, args, ok, fail){
+  google.script.run
+    .withSuccessHandler(function(r){ try{ ok && ok(r); }catch(e){ alert('แสดงผลผิดพลาด: ' + e.message); } })
+    .withFailureHandler(function(e){
+      var m = (e && e.message) ? e.message : String(e);
+      if (fail) fail(m); else $('view').innerHTML = '<div class="msg bad">' + esc(m) + '</div>';
+    })[fn].apply(null, args || []);
+}
+
+/* ─── เข้าสู่ระบบ ─── */
+function doLogin(){
+  var emp = $('lgEmp').value.trim(), pin = $('lgPin').value.trim();
+  $('lgMsg').textContent = '';
+  if (!emp || !pin){ $('lgMsg').textContent = 'กรอกรหัสพนักงานและ PIN ให้ครบ'; return; }
+  $('lgBtn').disabled = true; $('lgBtn').textContent = 'กำลังตรวจสอบ…';
+  google.script.run
+    .withSuccessHandler(function(r){
+      $('lgBtn').disabled = false; $('lgBtn').textContent = 'เข้าสู่ระบบ';
+      if (!r || !r.ok){ $('lgMsg').textContent = (r && r.msg) || 'เข้าสู่ระบบไม่สำเร็จ'; return; }
+      AUTH = { emp:emp, pin:pin };
+      ME = { name:r.name, role:r.role };
+      $('login').style.display = 'none';
+      $('app').style.display = '';
+      $('whoami').textContent = r.name + ' · ' + r.role;
+      go('home');
+    })
+    .withFailureHandler(function(e){
+      $('lgBtn').disabled = false; $('lgBtn').textContent = 'เข้าสู่ระบบ';
+      $('lgMsg').textContent = (e && e.message) ? e.message : 'เชื่อมต่อไม่ได้';
+    })
+    .loginEmpPin(emp, pin);
+}
+function logout(){
+  AUTH = null; ME = null;
+  $('app').style.display = 'none';
+  $('login').style.display = '';
+  $('lgEmp').value = ''; $('lgPin').value = ''; $('lgMsg').textContent = '';
+}
+function refreshData(){ go(CURVIEW); }
+
+/* ─── เปลี่ยนหน้า ─── */
+function go(v, arg){
+  CURVIEW = v;
+  if (v === 'home')    return loadHome();
+  if (v === 'list')    return loadList();
+  if (v === 'newclaim')return newClaimForm(arg);
+  if (v === 'claim')   return openClaim(arg);
+  $('view').innerHTML = '<div class="msg bad">ไม่รู้จักหน้า ' + esc(v) + '</div>';
+}
+
+/* ─── หน้าแรก ─── */
+function loadHome(){
+  busy(true, 'กำลังโหลดหน้าแรก…');
+  srv('getHome', [AUTH], function(h){
+    $('verBadge').textContent = h.version;
+    var t = '';
+    t += '<div class="card"><h3>สวัสดีคุณ ' + esc(h.name) + '</h3>' +
+         '<div class="hint">สิทธิ์ของคุณในงานเคลม: <b>' + esc(h.role) + '</b> · ปีเอกสารปัจจุบัน ' + h.year + '</div></div>';
+    t += '<div class="tiles">';
+    t += tile('newclaim', '📝 เปิดใบแจ้งเคลม', 'แจ้งปัญหาให้ Supplier · ยังไม่มีเรื่องเงิน');
+    t += tile('list',     '📋 ทะเบียนเอกสาร',  'เอกสารทั้งหมด ' + h.total + ' ใบ · ร่าง ' + h.draft + ' ใบ');
+    t += '</div>';
+    t += '<div class="card" style="margin-top:16px"><h3>ยังไม่เปิดใช้ในเวอร์ชันนี้</h3><div class="hint">' +
+         'ใบเรียกเก็บค่าเคลม · ใบตรวจรับแท็งค์ (Inspection) · รูป/วิดีโอขึ้น Drive · สายอนุมัติและลายเซ็นระบบ · สรุปต้นทุน JMC' +
+         '<br>กำลังทยอยทำตามแผน รอบต่อ ๆ ไป</div></div>';
+    $('view').innerHTML = t;
+  });
+}
+function tile(v, title, sub){
+  return '<div class="tile" onclick="go(\'' + v + '\')"><b>' + title + '</b><span>' + esc(sub) + '</span></div>';
+}
+</script>
