@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v0.1.1';
+var VERSION = 'v0.1.2';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -115,20 +115,33 @@ function readTab_(fileId, tabName){
 }
 
 /* ─────────── ผู้ใช้ + สิทธิ์ (อ่านจาก USERS ของ NOVA) ─────────── */
-var ROLES = ['ADMIN','APPROVER','PRODUCTION','QC','DESIGN','STORE','PURCHASE','HR','PICKER','GUEST'];
+var ROLES = ['ADMIN','APPROVER','PURCHASE','STORE','QC','PRODUCTION','DESIGN','SALES','HR','PICKER','GUEST'];
 
-function normRole_(v){
+/** 1 คนมีได้หลายสิทธิ์ — ในชีตเขียนคั่นกันได้ เช่น "Sales / Production / QC"
+ *  คืนเป็น "รายการสิทธิ์ทั้งหมด" ไม่ใช่ตัวเดียว ไม่งั้นสิทธิ์ที่เหลือหายเงียบ ๆ */
+function rolesOf_(v){
   var s = norm_(v).toLowerCase();
-  if (!s) return 'GUEST';
-  if (/admin|ผู้บริหาร|exec|ผบห/.test(s)) return 'ADMIN';
-  if (/approve|อนุมัติ/.test(s))          return 'APPROVER';
-  if (/hr|บุคคล/.test(s))                 return 'HR';
-  if (/qc|คุณภาพ/.test(s))                return 'QC';
-  if (/design|ออกแบบ|เขียนแบบ/.test(s))    return 'DESIGN';
-  if (/purchase|จัดซื้อ/.test(s))          return 'PURCHASE';
-  if (/store|สโตร์|คลัง/.test(s))          return 'STORE';
-  if (/product|ผลิต/.test(s))             return 'PRODUCTION';
-  if (/pick|เบิก/.test(s))                return 'PICKER';
+  if (!s) return [];
+  var out = [];
+  function add(r){ if (out.indexOf(r) < 0) out.push(r); }
+  if (/admin|exec|ผู้บริหาร|ผบห/.test(s)) add('ADMIN');
+  if (/approve|อนุมัติ/.test(s))          add('APPROVER');
+  if (/purchase|จัดซื้อ/.test(s))          add('PURCHASE');
+  if (/store|สโตร์|คลัง/.test(s))          add('STORE');
+  if (/\bqc\b|คุณภาพ/.test(s))            add('QC');
+  if (/product|ผลิต/.test(s))             add('PRODUCTION');
+  if (/design|ออกแบบ|เขียนแบบ/.test(s))    add('DESIGN');
+  if (/sale|ขาย/.test(s))                 add('SALES');
+  if (/\bhr\b|บุคคล/.test(s))             add('HR');
+  if (/pick|เบิก/.test(s))                add('PICKER');
+  return out;
+}
+
+/** สิทธิ์หลัก (ไว้โชว์ชื่อ) = ตัวที่สูงสุดตามลำดับใน ROLES */
+function normRole_(v){
+  var rs = rolesOf_(v);
+  if (!rs.length) return 'GUEST';
+  for (var i = 0; i < ROLES.length; i++) if (rs.indexOf(ROLES[i]) >= 0) return ROLES[i];
   return 'GUEST';
 }
 
@@ -160,6 +173,7 @@ function getUsers_(){
       email : norm_(iMail >= 0 ? v[iMail] : '').toLowerCase(),
       name  : norm_(iName >= 0 ? v[iName] : ''),
       role  : normRole_(iRole >= 0 ? v[iRole] : ''),
+      roles : rolesOf_(iRole >= 0 ? v[iRole] : []),
       roleRaw: norm_(iRole >= 0 ? v[iRole] : ''),
       active: norm_(iAct >= 0 ? v[iAct] : 'Y').toUpperCase() !== 'N',
       pin   : norm_(iPin >= 0 ? v[iPin] : ''),
@@ -183,8 +197,8 @@ function loginEmpPin(emp, pin){
     if (us[i].emp && us[i].emp === emp && us[i].pin && us[i].pin === pin){
       if (!us[i].active) return { ok:false, msg:'รหัสพนักงานนี้ถูกปิดการใช้งานแล้ว' };
       if (us[i].role === 'GUEST') return { ok:false, msg:'ยังไม่ได้กำหนดสิทธิ์งานเคลมให้รหัสนี้ (ช่อง role for Claim ในชีต USERS ว่างอยู่)' };
-      log_('login', emp, us[i].name + ' / ' + us[i].role);
-      return { ok:true, name:us[i].name, role:us[i].role, emp:us[i].emp };
+      log_('login', emp, us[i].name + ' / ' + us[i].roles.join(','));
+      return { ok:true, name:us[i].name, role:us[i].role, roles:us[i].roles, emp:us[i].emp };
     }
   }
   return { ok:false, msg:'รหัสพนักงานหรือ PIN ไม่ถูกต้อง' };
@@ -197,8 +211,8 @@ function whoAmI_(auth){
     if (r.ok) return { name:r.name, role:r.role, emp:r.emp };
   }
   var em = getEmail_();
-  if (em && AUTO_ADMIN.indexOf(em) >= 0) return { name:em.split('@')[0], role:'ADMIN', emp:'' };
-  return { name:'', role:'GUEST', emp:'' };
+  if (em && AUTO_ADMIN.indexOf(em) >= 0) return { name:em.split('@')[0], role:'ADMIN', roles:['ADMIN'], emp:'' };
+  return { name:'', role:'GUEST', roles:[], emp:'' };
 }
 
 /** เข้าระบบด้วยบัญชี Google ของบริษัท (เบียร์ + พี่แบล็ค) — ไม่ต้องมี PIN
@@ -209,14 +223,14 @@ function loginByEmail(){
     var nm = em.split('@')[0];
     var us = getUsers_();
     for (var i = 0; i < us.length; i++) if (us[i].email === em && us[i].name) { nm = us[i].name; break; }
-    return { ok:true, name:nm, role:'ADMIN', emp:'', via:'google' };
+    return { ok:true, name:nm, role:'ADMIN', roles:['ADMIN'], emp:'', via:'google' };
   }
   return { ok:false, email:em };
 }
 
 function getContext(auth){
   var me = whoAmI_(auth);
-  return { version:VERSION, name:me.name, role:me.role, emp:me.emp, year:yearBE_() };
+  return { version:VERSION, name:me.name, role:me.role, roles:me.roles || [], emp:me.emp, year:yearBE_() };
 }
 
 /* ─────────── ข้อมูลจ๊อบ (อ่านจาก MASTER — All WIP JT/JM) ─────────── */
@@ -415,9 +429,10 @@ function requireLogin_(auth){
 }
 function requireAny_(auth, roles){
   var me = requireLogin_(auth);
-  if (me.role === 'ADMIN') return me;
-  if (roles.indexOf(me.role) < 0) throw new Error('สิทธิ์ของคุณ (' + me.role + ') ทำรายการนี้ไม่ได้');
-  return me;
+  var mine = me.roles && me.roles.length ? me.roles : [me.role];
+  if (mine.indexOf('ADMIN') >= 0) return me;
+  for (var i = 0; i < mine.length; i++) if (roles.indexOf(mine[i]) >= 0) return me;
+  throw new Error('สิทธิ์ของคุณ (' + mine.join(', ') + ') ทำรายการนี้ไม่ได้');
 }
 
 /* ─────────── สร้าง / อ่าน / บันทึก ใบเคลม ─────────── */
@@ -577,7 +592,7 @@ function getHome(auth){
   try { list = listClaims({}, auth); } catch(e){}
   var draft = 0;
   for (var i = 0; i < list.length; i++) if (list[i].status === 'DRAFT') draft++;
-  return { version:VERSION, name:me.name, role:me.role, total:list.length, draft:draft, year:yearBE_() };
+  return { version:VERSION, name:me.name, role:me.role, roles:me.roles || [], total:list.length, draft:draft, year:yearBE_() };
 }
 
 /** ล้างแคช (ปุ่มรีเฟรช) */

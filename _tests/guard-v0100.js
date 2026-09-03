@@ -46,16 +46,28 @@ T('ไม่เจอ คืน -1',                sandbox.colIdx_(hdr, ['ไ�
 var hdr2 = ['(ว่าง)','email','ใหม่แทรก','display_name','role for NOVA BOM','role for Claim','active','PIN','รหัสพนักงาน'];
 T('แทรกคอลัมน์แล้วยังหาเจอ',      sandbox.colIdx_(hdr2, ['role for claim']), 5);
 
-/* กติกา 4 — แปลงคำในชีตเป็นรหัสสิทธิ์ ต้องได้ผลเดิมเสมอ */
-T('ผู้บริหาร → ADMIN',    sandbox.normRole_('ผู้บริหาร'), 'ADMIN');
-T('Purchase → PURCHASE',  sandbox.normRole_('Purchase'), 'PURCHASE');
-T('จัดซื้อ → PURCHASE',   sandbox.normRole_('จัดซื้อ'), 'PURCHASE');
-T('สโตร์ → STORE',        sandbox.normRole_('สโตร์'), 'STORE');
-T('QC → QC',              sandbox.normRole_('QC'), 'QC');
-T('Design → DESIGN',      sandbox.normRole_('Design'), 'DESIGN');
-T('HR → HR',              sandbox.normRole_('HR'), 'HR');
-T('ว่าง → GUEST',         sandbox.normRole_(''), 'GUEST');
-T('คำแปลก → GUEST',       sandbox.normRole_('อะไรก็ไม่รู้'), 'GUEST');
+/* กติกา 4 — แปลงคำในชีตเป็นรหัสสิทธิ์
+   ⚠️ ทดสอบด้วย "ค่าที่มีอยู่จริงในชีต USERS" ทั้ง 9 แบบ ไม่ใช่ค่าที่คิดขึ้นเอง */
+T('ADMIN_EXEC → ADMIN',            sandbox.normRole_('ADMIN_EXEC'), 'ADMIN');
+T('EXEC → ADMIN',                  sandbox.normRole_('EXEC'), 'ADMIN');
+T('Production → PRODUCTION',       sandbox.normRole_('Production'), 'PRODUCTION');
+T('PURCHASE → PURCHASE',           sandbox.normRole_('PURCHASE'), 'PURCHASE');
+T('QC → QC',                       sandbox.normRole_('QC'), 'QC');
+T('STORE → STORE',                 sandbox.normRole_('STORE'), 'STORE');
+T('Design & Estimate → DESIGN',    sandbox.normRole_('Design & Estimate'), 'DESIGN');
+T('ว่าง → GUEST',                   sandbox.normRole_(''), 'GUEST');
+T('คำแปลก → GUEST',                 sandbox.normRole_('อะไรก็ไม่รู้'), 'GUEST');
+
+/* กติกา 4b — 1 คนมีได้หลายสิทธิ์ ต้องได้ครบ ไม่ใช่เหลือตัวเดียว
+   เคสจริงในชีต: "Sales / Production / QC" — ถ้าคืนแค่ QC สิทธิ์ผลิตกับขายหายเงียบ */
+var multi = sandbox.rolesOf_('Sales / Production / QC');
+TT('Sales/Production/QC → ได้ SALES',      multi.indexOf('SALES') >= 0);
+TT('Sales/Production/QC → ได้ PRODUCTION', multi.indexOf('PRODUCTION') >= 0);
+TT('Sales/Production/QC → ได้ QC',         multi.indexOf('QC') >= 0);
+T('Sales/Production/QC → ได้ครบ 3 สิทธิ์',  multi.length, 3);
+T('ADMIN_EXEC ได้สิทธิ์เดียว',              sandbox.rolesOf_('ADMIN_EXEC').length, 1);
+T('ว่าง → ไม่มีสิทธิ์เลย',                   sandbox.rolesOf_('').length, 0);
+TT('QC ต้องไม่ไปโดนคำอื่นที่มี qc ปน',       sandbox.rolesOf_('Purchase').indexOf('QC') < 0);
 
 /* กติกา 5 — อ่านประเภทงานจากเลขจ๊อบได้ถูก รวมถึงเลขแปลก ๆ ที่มีจริงในระบบ */
 T('JT', sandbox.typeFromJobNo_('JT-69/0009'), 'JT');
