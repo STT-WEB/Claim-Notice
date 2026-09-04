@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v0.6.3';
+var VERSION = 'v0.6.4';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -39,7 +39,12 @@ var POREPORT = {
 var AUTO_ADMIN = ['sasipa@suteetankers.com','boriphat@suteetankers.com'];
 
 /* ─────────── หน้าเว็บ ─────────── */
-function doGet() {
+function doGet(e) {
+  /* ?check=1 → หน้าตรวจว่า "โค้ดที่ deploy อยู่จริง" มีอะไรบ้าง
+     ไม่ต้องล็อกอิน · ไม่มีข้อมูลธุรกิจสักตัว · คืนแค่รายชื่อฟังก์ชันกับขนาดไฟล์
+     มีไว้เพราะ Candy ตรวจของที่ขึ้นระบบแล้วเองไม่ได้ ต้องรบกวนเบียร์ทุกรอบ ซึ่งเสียเวลา */
+  if (e && e.parameter && e.parameter.check === '1') return deployCheck_();
+
   return HtmlService.createTemplateFromFile('CLAIM-Index').evaluate()
     .setTitle('STT CLAIM — งานเคลม / ตรวจรับ')
     .addMetaTag('viewport','width=device-width, initial-scale=1')
@@ -744,3 +749,60 @@ function photoCheck(docNo, auth){
 
 /* photoCoverage_ ย้ายไปอยู่ CLAIM-More.js แล้ว (v0.3.0) */
 
+/* ═══════════ ตรวจตัวเอง (v0.6.4) ═══════════
+ * เปิด <URL ระบบ>?check=1 แล้วอ่านผลได้เลย ไม่ต้องล็อกอิน
+ * ตอบว่า "ไฟล์ที่ deploy อยู่ตอนนี้ มีของที่ควรมีครบไหม"
+ * ปลอดภัย: อ่านเฉพาะโค้ดของตัวเอง ไม่แตะฐานข้อมูล ไม่คืนข้อมูลลูกค้า/ราคา/ผู้ใช้ */
+var DEPLOY_MARKERS = {
+  'js-core'   : ['var CLIENT_VER', 'function bindAll', 'function checkVer', 'stalebar'],
+  'js-grid'   : ['function makeGrid', 'function gridPaste', 'function gridTranslate'],
+  'js-flow'   : ['function flowBar(', 'function flowBarNew', 'function applyLocks'],
+  'js-claim'  : ['t += flowBarNew()', 'function openClaim', 'function claimCols', 'สถานที่ผลิต'],
+  'js-inspect': ['function openInspection', 'function inspTranslate'],
+  'js-report' : ['function loadRepMedia', 'function loadRepCost'],
+  'js-print'  : ['function openPrint', 'picbig', 'function blkPhotos'],
+  'styles'    : ['.flowwrap', '.picbig', '.stalebar', '.xt ']
+};
+
+function deployCheck_(){
+  var out = { version: VERSION, checkedAt: nowStamp_(), files: {}, problems: [] };
+
+  var clientVer = '';
+  for (var f in DEPLOY_MARKERS){
+    var body = '';
+    try { body = HtmlService.createHtmlOutputFromFile(f).getContent(); }
+    catch(err){ out.problems.push('เปิดไฟล์ ' + f + ' ไม่ได้ — ' + err.message); out.files[f] = 'MISSING'; continue; }
+
+    var miss = [];
+    for (var i = 0; i < DEPLOY_MARKERS[f].length; i++){
+      if (body.indexOf(DEPLOY_MARKERS[f][i]) < 0) miss.push(DEPLOY_MARKERS[f][i]);
+    }
+    out.files[f] = { bytes: body.length, missing: miss };
+    if (miss.length) out.problems.push('ไฟล์ ' + f + ' ขาด: ' + miss.join(' · '));
+
+    if (f === 'js-core'){
+      var m = body.match(/var CLIENT_VER = '([^']+)'/);
+      clientVer = m ? m[1] : '';
+    }
+  }
+
+  out.clientVer = clientVer || '(หาไม่เจอ)';
+  if (clientVer && clientVer !== VERSION){
+    out.problems.push('เวอร์ชันไม่ตรง — เซิร์ฟเวอร์ ' + VERSION + ' แต่หน้าเว็บ ' + clientVer);
+  }
+
+  /* ฟังก์ชันหลังบ้านที่ต้องมี — เช็คว่าไฟล์ .js ขึ้นครบทุกไฟล์จริง */
+  var need = ['createClaimWithPhotos','claimFlow','advanceClaim','rejectClaim',
+              'createInspection','sendUnAccToClaim','translateBatch','lookupGoods',
+              'reportMedia','reportCost','savePhoto'];
+  var noFn = [];
+  for (var k = 0; k < need.length; k++){
+    if (typeof this[need[k]] !== 'function') noFn.push(need[k]);
+  }
+  if (noFn.length) out.problems.push('ฟังก์ชันหลังบ้านหาย: ' + noFn.join(' · '));
+  out.backendOk = !noFn.length;
+
+  out.result = out.problems.length ? 'พบปัญหา ' + out.problems.length + ' ข้อ' : 'ผ่านหมด — ของที่ deploy ครบตรงตามที่ควรเป็น';
+  return ContentService.createTextOutput(JSON.stringify(out, null, 1))
+                       .setMimeType(ContentService.MimeType.JSON);
+}
