@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="utf-8">
+<title>ออกแบบ Official Claim Letter — STT CLAIM</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#e9ecef;font-family:"TH Sarabun New","Sarabun","Segoe UI",Tahoma,sans-serif;
+     font-size:15px;color:#141414}
+.bar{position:sticky;top:0;z-index:60;background:#141414;color:#fff;padding:10px 16px;
+     display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bar b{font-size:16px;margin-right:8px}
+.bar .lb{color:#999;font-size:12.5px;margin-left:10px}
+.bar button{background:#2a2a2a;color:#ddd;border:1px solid #444;border-radius:7px;
+            padding:6px 13px;cursor:pointer;font-family:inherit;font-size:14px}
+.bar button.on{background:#A32D2D;color:#fff;font-weight:700}
+.bar .sp{flex:1}
+.note{background:#fff8e1;border-left:5px solid #E8A33D;padding:12px 16px;margin:14px auto;
+      max-width:900px;border-radius:0 8px 8px 0;font-size:13.5px;line-height:1.65}
+.note b{color:#A32D2D}
+.note ul{margin:6px 0 0;padding-left:20px}
+.note li{margin:3px 0}
+.wrap{padding:14px 8px 60px}
+
+/* ── กระดาษ A4 จริง 794 × 1122 px ที่ 96dpi ── */
+.page{width:794px;height:1122px;margin:0 auto 22px;background:#fff;padding:16px 26px 34px;
+      overflow:hidden;box-shadow:0 3px 14px rgba(0,0,0,.18);position:relative}
+.hdr img{width:100%;max-height:84px;object-fit:contain;object-position:left center;display:block}
+.hdrline{border-bottom:2.5px solid #141414;margin-bottom:10px}
+
+.ref{display:flex;font-size:13.5px;margin-top:8px}
+.ref .sp{flex:1}
+.ref table{border-collapse:collapse}
+.ref td{padding:1px 5px}
+.ref td.l{text-align:right;color:#555;white-space:nowrap}
+.ref td.v{font-weight:700;min-width:130px}
+
+h1.lt{text-align:center;font-size:19px;margin:8px 0 2px;letter-spacing:.5px;text-transform:uppercase}
+h1.lt small{display:block;font-size:13.5px;font-weight:400;color:#555;letter-spacing:.3px;
+            text-transform:none;margin-top:2px}
+.rule{border-bottom:1.5px solid #141414;width:210px;margin:5px auto 10px}
+
+.to{font-size:13.5px;line-height:1.5;margin-bottom:9px;display:flex;align-items:flex-start;gap:20px}
+.to .tol{flex:1}
+.to table.tor{border-collapse:collapse;font-size:13px}
+.to table.tor td{padding:1px 5px}
+.to table.tor td.l{text-align:right;color:#555;white-space:nowrap}
+.to table.tor td.v{font-weight:700;min-width:126px}
+.to .lb{color:#666}
+.to b{font-size:14.5px}
+.subj{font-size:13px;margin:8px 0 9px;padding:5px 0;border-top:1px solid #ccc;border-bottom:1px solid #ccc}
+.subj b{margin-right:5px}
+.subj .th{display:block;color:#555;font-size:12px;margin-top:3px}
+
+p.b{font-size:13px;line-height:1.55;margin:6px 0;text-align:justify}
+p.b .th{display:block;color:#555;font-size:12.5px;margin-top:3px;line-height:1.6}
+
+table.g{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;margin:7px 0}
+table.g th{border:1px solid #555;border-bottom:2px solid #141414;padding:4px 3px;
+           font-size:11.5px;font-weight:700;line-height:1.2}
+table.g td{border:1px solid #999;padding:3px;vertical-align:top;word-wrap:break-word}
+table.g .r{text-align:right;font-variant-numeric:tabular-nums}
+table.g .c{text-align:center}
+table.g tfoot td{border-top:2px solid #141414;font-weight:700;font-size:13.5px;background:#f7f7f8}
+
+.amt{border:2px solid #141414;padding:7px 14px;margin:9px 0;display:flex;align-items:center;gap:14px}
+.amt .lb{font-size:12.5px;color:#555}
+.amt .big{font-size:18px;line-height:1.25;font-weight:700;font-variant-numeric:tabular-nums}
+.amt .fx{font-size:13.5px;color:#A32D2D;font-weight:700;margin-left:auto}
+.words{font-size:11px;color:#666;font-style:italic}
+
+.act{border:1px solid #999;padding:6px 11px;margin:8px 0;font-size:12px;line-height:1.65}
+.act .hd{font-weight:700;font-size:13px;margin-bottom:3px}
+.chk{display:inline-block;width:12px;height:12px;border:1.5px solid #141414;margin-right:6px;vertical-align:-1px}
+.chk.on{background:#141414;box-shadow:inset 0 0 0 2.5px #fff}
+
+/* ── ช่องเซ็น ── */
+.sigwrap{display:flex;gap:26px;margin-top:8px}
+.sigwrap>div{flex:1}
+  .sigttl{font-size:11px;font-weight:700;color:#333;border-bottom:1px solid #141414;
+        padding-bottom:3px;margin-bottom:22px;letter-spacing:.3px}
+.sigline{border-bottom:1px dotted #444;height:1px;margin-bottom:5px}
+.sigcap{font-size:11.5px;color:#444;line-height:1.6}
+.sigcap b{font-size:13px;color:#141414}
+.stampline{margin-top:7px;font-size:11px;color:#999;border-top:1px dotted #ddd;padding-top:4px}
+
+.ackbox{border:2px solid #141414;margin-top:16px}
+.ackhd{background:#141414;color:#fff;padding:4px 12px;font-size:12.5px;font-weight:700;letter-spacing:.4px}
+.ackbody{padding:10px 14px}
+.ackbody p{font-size:13px;line-height:1.7;margin:0 0 6px}
+.ackbody .th{color:#555;font-size:12.5px}
+
+.ackline{border:1.5px solid #141414;padding:6px 11px;margin-top:9px;font-size:12px;line-height:1.5}
+.ackline .th{display:block;color:#555;font-size:12px;margin-top:2px}
+.pf{position:absolute;left:26px;right:26px;bottom:12px;display:flex;font-size:11.5px;
+    color:#333;border-top:1px solid #ccc;padding-top:4px}
+.pf .sp{flex:1}
+.hideTh .th{display:none!important}
+.hideTbl .tblblock{display:none!important}
+
+@media print{
+ .bar,.note{display:none!important}
+ body{background:#fff}
+ .wrap{padding:0!important}
+ .page{margin:0!important;box-shadow:none;page-break-after:always}
+ .page:last-of-type{page-break-after:auto}
+ @page{margin:0;size:A4}
+}
+</style></head>
+<body>
+
+<div class="bar">
+  <b>ออกแบบ Official Claim Letter</b>
+  <span class="lb">ชื่อเอกสาร</span>
+  <button id="n1" class="on" onclick="setName(1)">LETTER OF CLAIM</button>
+  <button id="n2" onclick="setName(2)">CLAIM SETTLEMENT CONFIRMATION</button>
+  <span class="lb">ตารางสรุปรายการ</span>
+  <button id="t1" class="on" onclick="setTbl(1)">มี</button>
+  <button id="t2" onclick="setTbl(0)">ไม่มี (จดหมายล้วน)</button>
+  <span class="lb">ภาษา</span>
+  <button id="l1" class="on" onclick="setTh(1)">EN + ไทยกำกับ</button>
+  <button id="l2" onclick="setTh(0)">EN ล้วน</button>
+  <span class="sp"></span>
+  <button onclick="window.print()">🖨️ ลองปริ้น / บันทึก PDF</button>
+</div>
+
+<div class="note">
+  <b>นี่คือแบบร่างให้เบียร์ดูก่อน ยังไม่ได้ลงระบบ</b> — กดปุ่มด้านบนสลับดูแต่ละแบบได้
+  <ul>
+    <li><b>ชื่อเอกสาร ผมเสนอ 2 แบบ</b> — <b>LETTER OF CLAIM</b> คือชื่อมาตรฐานสากลที่ใช้กันจริงในการค้าระหว่างประเทศ
+        Supplier ต่างชาติเห็นแล้วเข้าใจทันทีว่าเป็นหนังสือเรียกร้องอย่างเป็นทางการ ·
+        ส่วน <b>CLAIM SETTLEMENT CONFIRMATION</b> เหมาะกว่าถ้าจุดประสงค์คือ<b>ให้เขาเซ็นยอมรับยอดเงิน</b>
+        เพราะชื่อบอกชัดว่าเป็นการ "ยืนยันข้อตกลง" ไม่ใช่แค่แจ้งให้ทราบฝ่ายเดียว</li>
+    <li><b>ตารางสรุปรายการ เลือกได้</b> ตามที่เบียร์บอก — มีก็ได้ ไม่มีก็ได้ ·
+        แบบไม่มีตารางจะอ้างอิงเลขที่ใบเคลมแทน เหมาะตอนที่ส่งใบเรียกเก็บแนบไปด้วยอยู่แล้ว</li>
+    <li><b>ไม่มีชื่อลูกค้าในเอกสารนี้</b> ใช้เลขจ๊อบอ้างอิงอย่างเดียว ตามกฎที่เบียร์วางไว้</li>
+    <li><b>ช่องเซ็น 2 ฝั่ง</b> — ฝั่ง STT เซ็นส่งออกไป · ฝั่ง Supplier เซ็นรับทราบและยินยอม แล้วส่งกลับ</li>
+  </ul>
+  <b>⚠️ ข้อควรระวัง</b> — เอกสารนี้เป็นหนังสือที่มีผลผูกพันทางการค้า โดยเฉพาะบรรทัด
+  "หากไม่ตอบกลับภายในกำหนด จะหักจากยอดค้างชำระ" ผมร่างตามแนวปฏิบัติทางการค้าทั่วไป
+  <b>แต่ผมไม่ใช่นักกฎหมาย</b> ก่อนใช้กับ Supplier จริงควรให้ฝ่ายกฎหมายหรือผู้บริหารตรวจถ้อยคำอีกรอบ
+</div>
+
+<div class="wrap" id="wrap">
+<div class="page" id="pg">
+
+  <div class="hdr"><img id="lh" src="" alt="SUTEE"></div>
+  <div class="hdrline"></div>
+
+  <h1 class="lt" id="ttl">Letter of Claim
+    <small id="ttlth">หนังสือแจ้งเรียกร้องค่าเสียหาย</small></h1>
+  <div class="rule"></div>
+
+  <div class="to">
+    <div class="tol">
+      <div><span class="lb">To :</span> <b>JINAN VALVE CO., LTD.</b></div>
+      <div><span class="lb">Attention :</span> Sales Manager / Quality Department</div>
+    </div>
+    <table class="tor">
+      <tr><td class="l">Our Ref.</td><td class="v">CLM-69/0001</td></tr>
+      <tr><td class="l">Date</td><td class="v">04 September 2026</td></tr>
+    </table>
+  </div>
+
+  <div class="subj"><b>Subject :</b> Claim for defective goods supplied under PO No. PO-69/0455 —
+    our Job Ref. JT-69/0009
+    <span class="th">เรื่อง : แจ้งเรียกร้องค่าเสียหายจากสินค้าชำรุด ตามใบสั่งซื้อเลขที่ PO-69/0455</span>
+  </div>
+
+  <p class="b">Dear Sir / Madam,</p>
+
+  <p class="b">We refer to the goods supplied under Purchase Order No. <b>PO-69/0455</b>, received
+    on <b>02/07/2569</b> for our Job Ref. <b>JT-69/0009</b>. Upon incoming inspection the item(s)
+    below were found <b>defective and unfit for the intended use</b>. Photographic evidence was
+    provided with our Claim Notice ref. <b>CLM-69/0001</b> dated <b>12/08/2569</b>, and your reply
+    dated <b>18/08/2569</b> is acknowledged.
+    <span class="th">อ้างถึงสินค้าตามใบสั่งซื้อเลขที่ PO-69/0455 รับเมื่อ 02/07/2569 จ๊อบ JT-69/0009 —
+      ตรวจรับแล้วพบว่าชำรุด ใช้งานไม่ได้ตามวัตถุประสงค์ แนบภาพถ่ายไปพร้อมใบแจ้งเคลม CLM-69/0001 แล้ว</span>
+  </p>
+
+  <div class="tblblock">
+  <table class="g">
+    <colgroup><col style="width:26px"><col style="width:92px"><col>
+      <col style="width:40px"><col style="width:40px"><col style="width:82px"><col style="width:92px"></colgroup>
+    <thead><tr>
+      <th>No.</th><th>Code</th><th>Description</th><th>Qty</th><th>Unit</th>
+      <th>Unit price<br>THB</th><th>Amount<br>THB</th>
+    </tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td>VLV-3040</td>
+        <td><b>API VALVE 4"</b><br>API valve leaking at flange during pressure test</td>
+        <td class="r">2</td><td class="c">PCS</td><td class="r">9,775.00</td><td class="r">19,550.00</td></tr>
+      <tr><td class="c">2</td><td>MH-2000</td>
+        <td><b>MANHOLE COVER 20"</b><br>Cover does not seal, hinge bent</td>
+        <td class="r">1</td><td class="c">SET</td><td class="r">12,500.00</td><td class="r">12,500.00</td></tr>
+      <tr><td class="c">3</td><td>—</td>
+        <td><b>Labour</b><br>Remove and refit valve and manhole (covers item 1–2)</td>
+        <td class="r">1</td><td class="c">LOT</td><td class="r">6,500.00</td><td class="r">6,500.00</td></tr>
+    </tbody>
+    <tfoot><tr><td colspan="6" class="r">Total claimed (THB)</td><td class="r">38,550.00</td></tr></tfoot>
+  </table>
+  </div>
+
+  <p class="b">To meet our delivery commitment we procured replacements and carried out the
+    necessary rework at our own cost, and therefore formally claim reimbursement as follows.
+    <span class="th">เพื่อให้ส่งมอบงานทันกำหนด เราจัดหาของทดแทนและซ่อมแก้ไขด้วยค่าใช้จ่ายของเราเอง
+      จึงขอเรียกเก็บค่าเสียหายตามจำนวนนี้</span>
+  </p>
+
+  <div class="amt">
+    <span class="lb">Total claimed</span>
+    <span class="big">THB 38,550.00</span>
+    <span class="words">(Thirty-eight thousand five hundred and fifty Baht only)</span>
+    <span class="fx">≈ USD 1,106.17</span>
+  </div>
+
+  <div class="act">
+    <div class="hd">Settlement method requested / วิธีชดเชยที่ขอ</div>
+    <div><span class="chk on"></span> Credit note &nbsp; <span class="chk"></span> Bank transfer
+         &nbsp; <span class="chk"></span> Free-of-charge replacement parts</div>
+    <div>Please confirm in writing by <b>30 September 2026</b>. Failing confirmation by that date,
+      the claimed amount will be deducted from the next payment due to your company.</div>
+  </div>
+
+  <div class="ackline">
+    <b>By signing below</b>, the supplier acknowledges receipt of this claim, confirms the details
+    stated above, and agrees to settle the claimed amount by the method indicated.
+    <span class="th">การลงนามด้านล่างถือเป็นการรับทราบ ยืนยันรายละเอียด และตกลงชดเชยตามวิธีที่เลือกไว้
+      กรุณาลงนามและส่งกลับ 1 ฉบับ</span>
+  </div>
+
+  <div class="sigwrap">
+    <div>
+      <div class="sigttl">FOR AND ON BEHALF OF<br>SUTEE TANKERS AND SPECIAL TRUCKS CO., LTD.</div>
+      <div class="sigline"></div>
+      <div class="sigcap"><b>_______________________________</b><br>
+        Name / ชื่อ &nbsp; ......................................<br>
+        Position / ตำแหน่ง &nbsp; ...........................<br>
+        Date / วันที่ &nbsp; ....................................</div>
+      <div class="stampline">ประทับตราบริษัท / Company stamp</div>
+    </div>
+    <div>
+      <div class="sigttl">ACKNOWLEDGED AND AGREED BY<br>JINAN VALVE CO., LTD.</div>
+      <div class="sigline"></div>
+      <div class="sigcap"><b>_______________________________</b><br>
+        Name / ชื่อ &nbsp; ......................................<br>
+        Position / ตำแหน่ง &nbsp; ...........................<br>
+        Date / วันที่ &nbsp; ....................................</div>
+      <div class="stampline">ประทับตราบริษัท / Company stamp</div>
+    </div>
+  </div>
+
+  <div class="pf"><span>FM-WH-03 Rev.00</span><span class="sp"></span><span>Page 1/1</span></div>
+</div>
+</div>
+
+<script>
+/* หัวกระดาษ — ใส่ทีหลังตอนต่อเข้าระบบจริง ตอนนี้วาดกล่องแทนให้เห็นตำแหน่ง */
+document.getElementById('lh').onerror = function(){
+  this.outerHTML = '<div style="height:74px;border:1px dashed #bbb;display:flex;align-items:center;' +
+    'padding-left:14px;color:#999;font-size:13px">[ หัวกระดาษบริษัท SUTEE — ระบบจะใส่ให้อัตโนมัติ ]</div>';
+};
+document.getElementById('lh').src = 'x';
+
+function setName(n){
+  document.getElementById('n1').className = n===1?'on':'';
+  document.getElementById('n2').className = n===2?'on':'';
+  var t = document.getElementById('ttl'), th = document.getElementById('ttlth');
+  if (n===1){ t.childNodes[0].nodeValue = 'Letter of Claim\n    ';
+              th.textContent = 'หนังสือแจ้งเรียกร้องค่าเสียหาย'; }
+  else      { t.childNodes[0].nodeValue = 'Claim Settlement Confirmation\n    ';
+              th.textContent = 'หนังสือยืนยันข้อตกลงชดเชยค่าเสียหาย'; }
+}
+function setTbl(on){
+  document.getElementById('t1').className = on?'on':'';
+  document.getElementById('t2').className = on?'':'on';
+  document.getElementById('wrap').classList.toggle('hideTbl', !on);
+}
+function setTh(on){
+  document.getElementById('l1').className = on?'on':'';
+  document.getElementById('l2').className = on?'':'on';
+  document.getElementById('wrap').classList.toggle('hideTh', !on);
+}
+</script>
+</body></html>
