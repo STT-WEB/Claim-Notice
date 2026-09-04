@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v0.6.4';
+var VERSION = 'v0.7.0';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -150,10 +150,52 @@ function normRole_(v){
   return 'GUEST';
 }
 
+/* ═══════════ แคชที่ไม่พังเวลาข้อมูลใหญ่ (v0.7.0) ═══════════
+ * CacheService จำกัด "ค่าละไม่เกิน 100KB" — ถ้าเกิน มัน throw ว่า
+ *   Exception: Argument too large: value
+ * ของเดิมเรียก cache.put ตรง ๆ ไม่มี try แถวรายการจ๊อบ (All WIP) ใหญ่เกิน 100KB
+ * → พังทุกครั้งที่ค้นเลขจ๊อบ และเพราะแคชไม่เคยติด เลยต้องอ่านชีตใหม่ทุกครั้ง = ช้าด้วย
+ * แก้: หั่นเป็นชิ้นละ 90KB เก็บหลายคีย์ แล้วต่อกลับตอนอ่าน · แคชไม่ได้ก็แค่ช้าลง ห้ามพัง */
+var CACHE_CHUNK = 90000, CACHE_MAXCHUNK = 40;
+
+function cacheGet_(key){
+  try {
+    var c = CacheService.getScriptCache(), head = c.get(key);
+    if (head == null) return null;
+    if (head.indexOf('#CHUNKS:') !== 0) return head;
+    var n = parseInt(head.slice(8), 10) || 0, keys = [], i;
+    for (i = 0; i < n; i++) keys.push(key + '#' + i);
+    var all = c.getAll(keys), buf = '';
+    for (i = 0; i < n; i++){
+      var part = all[key + '#' + i];
+      if (part == null) return null;          // ชิ้นใดชิ้นหนึ่งหมดอายุ = ถือว่าไม่มีแคช
+      buf += part;
+    }
+    return buf;
+  } catch(e){ return null; }
+}
+
+function cachePut_(key, str, ttl){
+  try {
+    var c = CacheService.getScriptCache();
+    if (str.length <= CACHE_CHUNK){ c.put(key, str, ttl); return true; }
+    var n = Math.ceil(str.length / CACHE_CHUNK);
+    if (n > CACHE_MAXCHUNK) return false;     // ใหญ่เกินจริง ๆ ไม่แคชดีกว่าพัง
+    var obj = {};
+    for (var i = 0; i < n; i++) obj[key + '#' + i] = str.substr(i * CACHE_CHUNK, CACHE_CHUNK);
+    c.putAll(obj, ttl);
+    c.put(key, '#CHUNKS:' + n, ttl);          // เขียนสารบัญทีหลังเสมอ
+    return true;
+  } catch(e){ return false; }
+}
+
+/* จำไว้ในรอบทำงานเดียวกัน — ของพวกนี้ถูกเรียกซ้ำหลายครั้งต่อ 1 คำสั่ง */
+var _USERS = null, _WIP = null, _VEND = null, _ME = {};
+
 function getUsers_(){
-  var cache = CacheService.getScriptCache();
-  var hit = cache.get('CLAIM_USERS');
-  if (hit) { try { return JSON.parse(hit); } catch(e){} }
+  if (_USERS) return _USERS;
+  var hit = cacheGet_('CLAIM_USERS');
+  if (hit) { try { _USERS = JSON.parse(hit); return _USERS; } catch(e){} }
 
   var rows = readTab_(CFG.MASTER, 'USERS') || [];
   if (!rows.length) return [];
@@ -169,6 +211,8 @@ function getUsers_(){
   var iAct  = colIdx_(hdr, ['active','ใช้งาน']);
   var iPin  = colIdx_(hdr, ['pin','รหัสผ่าน']);
   var iEmp  = colIdx_(hdr, ['รหัสพนักงาน','employee','emp']);
+  // แผนกของคนคนนั้น — เบียร์: "แผนกที่ขอเคลม ต้องขึ้นมาเองตาม User"
+  var iDept = colIdx_(hdr, ['แผนก','department','dept','ฝ่าย','สังกัด','division','section']);
 
   var out = [];
   for (var r = hr + 1; r < rows.length; r++){
@@ -182,10 +226,12 @@ function getUsers_(){
       roleRaw: norm_(iRole >= 0 ? v[iRole] : ''),
       active: norm_(iAct >= 0 ? v[iAct] : 'Y').toUpperCase() !== 'N',
       pin   : norm_(iPin >= 0 ? v[iPin] : ''),
-      emp   : norm_(iEmp >= 0 ? v[iEmp] : '')
+      emp   : norm_(iEmp >= 0 ? v[iEmp] : ''),
+      dept  : norm_(iDept >= 0 ? v[iDept] : '')
     });
   }
-  cache.put('CLAIM_USERS', JSON.stringify(out), 300);
+  cachePut_('CLAIM_USERS', JSON.stringify(out), 300);
+  _USERS = out;
   return out;
 }
 
@@ -194,7 +240,11 @@ function getEmail_(){
 }
 
 /** เข้าระบบด้วยรหัสพนักงาน + PIN (ต้องตรงทั้งคู่ = กันใช้ PIN ของเพื่อน) */
-function loginEmpPin(emp, pin){
+/* ⚠️ v0.7.0 — แยก "ตรวจรหัส" ออกจาก "บันทึกว่าเข้าระบบ"
+ * ของเดิม loginEmpPin เขียน log_ ทุกครั้งที่ถูกเรียก และ whoAmI_ ก็เรียกตัวนี้
+ * ทุกคำสั่งที่ยิงมาหลังบ้าน → ทุกครั้งที่กรอกอะไรสักช่อง ระบบไปต่อแถวลงชีต LOG หนึ่งแถว
+ * = ช้าทั้งระบบแบบไม่มีใครรู้ · ตอนนี้เขียน log เฉพาะตอนกดเข้าสู่ระบบจริง ๆ เท่านั้น */
+function authUser_(emp, pin){
   emp = norm_(emp); pin = norm_(pin);
   if (!emp || !pin) return { ok:false, msg:'กรอกรหัสพนักงานและ PIN ให้ครบ' };
   var us = getUsers_();
@@ -202,22 +252,44 @@ function loginEmpPin(emp, pin){
     if (us[i].emp && us[i].emp === emp && us[i].pin && us[i].pin === pin){
       if (!us[i].active) return { ok:false, msg:'รหัสพนักงานนี้ถูกปิดการใช้งานแล้ว' };
       if (us[i].role === 'GUEST') return { ok:false, msg:'ยังไม่ได้กำหนดสิทธิ์งานเคลมให้รหัสนี้ (ช่อง role for Claim ในชีต USERS ว่างอยู่)' };
-      log_('login', emp, us[i].name + ' / ' + us[i].roles.join(','));
-      return { ok:true, name:us[i].name, role:us[i].role, roles:us[i].roles, emp:us[i].emp };
+      return { ok:true, name:us[i].name, role:us[i].role, roles:us[i].roles,
+               emp:us[i].emp, dept:us[i].dept || deptFromRoles_(us[i].roles) };
     }
   }
   return { ok:false, msg:'รหัสพนักงานหรือ PIN ไม่ถูกต้อง' };
 }
 
+/** ถ้าชีต USERS ไม่มีคอลัมน์แผนก ให้เดาจากสิทธิ์ที่ตั้งไว้ — เบียร์แก้ทับได้เสมอ */
+function deptFromRoles_(roles){
+  var map = { PRODUCTION:'ผลิต', SALES:'ขาย', QC:'QC', DESIGN:'ออกแบบ',
+              STORE:'สโตร์', PURCHASE:'จัดซื้อ', HR:'บุคคล', PICKER:'คลังสินค้า' };
+  roles = roles || [];
+  for (var i = 0; i < roles.length; i++) if (map[roles[i]]) return map[roles[i]];
+  return '';
+}
+
+function loginEmpPin(emp, pin){
+  var r = authUser_(emp, pin);
+  if (r.ok) log_('login', norm_(emp), r.name + ' / ' + (r.roles || []).join(','));
+  return r;
+}
+
 /** ใครเป็นใคร — เชื่อ PIN ก่อน แล้วค่อย fallback อีเมลบริษัท (บทเรียน v0.38 ของ NOVA) */
 function whoAmI_(auth){
   if (auth && auth.emp && auth.pin){
-    var r = loginEmpPin(auth.emp, auth.pin);
-    if (r.ok) return { name:r.name, role:r.role, emp:r.emp };
+    var k = norm_(auth.emp) + '|' + norm_(auth.pin);
+    if (_ME[k]) return _ME[k];                 // 1 คำสั่งเรียกซ้ำหลายรอบ ตรวจรอบเดียวพอ
+    var r = authUser_(auth.emp, auth.pin);
+    if (r.ok){
+      // ⚠️ ต้องส่ง roles กลับไปด้วย ไม่งั้น canEditField_ เห็นสิทธิ์แค่ตัวเดียว
+      //    คนที่เป็นทั้งสโตร์และจัดซื้อจะโดนล็อกช่องทั้งที่ควรแก้ได้
+      _ME[k] = { name:r.name, role:r.role, roles:r.roles || [r.role], emp:r.emp, dept:r.dept || '' };
+      return _ME[k];
+    }
   }
   var em = getEmail_();
-  if (em && AUTO_ADMIN.indexOf(em) >= 0) return { name:em.split('@')[0], role:'ADMIN', roles:['ADMIN'], emp:'' };
-  return { name:'', role:'GUEST', roles:[], emp:'' };
+  if (em && AUTO_ADMIN.indexOf(em) >= 0) return { name:em.split('@')[0], role:'ADMIN', roles:['ADMIN'], emp:'', dept:'ผู้บริหาร' };
+  return { name:'', role:'GUEST', roles:[], emp:'', dept:'' };
 }
 
 /** เข้าระบบด้วยบัญชี Google ของบริษัท (เบียร์ + พี่แบล็ค) — ไม่ต้องมี PIN
@@ -235,14 +307,15 @@ function loginByEmail(){
 
 function getContext(auth){
   var me = whoAmI_(auth);
-  return { version:VERSION, name:me.name, role:me.role, roles:me.roles || [], emp:me.emp, year:yearBE_() };
+  return { version:VERSION, name:me.name, role:me.role, roles:me.roles || [], emp:me.emp,
+           dept:me.dept || '', year:yearBE_() };
 }
 
 /* ─────────── ข้อมูลจ๊อบ (อ่านจาก MASTER — All WIP JT/JM) ─────────── */
 function wipRows_(){
-  var cache = CacheService.getScriptCache();
-  var hit = cache.get('CLAIM_WIP');
-  if (hit) { try { return JSON.parse(hit); } catch(e){} }
+  if (_WIP) return _WIP;
+  var hit = cacheGet_('CLAIM_WIP');
+  if (hit) { try { _WIP = JSON.parse(hit); return _WIP; } catch(e){} }
 
   var rows = readTab_(CFG.MASTER, 'All WIP JT/JM') || [];
   if (!rows.length) return [];
@@ -273,7 +346,8 @@ function wipRows_(){
       loc     : norm_(iLoc   >= 0 ? v[iLoc]   : '')
     });
   }
-  cache.put('CLAIM_WIP', JSON.stringify(out), 600);
+  cachePut_('CLAIM_WIP', JSON.stringify(out), 600);
+  _WIP = out;
   return out;
 }
 
@@ -313,9 +387,9 @@ function listJobs(type){
 
 /** รายชื่อผู้ขาย (อ่านจาก MASTER แท็บ VENDORS — หัวตารางอยู่แถว 2) */
 function listVendors(){
-  var cache = CacheService.getScriptCache();
-  var hit = cache.get('CLAIM_VENDORS');
-  if (hit) { try { return JSON.parse(hit); } catch(e){} }
+  if (_VEND) return _VEND;
+  var hit = cacheGet_('CLAIM_VENDORS');
+  if (hit) { try { _VEND = JSON.parse(hit); return _VEND; } catch(e){} }
   var rows = readTab_(CFG.MASTER, 'VENDORS') || [];
   if (!rows.length) return [];
   var hr = findHeaderRow_(rows, ['vendorname','vendor name','ชื่อผู้ขาย'], 6);
@@ -326,7 +400,8 @@ function listVendors(){
     if (v && out.indexOf(v) < 0) out.push(v);
   }
   out.sort();
-  CacheService.getScriptCache().put('CLAIM_VENDORS', JSON.stringify(out), 1800);
+  cachePut_('CLAIM_VENDORS', JSON.stringify(out), 1800);
+  _VEND = out;
   return out;
 }
 
@@ -622,7 +697,8 @@ function getHome(auth){
 /** ล้างแคช (ปุ่มรีเฟรช) */
 function clearCaches(){
   var c = CacheService.getScriptCache();
-  c.removeAll(['CLAIM_USERS','CLAIM_WIP','CLAIM_VENDORS']);
+  c.removeAll(['CLAIM_USERS','CLAIM_WIP','CLAIM_VENDORS','CLAIM_GOODS','CLAIM_HOME']);
+  _USERS = _WIP = _VEND = null; _ME = {};
   return 'ล้างแคชแล้ว';
 }
 
@@ -666,7 +742,13 @@ function getMediaFolderLink(docNo, jobNo, auth){
 /** บันทึกรูป 1 ใบ — dataUrl มาจากฝั่งเว็บที่ย่อรูปแล้ว */
 function savePhoto(docNo, jobNo, seq, dataUrl, fname, auth){
   var me = requireLogin_(auth);
-  docNo = norm_(docNo); jobNo = norm_(jobNo); seq = num_(seq);
+  /* ⚠️ v0.7.0 — seq ต้องเป็น "ข้อความ" ไม่ใช่ตัวเลข
+     ตอนเปิดใบใหม่ ตารางยังไม่มีลำดับจริง ใช้รหัสแถวชั่วคราว r1 r2 r3 …
+     ของเดิมแปลงเป็นตัวเลข → num_('r1') = 0 ทุกแถวกลายเป็นข้อ 0 เหมือนกันหมด
+     → อัปโหลดขึ้น Drive สำเร็จ แต่หน้าจอหาไม่เจอ (รูปหายต่อหน้าต่อตา)
+       และตอนกดบันทึก รูปก็ย้ายไปเข้าใบจริงไม่ได้เพราะจับคู่ลำดับไม่ติด */
+  docNo = norm_(docNo); jobNo = norm_(jobNo); seq = norm_(seq);
+  if (!seq) throw new Error('ไม่รู้ว่ารูปนี้เป็นของรายการไหน');
   if (!docNo) throw new Error('ยังไม่มีเลขที่เอกสาร — บันทึกใบเคลมก่อนแล้วค่อยแนบรูป');
 
   var m = String(dataUrl || '').match(/^data:([^;]+);base64,([\s\S]*)$/);
@@ -686,7 +768,7 @@ function savePhoto(docNo, jobNo, seq, dataUrl, fname, auth){
   if (lr > 1){
     var v = sh.getRange(2,1,lr-1,3).getDisplayValues();
     for (var i = 0; i < v.length; i++){
-      if (norm_(v[i][0]) === docNo && num_(v[i][1]) === seq) no = Math.max(no, num_(v[i][2]) + 1);
+      if (norm_(v[i][0]) === docNo && norm_(v[i][1]) === seq) no = Math.max(no, num_(v[i][2]) + 1);
     }
   }
   sh.appendRow([docNo, seq, no, f.getName(), id, thumb, view, 'Y', me.name, nowStamp_()]);
@@ -705,7 +787,7 @@ function listPhotos(docNo, auth){
   for (var i = 0; i < v.length; i++){
     if (norm_(v[i][0]) !== docNo) continue;
     if (norm_(v[i][7]).toUpperCase() === 'N') continue;          // ถูกเอาออกแล้ว
-    var s = String(num_(v[i][1]));
+    var s = norm_(v[i][1]);            // เก็บเป็นข้อความ ใช้ได้ทั้ง "1" และ "r1" ของใบร่าง
     if (!out[s]) out[s] = [];
     out[s].push({ id:v[i][4], thumb:v[i][5], view:v[i][6], name:v[i][3], by:v[i][8], at:v[i][9] });
   }
@@ -754,14 +836,15 @@ function photoCheck(docNo, auth){
  * ตอบว่า "ไฟล์ที่ deploy อยู่ตอนนี้ มีของที่ควรมีครบไหม"
  * ปลอดภัย: อ่านเฉพาะโค้ดของตัวเอง ไม่แตะฐานข้อมูล ไม่คืนข้อมูลลูกค้า/ราคา/ผู้ใช้ */
 var DEPLOY_MARKERS = {
-  'js-core'   : ['var CLIENT_VER', 'function bindAll', 'function checkVer', 'stalebar'],
+  'js-core'   : ['var CLIENT_VER', 'function bindAll', 'function checkVer', 'stalebar', 'function fr(label, ctrl, who, req)'],
   'js-grid'   : ['function makeGrid', 'function gridPaste', 'function gridTranslate'],
   'js-flow'   : ['function flowBar(', 'function flowBarNew', 'function applyLocks'],
-  'js-claim'  : ['t += flowBarNew()', 'function openClaim', 'function claimCols', 'สถานที่ผลิต'],
+  'js-claim'  : ['t += flowBarNew()', 'function openClaim', 'function claimCols', 'สถานที่ผลิต',
+                 'function missingFields', 'function hasRole', 'ผู้ขอเคลม'],
   'js-inspect': ['function openInspection', 'function inspTranslate'],
   'js-report' : ['function loadRepMedia', 'function loadRepCost'],
   'js-print'  : ['function openPrint', 'picbig', 'function blkPhotos'],
-  'styles'    : ['.flowwrap', '.picbig', '.stalebar', '.xt ']
+  'styles'    : ['.flowwrap', '.picbig', '.stalebar', '.xt ', '.whokey']
 };
 
 function deployCheck_(){
@@ -794,7 +877,8 @@ function deployCheck_(){
   /* ฟังก์ชันหลังบ้านที่ต้องมี — เช็คว่าไฟล์ .js ขึ้นครบทุกไฟล์จริง */
   var need = ['createClaimWithPhotos','claimFlow','advanceClaim','rejectClaim',
               'createInspection','sendUnAccToClaim','translateBatch','lookupGoods',
-              'reportMedia','reportCost','savePhoto'];
+              'reportMedia','reportCost','savePhoto',
+              'cacheGet_','cachePut_','authUser_','deptFromRoles_'];
   var noFn = [];
   for (var k = 0; k < need.length; k++){
     if (typeof this[need[k]] !== 'function') noFn.push(need[k]);

@@ -436,8 +436,7 @@ function reportMedia(auth){
 function getHome2(auth){
   var me = requireLogin_(auth);
 
-  var cache = CacheService.getScriptCache();
-  var hit = cache.get('CLAIM_HOME');
+  var hit = cacheGet_('CLAIM_HOME');
   if (hit){
     try { var o = JSON.parse(hit); o.name = me.name; o.role = me.role; o.roles = me.roles || []; return o; }
     catch(e){}
@@ -521,7 +520,7 @@ function getHome2(auth){
   }
   out.rep.jobs = Object.keys(jobs).length;
 
-  cache.put('CLAIM_HOME', JSON.stringify(out), 20);   // 20 วิพอ — กดรีเฟรชแล้วเห็นของใหม่ทันที
+  cachePut_('CLAIM_HOME', JSON.stringify(out), 20);   // 20 วิพอ — กดรีเฟรชแล้วเห็นของใหม่ทันที
   return out;
 }
 
@@ -553,10 +552,11 @@ function getInspFull(docNo, auth){
  * ทำเป็น "ถามทีเดียวทั้งตาราง" ไม่ใช่ถามทีละช่อง — วางทับ 20 แถวก็ยิงคำสั่งเดียว */
 
 /** ทะเบียนสินค้าจาก MASTER แท็บ Data Good Code */
+var _GOODS = null;
 function goodsMap_(){
-  var cache = CacheService.getScriptCache();
-  var hit = cache.get('CLAIM_GOODS');
-  if (hit){ try { return JSON.parse(hit); } catch(e){} }
+  if (_GOODS) return _GOODS;
+  var hit = cacheGet_('CLAIM_GOODS');
+  if (hit){ try { _GOODS = JSON.parse(hit); return _GOODS; } catch(e){} }
 
   var rows = readTab_(CFG.MASTER, 'Data Good Code') || [];
   var map = {};
@@ -573,7 +573,8 @@ function goodsMap_(){
                                   unit:norm_(iU >= 0 ? rows[r][iU] : '') };
     }
   }
-  try { cache.put('CLAIM_GOODS', JSON.stringify(map), 1800); } catch(e){}   // ใหญ่เกิน cache ก็ไม่เป็นไร
+  cachePut_('CLAIM_GOODS', JSON.stringify(map), 1800);   // หั่นชิ้นเก็บได้แล้ว ไม่ต้องอ่านชีตซ้ำ
+  _GOODS = map;
   return map;
 }
 
@@ -734,12 +735,11 @@ function tr_(text, from, to){
   if (!text) return '';
   var key = 'TR_' + from + to + '_' + Utilities.base64Encode(
               Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, text));
-  var cache = CacheService.getScriptCache();
-  var hit = cache.get(key);
+  var hit = cacheGet_(key);
   if (hit != null) return hit;
   var out = '';
   try { out = LanguageApp.translate(text, from, to); } catch(e){ out = ''; }
-  if (out) { try { cache.put(key, out, 21600); } catch(e){} }   // จำไว้ 6 ชม.
+  if (out) cachePut_(key, out, 21600);   // จำไว้ 6 ชม.
   return out;
 }
 

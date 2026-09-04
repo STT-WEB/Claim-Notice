@@ -11,7 +11,7 @@
    วิธีแก้: ฝังเลขเวอร์ชันไว้ในไฟล์หน้าเว็บเองด้วย (CLIENT_VER ข้างล่างนี้)
    ถ้า 2 ค่าไม่ตรงกัน = จอที่เห็นเป็นของเก่าแน่นอน ระบบจะขึ้นแถบแดงบอกให้กด Ctrl+Shift+R
    ⚠️ แก้ไฟล์หน้าเว็บทุกครั้ง ต้องเลื่อน CLIENT_VER ให้ตรงกับ VERSION ใน CLAIM-Hub.js */
-var CLIENT_VER = 'v0.6.4';
+var CLIENT_VER = 'v0.7.0';
 
 var AUTH = null;        // {emp, pin} — อยู่ในหน่วยความจำหน้าเว็บเท่านั้น ไม่เก็บลงเครื่อง
 var ME   = null;
@@ -119,7 +119,19 @@ function bindAll(scopeEl, docNo){
 }
 
 /* ─── ตัวช่วยสร้างช่องกรอก (ใช้ร่วมกันทุกหน้า) ─── */
-function fr(label, ctrl){ return '<div class="frow"><label>' + label + '</label>' + ctrl + '</div>'; }
+/* who = ป้ายบอกว่าช่องนี้ใครเป็นคนกรอก · req = true ใส่ดาวแดงว่าต้องกรอก
+   เบียร์: "ใครต้องใส่ข้อมูลตรงไหน ไม่มีบอกเลย" — ตอนนี้ทุกช่องบอกเจ้าของงานแล้ว */
+function fr(label, ctrl, who, req){
+  /* who เขียนได้ 2 แบบ: "ขั้น 1" หรือ "ขั้น 1|ข้อความเต็มตอนเอาเมาส์ชี้"
+     ป้ายต้องสั้นพอให้อยู่บรรทัดเดียว ไม่งั้นฟอร์มยืดจนอ่านยาก — คำอธิบายเต็มอยู่แถบบนสุด */
+  var tag = '', tip = '';
+  if (who){ var q = who.split('|'); tag = q[0]; tip = q[1] || q[0]; }
+  var cls = tag.indexOf('ขั้น 1') === 0 ? ' s1' : tag.indexOf('ขั้น 2') === 0 ? ' s2' : ' au';
+  return '<div class="frow"><label>' + label +
+         (req ? ' <b class="req" title="ต้องกรอก">*</b>' : '') +
+         (tag ? '<span class="who' + cls + '" title="' + esc(tip) + '">' + esc(tag) + '</span>' : '') +
+         '</label>' + ctrl + '</div>';
+}
 function fld(label, ctrl){ return '<div class="fld"><label>' + label + '</label><div><b>' + ctrl + '</b></div></div>'; }
 /** ช่องที่บันทึกเอง — bindAll() จะอ่าน data-save / data-f / data-seq แล้วผูก event ให้ */
 function ip(id, fn, field, val, ph, list){
@@ -145,6 +157,7 @@ function checkVer(serverVer){
   if (!serverVer || serverVer === CLIENT_VER) return;
 
   /* ขึ้นเตือนแบบไม่ต้องเดา บอกไปเลยว่าเห็นของเก่าอยู่ ต้องทำอะไร */
+  if (document.querySelector('.stalebar')) return;   // ขึ้นแถบเดียวพอ
   var w = document.createElement('div');
   w.className = 'stalebar';
   w.innerHTML = '⚠️ <b>หน้าเว็บที่คุณเห็นเป็นของเก่า</b> — ' +
@@ -169,7 +182,7 @@ function loginTab(which){
 }
 
 function enterApp(r, via){
-  ME = { name:r.name, role:r.role, roles:r.roles || [] };
+  ME = { name:r.name, role:r.role, roles:r.roles || [], dept:r.dept || '', emp:r.emp || '' };
   $('loginScreen').style.display = 'none';
   $('app').style.display = '';
   var rs = (r.roles && r.roles.length) ? r.roles.join(' · ') : r.role;

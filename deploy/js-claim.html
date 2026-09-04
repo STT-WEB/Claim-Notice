@@ -52,23 +52,36 @@ function newClaimForm(){
        '<button class="btn primary" id="saveBtn" onclick="submitClaim()">💾 บันทึกใบแจ้งเคลม</button></div>';
   t += flowBarNew();
   t += '<div id="fmsg"></div>';
+  t += '<div class="whokey">' +
+       '<span><b class="req">*</b> ต้องกรอกก่อนบันทึก</span>' +
+       '<span><b class="who s1">ขั้น 1</b> ผลิต / ขาย / QC / ออกแบบ กรอก</span>' +
+       '<span><b class="who s2">ขั้น 2</b> สโตร์กรอก (จัดซื้อช่วยได้)</span>' +
+       '<span><b class="who au">อัตโนมัติ</b> ระบบเติมให้เอง</span></div>';
+
+  var W1 = 'ขั้น 1|ขั้น 1 · ผลิต / ขาย / QC / ออกแบบ เป็นคนกรอก';
+  var W2 = 'ขั้น 2|ขั้น 2 · สโตร์เป็นคนกรอก (จัดซื้อช่วยได้)';
+  var canStore = hasRole('STORE') || hasRole('PURCHASE') || hasRole('ADMIN');
+
   t += '<div class="fgrid">';
-  t += fr('ประเภทการเคลม', '<select id="f_claimType"><option value="after">หลังส่งมอบ (After-Sales)</option><option value="pre">ก่อนส่งมอบ (Pre-Delivery)</option></select>');
-  t += fr('เลขที่ JOB', '<input id="f_jobNo" placeholder="JT-69/0009" onblur="jobLookup()">');
-  t += fr('ชื่อลูกค้า', '<input id="f_jobName">');
+  t += fr('ประเภทการเคลม', '<select id="f_claimType"><option value="after">หลังส่งมอบ (After-Sales)</option><option value="pre">ก่อนส่งมอบ (Pre-Delivery)</option></select>', W1, true);
+  t += fr('เลขที่ JOB', '<input id="f_jobNo" placeholder="JT-69/0009" onblur="jobLookup()">', W1, true);
+  t += fr('ชื่อลูกค้า', '<input id="f_jobName" placeholder="ขึ้นเองจากเลขจ๊อบ">', 'อัตโนมัติ|ขึ้นเองจากเลขที่ JOB');
 
-  t += fr('สถานที่ผลิต', '<select id="f_area" onchange="areaChanged()"><option value="dom">ในประเทศ</option><option value="for">ต่างประเทศ</option></select>');
-  t += fr('MODEL', '<input id="f_model">');
-  t += fr('SERIAL NO.', '<input id="f_serialNo">');
+  t += fr('สถานที่ผลิต', '<select id="f_area" onchange="areaChanged()"><option value="dom">ในประเทศ</option><option value="for">ต่างประเทศ</option></select>', W1, true);
+  t += fr('MODEL', '<input id="f_model">', W1, true);
+  t += fr('SERIAL NO.', '<input id="f_serialNo">', W1);
 
-  t += '<div id="f_fkwrap" style="display:none">' + fr('ชนิดงาน ตปท.', '<select id="f_foreignKind"><option value="equip">อุปกรณ์ (ผ่านสโตร์)</option><option value="tanker">Tankers (ไม่ผ่านสโตร์)</option></select>') + '</div>';
-  t += fr('CHASSIS <i>STT</i>', '<input id="f_chassisStt">');
-  t += fr('CHASSIS <i>ผู้ผลิต</i>', '<input id="f_chassisMaker">');
+  t += '<div id="f_fkwrap" style="display:none">' + fr('ชนิดงาน ตปท.', '<select id="f_foreignKind"><option value="equip">อุปกรณ์ (ผ่านสโตร์)</option><option value="tanker">Tankers (ไม่ผ่านสโตร์)</option></select>', W1, true) + '</div>';
+  t += '<div id="f_csttwrap">' + fr('CHASSIS <i>STT</i>', '<input id="f_chassisStt">', W1) + '</div>';
+  t += '<div id="f_cmkwrap">' + fr('CHASSIS <i>ผู้ผลิต</i>', '<input id="f_chassisMaker">', W1) + '</div>';
 
-  t += fr('JMC ที่ผูก', '<input id="f_jmc" placeholder="เว้นว่างได้ เติมทีหลัง">');
-  t += fr('เลขใบส่งมอบ', '<input id="f_deliveryNote">');
-  t += fr('แผนกที่ขอเคลม', '<input id="f_dept">');
-  t += fr('วันที่ต้องการของ', '<input id="f_wantDate" placeholder="DD/MM/YYYY">');
+  t += fr('JMC ที่ผูก', '<input id="f_jmc" placeholder="เว้นว่างได้ เติมทีหลัง">', 'ขั้น 1|ขั้น 1 · คนเปิดใบเป็นคนกรอก เติมทีหลังได้');
+  t += fr('เลขใบส่งมอบ', '<input id="f_deliveryNote" placeholder="' +
+       (canStore ? 'กรอกได้เลย' : 'สโตร์เป็นคนกรอกในขั้นที่ 2') + '"' +
+       (canStore ? '' : ' disabled') + '>', W2);
+  t += fr('ผู้ขอเคลม', '<input id="f_by" disabled>', 'อัตโนมัติ|ขึ้นเองจากคนที่เข้าสู่ระบบ');
+  t += fr('แผนกที่ขอเคลม', '<input id="f_dept">', 'อัตโนมัติ|ขึ้นเองจากคนที่เข้าสู่ระบบ · พิมพ์ทับได้', true);
+  t += fr('วันที่ต้องการของ', '<input id="f_wantDate" placeholder="DD/MM/YYYY">', W1, true);
   t += '</div></div>';
 
   t += '<div class="card tight"><div class="cardhd"><h3>รายการที่เคลม</h3>' +
@@ -80,9 +93,14 @@ function newClaimForm(){
 
   $('view').innerHTML = t;
 
+  /* เบียร์: "ชื่อผู้ขอเคลมและแผนกขึ้นเองอัตโนมัติ จาก user" */
+  $('f_by').value   = (ME && ME.name) || '';
+  $('f_dept').value = (ME && ME.dept) || '';
+
   GNEW = makeGrid('gridBox', claimCols(), null, gridOptsNew());
   drawTrBtns('GNEW');
   updateNewPhBar();
+  areaChanged();
 
   if (!VENDORS) srv('listVendors', [], function(v){ VENDORS = v || []; fillVendorList(); });
   else fillVendorList();
@@ -95,8 +113,54 @@ function drawTrBtns(which){
   box.innerHTML = '<button class="btn ghost" onclick="gridTranslate(' + which + '.id)">🌐 แปลไทย → EN</button>' +
                   '<button class="btn ghost" onclick="gridTrCheck(' + which + '.id)">🔎 ตรวจคำแปล</button>';
 }
+
+/* ── ช่องบังคับกรอก (v0.7.0) ───────────────────────────────────
+   กฎของเบียร์: ทุกใบต้องมี ประเภทการเคลม · เลขที่ JOB · สถานที่ผลิต ·
+   MODEL · แผนก · วันที่ต้องการของ
+   ถ้าเลือก "ต่างประเทศ" เพิ่ม CHASSIS STT และ CHASSIS ผู้ผลิต */
+function hasRole(r){
+  if (!ME) return false;
+  var rs = (ME.roles && ME.roles.length) ? ME.roles : [ME.role];
+  return rs.indexOf(r) >= 0;
+}
+function markReq(wrapId, on){
+  var w = $(wrapId); if (!w) return;
+  var lb = w.querySelector('label'); if (!lb) return;
+  var st = lb.querySelector('.req');
+  if (on && !st){
+    st = document.createElement('b'); st.className = 'req'; st.title = 'ต้องกรอก';
+    st.textContent = ' *';
+    lb.insertBefore(st, lb.querySelector('.who') || null);
+  } else if (!on && st) st.parentNode.removeChild(st);
+}
+function reqFields(){
+  var need = [
+    ['f_claimType','ประเภทการเคลม'], ['f_jobNo','เลขที่ JOB'], ['f_area','สถานที่ผลิต'],
+    ['f_model','MODEL'], ['f_dept','แผนกที่ขอเคลม'], ['f_wantDate','วันที่ต้องการของ']
+  ];
+  if ($('f_area') && $('f_area').value === 'for'){
+    need.push(['f_chassisStt','CHASSIS STT']);
+    need.push(['f_chassisMaker','CHASSIS ผู้ผลิต']);
+  }
+  return need;
+}
+/** คืนรายชื่อช่องที่ยังว่าง + ทำกรอบแดงให้เห็นว่าช่องไหน */
+function missingFields(){
+  var need = reqFields(), miss = [];
+  for (var i = 0; i < need.length; i++){
+    var el = $(need[i][0]); if (!el) continue;
+    if (!el.value || !String(el.value).trim()){ el.classList.add('need'); miss.push(need[i][1]); }
+    else el.classList.remove('need');
+  }
+  return miss;
+}
 function areaChanged(){
-  $('f_fkwrap').style.display = ($('f_area').value === 'for') ? '' : 'none';
+  var isFor = ($('f_area').value === 'for');
+  $('f_fkwrap').style.display = isFor ? '' : 'none';
+  /* เบียร์: "ถ้าต่างประเทศ ต้องมี CHASSIS ผู้ผลิต บังคับใส่ CHASSIS STT ด้วย
+     ประเภทการเคลม เลขที่ JOB ด้วย" → ดาวแดงขึ้น/ลงตามสถานที่ผลิต */
+  markReq('f_csttwrap', isFor);
+  markReq('f_cmkwrap', isFor);
   /* สลับในประเทศ↔ต่างประเทศ = คอลัมน์ EN เข้า/ออก → สร้างตารางใหม่โดยเก็บข้อมูลที่กรอกไว้ */
   if (GNEW){
     var keep = gridData(GNEW.id);
@@ -186,8 +250,17 @@ function jobLookup(){
 }
 
 function submitClaim(){
+  /* ช่องบังคับกรอกก่อนเป็นอันดับแรก — บอกให้ครบทีเดียวพร้อมกรอบแดง
+     ไม่ใช่ให้เบียร์กดแล้วรู้ทีละช่อง กดใหม่แล้วรู้อีกช่อง */
+  var need = missingFields();
+  if (need.length){
+    $('fmsg').innerHTML = '<div class="msg bad">ยังไม่ได้กรอก: <b>' + esc(need.join(' · ')) + '</b>' +
+      ($('f_area').value === 'for' ? '<br><span class="hint">งานต่างประเทศบังคับ CHASSIS ทั้งของ STT และของผู้ผลิต</span>' : '') +
+      '</div>';
+    window.scrollTo(0, 0);
+    return;
+  }
   var jobNo = $('f_jobNo').value.trim();
-  if (!jobNo){ $('fmsg').innerHTML = '<div class="msg bad">ต้องระบุเลขที่ JOB ก่อน</div>'; return; }
 
   var rows = gridFilledRows(GNEW.id);
   if (!rows.length){ $('fmsg').innerHTML = '<div class="msg bad">ต้องมีรายการที่เคลมอย่างน้อย 1 รายการ</div>'; return; }
@@ -371,20 +444,36 @@ function paneClaim(c, docNo){
   var h = c.head;
   var t = '<div class="card tight"><div class="cardhd"><h3>ข้อมูลใบแจ้งเคลม</h3>' +
     '<span class="sub">พิมพ์แล้วบันทึกเอง ไม่ต้องกดปุ่ม</span></div><div class="fgrid">';
-  t += fr('เลขที่ JOB', ip('c_jobNo','saveClaimField','jobNo',h['เลขที่ JOB'])) +
-       fr('ชื่อลูกค้า', ip('c_jobName','saveClaimField','jobName',h['ชื่อลูกค้า'])) +
-       fr('วันที่', '<input value="' + esc(h['วันที่']) + '" disabled>');
-  t += fr('MODEL', ip('c_model','saveClaimField','model',h['MODEL'])) +
-       fr('SERIAL NO.', ip('c_serialNo','saveClaimField','serialNo',h['SERIAL NO.'])) +
-       fr('JMC ที่ผูก', ip('c_jmc','saveClaimField','jmc',h['JMC ที่ผูก'],'เว้นว่างได้ เติมทีหลัง'));
-  t += fr('CHASSIS <i>STT</i>', ip('c_chassisStt','saveClaimField','chassisStt',h['CHASSIS NO. (STT)'])) +
-       fr('CHASSIS <i>ผู้ผลิต</i>', ip('c_chassisMaker','saveClaimField','chassisMaker',h['CHASSIS NO. (ผู้ผลิต)'])) +
-       fr('เลขใบส่งมอบ', ip('c_deliveryNote','saveClaimField','deliveryNote',h['เลขใบส่งมอบ']));
-  t += fr('แผนกที่ขอเคลม', ip('c_dept','saveClaimField','dept',h['แผนก'])) +
-       fr('วันที่ต้องการของ', ip('c_wantDate','saveClaimField','wantDate',h['วันที่ต้องการของ'],'DD/MM/YYYY')) +
+  var W1 = 'ขั้น 1|ขั้น 1 · ผลิต / ขาย / QC / ออกแบบ เป็นคนกรอก';
+  var W2 = 'ขั้น 2|ขั้น 2 · สโตร์เป็นคนกรอก (จัดซื้อช่วยได้)';
+  var isFor = (h['สถานที่ผลิต'] === 'for');
+
+  t += '<div class="whokey">' +
+       '<span><b class="req">*</b> ต้องมีก่อนส่งต่อขั้นถัดไป</span>' +
+       '<span><b class="who s1">ขั้น 1</b> ผลิต / ขาย / QC / ออกแบบ กรอก</span>' +
+       '<span><b class="who s2">ขั้น 2</b> สโตร์กรอก (จัดซื้อช่วยได้)</span>' +
+       '<span><b class="who au">อัตโนมัติ</b> ระบบเติมให้เอง</span>' +
+       '<span>ช่องสีเทา = ไม่ใช่หน้าที่คุณ หรือเลยขั้นไปแล้ว</span></div>';
+
+  t += fr('ประเภทการเคลม', sel('c_claimType','saveClaimField','claimType',h['ประเภทการเคลม'],
+            [['after','หลังส่งมอบ (After-Sales)'],['pre','ก่อนส่งมอบ (Pre-Delivery)']]), W1, true) +
+       fr('สถานที่ผลิต', sel('c_area','saveClaimField','area',h['สถานที่ผลิต'],
+            [['dom','ในประเทศ'],['for','ต่างประเทศ']]), W1, true) +
+       fr('วันที่', '<input value="' + esc(h['วันที่']) + '" disabled>', 'อัตโนมัติ|วันที่เปิดใบ');
+  t += fr('เลขที่ JOB', ip('c_jobNo','saveClaimField','jobNo',h['เลขที่ JOB']), W1, true) +
+       fr('ชื่อลูกค้า', ip('c_jobName','saveClaimField','jobName',h['ชื่อลูกค้า']), 'อัตโนมัติ|ขึ้นเองจากเลขที่ JOB') +
+       fr('MODEL', ip('c_model','saveClaimField','model',h['MODEL']), W1, true);
+  t += fr('SERIAL NO.', ip('c_serialNo','saveClaimField','serialNo',h['SERIAL NO.']), W1) +
+       fr('CHASSIS <i>STT</i>', ip('c_chassisStt','saveClaimField','chassisStt',h['CHASSIS NO. (STT)']), W1, isFor) +
+       fr('CHASSIS <i>ผู้ผลิต</i>', ip('c_chassisMaker','saveClaimField','chassisMaker',h['CHASSIS NO. (ผู้ผลิต)']), W1, isFor);
+  t += fr('JMC ที่ผูก', ip('c_jmc','saveClaimField','jmc',h['JMC ที่ผูก'],'เว้นว่างได้ เติมทีหลัง'), 'ขั้น 1|ขั้น 1 · คนเปิดใบเป็นคนกรอก เติมทีหลังได้') +
+       fr('เลขใบส่งมอบ', ip('c_deliveryNote','saveClaimField','deliveryNote',h['เลขใบส่งมอบ']), W2, true) +
+       fr('ผู้ขอเคลม', '<input value="' + esc(h['ผู้ขอเคลม'] || '') + '" disabled>', 'อัตโนมัติ|ชื่อคนที่เปิดใบนี้');
+  t += fr('แผนกที่ขอเคลม', ip('c_dept','saveClaimField','dept',h['แผนก']), 'อัตโนมัติ|ขึ้นเองจากคนที่เปิดใบ · พิมพ์ทับได้', true) +
+       fr('วันที่ต้องการของ', ip('c_wantDate','saveClaimField','wantDate',h['วันที่ต้องการของ'],'DD/MM/YYYY'), W1, true) +
        fr('สถานะ', sel('c_status','saveClaimField','status',h['สถานะ'],
             [['DRAFT','ร่าง'],['SENT','ส่ง Supplier แล้ว'],['REPLIED','Supplier ตอบแล้ว'],
-             ['BILLED','ออกใบเรียกเก็บแล้ว'],['CLOSED','ปิดงานแล้ว']]));
+             ['BILLED','ออกใบเรียกเก็บแล้ว'],['CLOSED','ปิดงานแล้ว']]), 'ทุกขั้น|ทุกขั้นตอนแก้ได้');
   t += '</div>';
   t += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
     '<button class="btn ghost" onclick="addClaimRow()">+ เพิ่มรายการ</button>' +
