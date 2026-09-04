@@ -44,7 +44,7 @@ function saveClaimField(docNo, field, value, auth){
   /* v0.5.0 — "ทำงานแทนกันไม่ได้" ตามที่เบียร์สั่ง
      เช็คที่หลังบ้านด้วย ไม่ใช่แค่ทำช่องเป็นสีเทาบนหน้าจอ
      หน้าจอกันคนพลาด · หลังบ้านกันคนตั้งใจ */
-  var gate = canEditField_(claimStage_(d.claims, r), field, FIELD_STAGE, me);
+  var gate = canEditField_(claimStage_(d.claims, r), field, FIELD_STAGE, me, claimReceived_(d, r));
   if (!gate.ok) throw new Error(gate.why);
 
   var v = norm_(value);
@@ -106,7 +106,7 @@ function saveItemField(docNo, seq, field, value, auth){
   if (r < 0) throw new Error('ไม่พบรายการที่ ' + seq);
 
   var cr = findClaimRow_(d.claims, norm_(docNo));
-  var gate = canEditField_(claimStage_(d.claims, cr), field, ITEM_STAGE, me);
+  var gate = canEditField_(claimStage_(d.claims, cr), field, ITEM_STAGE, me, claimReceived_(d, cr));
   if (!gate.ok) throw new Error(gate.why);
 
   var v = norm_(value);
@@ -549,7 +549,9 @@ function getHome2(auth){
   }
   out.rep.jobs = Object.keys(jobs).length;
 
-  cachePut_('CLAIM_HOME', JSON.stringify(out), 20);   // 20 วิพอ — กดรีเฟรชแล้วเห็นของใหม่ทันที
+  cachePut_('CLAIM_HOME', JSON.stringify(out), 180);
+  /* 3 นาที — ทุกครั้งที่มีคนสร้าง/ส่งต่อ/ยกเลิกใบ ระบบล้างแคชนี้ให้เองอยู่แล้ว
+     ตัวเลขจึงไม่มีทางค้าง และหน้าแรกไม่ต้องนับใหม่ทุกครั้งที่กดกลับมา */
   return out;
 }
 

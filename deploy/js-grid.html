@@ -328,24 +328,31 @@ function gridTrCheck(id){
   setTrMsg('กำลังแปลกลับเป็นไทยเพื่อตรวจ…', 'wait');
   srv('translateCheck', [pairs, AUTH], function(res){
     setTrMsg('', '');
-    var t = '<div class="lightbox trbox"><div class="trpanel"><div class="trhd">' +
-      '<b>ตรวจคำแปล</b><span>อ่าน “แปลกลับเป็นไทย” เทียบกับต้นฉบับ — ถ้าความหมายเพี้ยน แปลว่าคำอังกฤษนั้นใช้ไม่ได้ ให้พิมพ์แก้เอง</span>' +
-      '<button onclick="this.closest(\'.lightbox\').remove()">ปิด ✕</button></div>' +
-      '<table class="t"><thead><tr><th style="width:34px">แถว</th><th>ต้นฉบับ (ไทย)</th>' +
-      '<th>คำแปล (EN)</th><th>แปลกลับเป็นไทย</th></tr></thead><tbody>';
+    /* เบียร์: "อยากให้เป็นแบบ POP Up เล็กๆ ด้านข้างเลย ไม่ต้องเปิดหน้าจอใหญ่
+       เพราะถ้ามีหลายรายการมันจะเยอะมาก"
+       → แผงลอยชิดขวา กว้าง 400px เลื่อนอ่านในตัวเอง หน้าหลักยังกดใช้งานต่อได้ */
+    var bad = 0;
+    for (var b = 0; b < res.length; b++) if (!looksClose(res[b].th, res[b].back)) bad++;
+
+    var t = '<div class="trside" id="trside"><div class="trshd">' +
+      '<b>🔎 ตรวจคำแปล</b>' +
+      '<span class="pill ' + (bad ? 'red' : 'green') + '">' +
+        (bad ? 'ต้องดูอีกที ' + bad + ' แถว' : 'ผ่านหมด ' + res.length + ' แถว') + '</span>' +
+      '<button class="trsx" onclick="closeTrSide()">✕</button></div>' +
+      '<div class="trsnote">อ่าน “แปลกลับเป็นไทย” เทียบกับต้นฉบับ — ความหมายเพี้ยน = คำอังกฤษนั้นใช้ไม่ได้ พิมพ์แก้ในตารางได้เลย</div>' +
+      '<div class="trsbody">';
     for (var i = 0; i < res.length; i++){
-      var x = res[i];
-      var same = looksClose(x.th, x.back);
-      t += '<tr><td class="c">' + x.seq + '</td><td>' + esc(x.th) + '</td>' +
-        '<td>' + esc(x.en) + '</td>' +
-        '<td class="' + (same ? '' : 'trbad') + '">' + esc(x.back) +
-        (same ? '' : ' <span class="pill red">ตรวจดูอีกที</span>') + '</td></tr>';
+      var x = res[i], same = looksClose(x.th, x.back);
+      t += '<div class="trsrow' + (same ? '' : ' bad') + '">' +
+        '<div class="trsno">แถว ' + x.seq + (same ? ' <span class="ok">✓</span>' : ' <span class="pill red">ตรวจดูอีกที</span>') + '</div>' +
+        '<div class="trsl"><i>ไทย</i>' + esc(x.th) + '</div>' +
+        '<div class="trsl"><i>EN</i>' + esc(x.en) + '</div>' +
+        '<div class="trsl back"><i>แปลกลับ</i>' + esc(x.back) + '</div></div>';
     }
-    t += '</tbody></table></div></div>';
+    t += '</div></div>';
+    closeTrSide();
     var d = document.createElement('div'); d.innerHTML = t;
-    var node = d.firstChild;
-    node.onclick = function(e){ if (e.target === node) node.remove(); };
-    document.body.appendChild(node);
+    document.body.appendChild(d.firstChild);
   }, function(m){ setTrMsg(m, 'bad'); });
 }
 /** เทียบหยาบ ๆ ว่าแปลกลับแล้วยังใกล้ของเดิมไหม — ใช้แค่ชี้จุดที่ควรอ่านซ้ำ ไม่ได้ตัดสินแทนคน */
@@ -356,4 +363,6 @@ function looksClose(a, b){
   for (var i = 0; i + 2 <= a.length; i += 2){ n++; if (b.indexOf(a.substr(i, 2)) >= 0) hit++; }
   return n ? (hit / n) >= 0.45 : false;
 }
+
+function closeTrSide(){ var e = $('trside'); if (e) e.parentNode.removeChild(e); }
 </script>

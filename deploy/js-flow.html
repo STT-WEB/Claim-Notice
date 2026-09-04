@@ -32,10 +32,21 @@ function flowBar(f){
          '<div class="rjnote">' + esc(f.rejectNote) + '</div></div>';
   }
 
+  if (f.stage === 'CANCELLED'){
+    t += '<div class="flowreject">🚫 <b>ใบนี้ถูกยกเลิกแล้ว</b>' +
+         (f.cancelReason ? '<div class="rjnote">' + esc(f.cancelReason) + '</div>' : '') + '</div></div>';
+    return t;
+  }
+
   t += '<div class="flownow">' +
        '<div><b>ขั้นที่ ' + f.no + ' · ' + esc(f.name) + '</b>' +
        '<span class="fwho">รอ ' + esc(f.who) + '</span></div>' +
-       '<div class="ftodo">' + esc(f.todo) + '</div></div>';
+       '<div class="ftodo">' + esc(f.todo) + '</div>' +
+       (f.isDraft ? '<div class="fdraft">📝 ยังเป็น<b>ร่าง</b> — เซฟค้างไว้ก่อนได้ ' +
+                    'สโตร์กับจัดซื้อยังไม่เห็นใบนี้ จนกว่าจะขออนุมัติและได้รับอนุมัติ</div>' : '') +
+       (f.needReceive && f.received
+          ? '<div class="frcv">✓ รับเรื่องแล้วโดย ' + esc(f.receivedBy) + ' เมื่อ ' + esc(f.receivedAt) + '</div>' : '') +
+       '</div>';
 
   /* ยังขาดอะไร — บอกก่อนที่จะกดส่งต่อ ไม่ใช่บอกตอนกดแล้วไม่ผ่าน */
   if (f.isOwner && f.missing && f.missing.length){
@@ -43,7 +54,11 @@ function flowBar(f){
   }
 
   t += '<div class="flowbtn">';
-  if (f.isOwner && f.next){
+  /* ต้องกดรับเรื่องก่อน ถึงจะกรอกและส่งต่อได้ — เบียร์: "สโตร์รับเรื่อง ... จัดซื้อกดรับเอกสาร" */
+  if (f.isOwner && f.needReceive && !f.received){
+    t += '<button class="btn primary" onclick="doReceive()">' + esc(f.receiveLabel) + '</button>' +
+         '<span class="fview">รับเรื่องก่อน แล้วช่องของคุณจะเปิดให้กรอก</span>';
+  } else if (f.isOwner && f.next){
     var can = !(f.missing && f.missing.length);
     t += '<button class="btn primary" ' + (can ? '' : 'disabled ') +
          'onclick="doAdvance()">' + esc(f.nextLabel) + '</button>';
@@ -56,6 +71,9 @@ function flowBar(f){
   }
   if (f.history){
     t += '<button class="btn ghost" onclick="showHistory()">🕘 ประวัติการส่งต่อ</button>';
+  }
+  if (f.canCancel){          // เบียร์เท่านั้น
+    t += '<button class="btn ghost danger" onclick="openCancel()">🚫 ยกเลิกใบเคลม</button>';
   }
   t += '</div></div>';
   return t;
@@ -76,7 +94,7 @@ function openReject(){
     '<button onclick="this.closest(\'.lightbox\').remove()">ปิด ✕</button></div>' +
     '<div class="frow"><label>ส่งกลับหา</label>' +
       '<select id="rjTo"><option value="STORE">ขั้น 2 · สโตร์ (เลขใบส่งมอบ · PO · Supplier)</option>' +
-      '<option value="REQUEST">ขั้น 1 · คนเปิดใบ (ข้อมูลรถ · รายการที่เคลม · รูป)</option></select></div>' +
+      '<option value="REQUEST">ต้นน้ำ · ทีมงานที่เปิดใบ (ข้อมูลรถ · รายการที่เคลม · รูป)</option></select></div>' +
     '<div class="frow"><label>ต้องแก้อะไร</label>' +
       '<textarea id="rjWhy" class="tall" placeholder="เช่น PO ของรายการที่ 2 ไม่ตรงกับ Supplier · รูปรายการที่ 3 ถ่ายไม่ชัด"></textarea></div>' +
     '<div id="rjMsg"></div>' +
@@ -166,5 +184,21 @@ function flowBarNew(){
        'บันทึกแล้วระบบจะให้ส่งต่อไปให้สโตร์เติม PO และเด้งแจ้งเตือนเข้า LINE ให้เอง</div></div>';
   t += '</div>';
   return t;
+}
+
+/* ── กดรับเรื่อง / กดรับเอกสาร ── */
+function doReceive(){
+  srv('receiveClaim', [CURDOC, AUTH], function(){ openClaim(CURDOC); },
+      function(m){ alert(m); });
+}
+
+/* ── ยกเลิกใบเคลม (ผู้บริหารเท่านั้น) ── */
+function openCancel(){
+  var why = prompt('ยกเลิกใบเคลม ' + CURDOC + '\n\nใบที่ยกเลิกจะไม่โผล่ในทะเบียนอีก แต่ข้อมูลยังอยู่ในไฟล์\n' +
+                   'บอกเหตุผลที่ยกเลิก:');
+  if (why === null) return;
+  if (!String(why).trim()){ alert('ต้องบอกเหตุผลครับ'); return; }
+  srv('cancelClaim', [CURDOC, why, AUTH], function(){ alert('ยกเลิกใบ ' + CURDOC + ' แล้ว'); go('list'); },
+      function(m){ alert(m); });
 }
 </script>

@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v0.8.0';
+var VERSION = 'v0.9.0';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -660,17 +660,34 @@ function getClaim(docNo, auth){
 }
 
 /** ทะเบียนเอกสารทั้งหมด */
+/** เบียร์: "ทีมงานอาจจะทำใบร่างไว้ก่อนได้ เพราะงั้นสโตร์กับจัดซื้อก็จะไม่เห็นข้อมูลนั้น"
+ *  ใบที่ยังเป็นร่าง เห็นได้เฉพาะ คนที่เปิดใบ · แผนกเดียวกับคนเปิด · ผู้บังคับบัญชา · ผู้บริหาร */
+function canSeeDraft_(me, createdBy, dept){
+  var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
+  if (mine.indexOf('ADMIN') >= 0 || mine.indexOf('APPROVER') >= 0) return true;
+  if (norm_(createdBy) && norm_(createdBy) === norm_(me.name)) return true;
+  if (norm_(dept) && norm_(dept) === norm_(me.dept)) return true;     // เพื่อนร่วมแผนกเห็นได้
+  return false;
+}
+
 function listClaims(filter, auth){
-  requireLogin_(auth);
+  var meL = requireLogin_(auth);
   filter = filter || {};
   var d = db_(), lr = d.claims.getLastRow();
   if (lr < 2) return [];
+  var full = claimHdr_();
+  ensureCols_(d.claims, full);
   var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
-  var rows = d.claims.getRange(2,1,lr-1,HDR_CLAIM.length).getDisplayValues();
+  var rows = d.claims.getRange(2,1,lr-1,full.length).getDisplayValues();
+  var iStage = colOf_('ขั้นตอน') - 1;
   var pho = photoCoverage_();          // v0.2.0 — รูปครบไหม ดูได้ตั้งแต่หน้าทะเบียน
   var out = [];
   for (var i = rows.length - 1; i >= 0; i--){      // ใหม่อยู่บน
     var o = claimRowObj_(hdr, rows[i]);
+    var stg = norm_(rows[i][iStage]) || 'REQUEST';
+    /* ใบร่างยังไม่ให้สโตร์/จัดซื้อเห็น — เห็นเฉพาะคนเปิด แผนกเดียวกัน ผู้บังคับบัญชา ผู้บริหาร */
+    if (stageDef_(stg).draft && !canSeeDraft_(meL, o['สร้างโดย'], o['แผนก'])) continue;
+    if (stg === 'CANCELLED' && !filter.showCancelled) continue;    // ใบที่ยกเลิกแล้ว ซ่อนไว้ก่อน
     if (filter.jobNo && o['เลขที่ JOB'].toUpperCase() !== norm_(filter.jobNo).toUpperCase()) continue;
     if (filter.type && typeFromJobNo_(o['เลขที่ JOB']).toUpperCase() !== norm_(filter.type).toUpperCase()) continue;
     if (filter.q){
@@ -683,6 +700,8 @@ function listClaims(filter, auth){
       claimType:o['ประเภทการเคลม'], area:o['สถานที่ผลิต'],
       jobNo:o['เลขที่ JOB'], jobName:o['ชื่อลูกค้า'], model:o['MODEL'],
       status:o['สถานะ'], by:o['สร้างโดย'],
+      stage:stg, stageNo:stageDef_(stg).no, stageName:stageDef_(stg).name,
+      waitWho:stageDef_(stg).who,
       nItem: (pho.item[o['เลขที่เอกสาร']] || 0),
       nPhoto:(pho.photo[o['เลขที่เอกสาร']] || 0),
       nNoPhoto:(pho.noPhoto[o['เลขที่เอกสาร']] === undefined
@@ -796,6 +815,38 @@ function listPhotos(docNo, auth){
    เดิมโค้ดข้างในเรียก listPhotos(docNo, null) ซึ่งบังคับล็อกอิน
    → เปิดใบเคลม/กดส่งต่อขั้น พังทันทีด้วยข้อความ "กรุณาเข้าสู่ระบบก่อน"
    ทั้งที่ผู้ใช้ล็อกอินอยู่ · ฟังก์ชันที่คนเรียกจากหน้าเว็บยังตรวจสิทธิ์เหมือนเดิม */
+/** เบียร์: "รูปที่โหลดมาใส่แล้ว เบียร์จะ Copy ไปให้ Supplier ยังไง"
+ *  → มัดรูปทั้งใบเป็นไฟล์ .zip ไฟล์เดียว ดาวน์โหลดแล้วลากเข้า LINE / แนบเมลได้เลย
+ *    ไม่ใช่ให้ส่งลิงก์ให้เขาไปกดเปิดทีละรูป                                        */
+function zipPhotos(docNo, auth){
+  requireLogin_(auth);
+  docNo = norm_(docNo);
+  var ph = photosOf_(docNo), blobs = [], n = 0;
+  var seqs = Object.keys(ph).sort();
+  for (var i = 0; i < seqs.length; i++){
+    var list = ph[seqs[i]];
+    for (var j = 0; j < list.length; j++){
+      try {
+        var f = DriveApp.getFileById(list[j].id);
+        var b = f.getBlob();
+        b.setName(docNo.replace(/[^\w]+/g,'-') + '_ข้อ' + seqs[i] + '_' + (j + 1) + '.jpg');
+        blobs.push(b); n++;
+      } catch(e){}
+    }
+  }
+  if (!n) throw new Error('ใบนี้ยังไม่มีรูปให้ดาวน์โหลด');
+
+  var name = 'รูปเคลม_' + docNo.replace(/[^\w]+/g,'-') + '.zip';
+  var folder = mediaFolder_('', docNo);
+  var old = folder.getFilesByName(name);
+  while (old.hasNext()){ try { old.next().setTrashed(true); } catch(e){} }   // ทับของเก่า ไม่ให้กองไว้
+  var zf = folder.createFile(Utilities.zip(blobs, name));
+  try { zf.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch(e){}
+  log_('zipPhotos', docNo, n + ' รูป');
+  return { ok:true, n:n, name:name,
+           url:'https://drive.google.com/uc?export=download&id=' + zf.getId() };
+}
+
 function photosOf_(docNo){
   docNo = norm_(docNo);
   var sh = photoTab_(), lr = sh.getLastRow();

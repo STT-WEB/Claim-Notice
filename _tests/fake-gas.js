@@ -96,6 +96,8 @@ class DFile{
   constructor(name,blob){ this.id='F'+(++DRIVE_N); this.name=name; this.blob=blob; this.parents=[]; DFILES[this.id]=this; }
   getId(){ return this.id; } getName(){ return this.name; }
   setSharing(){ return this; } setTrashed(){ this.trashed=true; return this; }
+  getBlob(){ const b=this.blob; return { getName:()=>b?b.getName():this.name, setName(n){ this._n=n; return this; },
+                                         getBytes:()=>b?b.getBytes():[], getContentType:()=>'image/jpeg' }; }
   getParents(){ let i=0,p=this.parents; return { hasNext:()=>i<p.length, next:()=>p[i++] }; }
 }
 class DFolder{
@@ -103,6 +105,7 @@ class DFolder{
   getId(){ return this.id; } getName(){ return this.name; } getUrl(){ return 'https://drive/'+this.id; }
   createFolder(n){ const f=new DFolder(n); this.folders.push(f); return f; }
   getFoldersByName(n){ const m=this.folders.filter(f=>f.name===n); let i=0; return { hasNext:()=>i<m.length, next:()=>m[i++] }; }
+  getFilesByName(n){ const m=this.files.filter(f=>f.name===n); let i=0; return { hasNext:()=>i<m.length, next:()=>m[i++] }; }
   createFile(blob){ const f=new DFile(blob.getName(),blob); f.parents.push(this); this.files.push(f); STATS.driveFiles++; return f; }
   addFile(f){ if(!f.parents.includes(this)){ f.parents.push(this); this.files.push(f);} return this; }
   removeFile(f){ f.parents=f.parents.filter(p=>p!==this); this.files=this.files.filter(x=>x!==f); return this; }
@@ -127,7 +130,8 @@ const Utilities = {
     return f.replace('yyyy',d.getFullYear()).replace('MM',p(d.getMonth()+1)).replace('dd',p(d.getDate()))
             .replace('HH',p(d.getHours())).replace('mm',p(d.getMinutes())).replace('ss',p(d.getSeconds()));
   },
-  sleep(){}
+  sleep(){},
+  zip:(blobs,name)=>({ getName:()=>name, getBytes:()=>[], getContentType:()=>'application/zip' })
 };
 /* ⚠️ ของจริง: Web App ที่ deploy แบบ "ใครก็เข้าได้" Session.getActiveUser().getEmail()
    คืนค่าว่าง เกือบทุกกรณี  ถ้าจำลองให้คืนอีเมล = ซ่อนบั๊กที่ของจริงพัง (เคยพลาดมาแล้ว) */

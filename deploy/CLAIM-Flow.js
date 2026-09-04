@@ -1,16 +1,18 @@
 /**
  * STT CLAIM · ขั้นตอนงานและหน้าที่ (v0.5.0)
  * ─────────────────────────────────────────────────────────────
- * เบียร์ออกแบบ 4 ก.ย. 2569:
- *   ขั้น 1  Production / Sales / QC / Design  → กรอกข้อมูลที่ตัวเองรู้ + รายการที่เคลม
- *   ขั้น 2  สโตร์                              → เลขใบส่งมอบ · PO · Supplier   (เด้ง LINE)
- *   ขั้น 3  จัดซื้อ                            → ตรวจว่าครบไหม → Accept หรือ ตีกลับ (เด้ง LINE)
- *   ขั้น 4  จัดซื้อ                            → ส่ง Supplier · รับคำตอบ · ออกใบเรียกเก็บ
- *   ขั้น 5  QC / Production                    → รับของกลับ ตรวจรับ
- *   ขั้น 6  ปิดงาน
+ * เบียร์แก้โครงใหม่ 4 ก.ย. 2569 (ให้เหมือน BOM ใน NOVA):
+ *   ขั้น 1  ทีมงาน (Production/Sales/QC/Design) → กรอกข้อมูลตัวเอง + รูป · **เก็บเป็นร่างไว้ก่อนได้**
+ *                                                  ร่าง = สโตร์กับจัดซื้อยังไม่เห็น
+ *   ขั้น 2  ผู้บังคับบัญชา                        → อนุมัติ (หรือตีกลับให้แก้)
+ *   ขั้น 3  สโตร์        → **กดรับเรื่อง** ก่อน แล้วเติม เลขใบส่งมอบ · PO · Supplier → ส่งต่อ
+ *   ขั้น 4  จัดซื้อ      → **กดรับเอกสาร** ก่อน แล้วตรวจ → Accept หรือ ตีกลับไปต้นน้ำ
+ *   ขั้น 5  จัดซื้อ      → ส่ง Supplier · รับคำตอบ · ออกใบเรียกเก็บ
+ *   ขั้น 6  QC / Production → รับของกลับ ตรวจรับ
+ *   ขั้น 7  ปิดงาน       (+ สถานะพิเศษ "ยกเลิกแล้ว" ซึ่งเบียร์เท่านั้นที่สั่งได้)
  *
- * หลักที่เบียร์วางไว้ (ต่างจาก NOVA ที่แบ่งด้วยเมนู):
- *   · เอกสารใบเดียว **ทุกคนเห็นข้อมูลทั้งหมด** ไม่มีใครถูกซ่อนอะไร
+ * หลักที่เบียร์วางไว้:
+ *   · พ้นขั้นร่างแล้ว เอกสารใบเดียว **ทุกคนเห็นข้อมูลทั้งหมด**
  *   · แต่ **ทำงานแทนกันไม่ได้** — แก้ได้เฉพาะช่องของขั้นตัวเอง
  *   · ยกเว้น **สโตร์กับจัดซื้อช่วยกันได้** (เบียร์สั่งไว้ชัด)
  *   · ตีกลับได้ ระบุเหตุผล แล้วเอกสารเด้งกลับไปขั้นนั้นให้แก้
@@ -18,38 +20,51 @@
 
 /* ─────────── นิยามขั้นตอน ─────────── */
 var STAGES = [
-  { key:'REQUEST', no:1, name:'แจ้งเคลม',
+  { key:'REQUEST', no:1, name:'ร่าง · ทีมงานกรอก',
     who:'Production / Sales / QC / Design',
     roles:['PRODUCTION','SALES','QC','DESIGN'],
-    todo:'กรอกข้อมูลรถและรายการที่เคลม พร้อมแนบรูปทุกรายการ',
-    next:'STORE', nextLabel:'➜ ส่งให้สโตร์เติม PO', lineKey:'STORE' },
+    draft:true,                                   // ร่าง = สโตร์/จัดซื้อยังไม่เห็นใบนี้
+    todo:'กรอกข้อมูลของตัวเองให้ครบ + แนบรูปทุกรายการ · ช่องของสโตร์ยังไม่ต้องกรอก · เซฟค้างไว้ก่อนได้',
+    next:'APPROVAL', nextLabel:'➜ ส่งขออนุมัติ', lineKey:'APPROVER' },
 
-  { key:'STORE', no:2, name:'สโตร์เติมข้อมูล',
+  { key:'APPROVAL', no:2, name:'รอผู้บังคับบัญชาอนุมัติ',
+    who:'ผู้บังคับบัญชา (Approver)',
+    roles:['APPROVER'],
+    todo:'ตรวจว่าเคลมนี้สมควรออกไหม · อนุมัติแล้วเอกสารจะวิ่งไปหาสโตร์',
+    next:'STORE', nextLabel:'✓ อนุมัติ — ส่งให้สโตร์', lineKey:'STORE' },
+
+  { key:'STORE', no:3, name:'สโตร์รับเรื่อง · เติมข้อมูล',
     who:'สโตร์ (จัดซื้อช่วยได้)',
     roles:['STORE','PURCHASE'],
-    todo:'เติมเลขใบส่งมอบ · PO · Supplier ของแต่ละรายการ',
-    next:'PURCHASE', nextLabel:'➜ ส่งให้จัดซื้อตรวจ', lineKey:'PURCHASE' },
+    needReceive:true, receiveLabel:'📥 กดรับเรื่อง',
+    todo:'กดรับเรื่องก่อน แล้วเติมเลขใบส่งมอบ · PO · Supplier ของแต่ละรายการ',
+    next:'PURCHASE', nextLabel:'➜ ส่งให้จัดซื้อ', lineKey:'PURCHASE' },
 
-  { key:'PURCHASE', no:3, name:'จัดซื้อตรวจข้อมูล',
+  { key:'PURCHASE', no:4, name:'จัดซื้อรับเอกสาร · ตรวจ',
     who:'จัดซื้อ (สโตร์ช่วยได้)',
     roles:['PURCHASE','STORE'],
-    todo:'ตรวจว่าข้อมูลตรงและครบหรือยัง ถ้าครบกด Accept ถ้าไม่ครบตีกลับพร้อมเหตุผล',
+    needReceive:true, receiveLabel:'📥 กดรับเอกสาร',
+    todo:'กดรับเอกสารก่อน แล้วตรวจว่าข้อมูลครบไหม · ครบแล้วกด Accept · ไม่ครบตีกลับไปต้นน้ำพร้อมเหตุผล',
     next:'SUPPLIER', nextLabel:'✓ Accept — ข้อมูลครบ พร้อมส่ง Supplier', lineKey:'' },
 
-  { key:'SUPPLIER', no:4, name:'ส่ง Supplier · รอคำตอบ',
+  { key:'SUPPLIER', no:5, name:'ส่ง Supplier · รอคำตอบ',
     who:'จัดซื้อ (สโตร์ช่วยได้)',
     roles:['PURCHASE','STORE'],
     todo:'ส่งเอกสารให้ Supplier · บันทึกคำตอบที่ได้ · ออกใบเรียกเก็บถ้า STT ต้องซื้อ/ซ่อมเอง',
     next:'RETURN', nextLabel:'➜ ของกลับมาแล้ว ส่งให้ QC ตรวจรับ', lineKey:'QC' },
 
-  { key:'RETURN', no:5, name:'รับของกลับ + QC',
+  { key:'RETURN', no:6, name:'รับของกลับ + QC',
     who:'QC / Production',
     roles:['QC','PRODUCTION'],
     todo:'ถ่ายรูปของที่ได้กลับมา แล้วกด Accept / ไม่ Accept',
     next:'CLOSED', nextLabel:'✓ ปิดงานเคลม', lineKey:'' },
 
-  { key:'CLOSED', no:6, name:'ปิดงานแล้ว',
-    who:'—', roles:[], todo:'งานนี้จบแล้ว', next:'', nextLabel:'', lineKey:'' }
+  { key:'CLOSED', no:7, name:'ปิดงานแล้ว',
+    who:'—', roles:[], todo:'งานนี้จบแล้ว', next:'', nextLabel:'', lineKey:'' },
+
+  /* ยกเลิก — ไม่ใช่ขั้นตอนปกติ ไม่โชว์ในแถบขั้นตอน · เบียร์เท่านั้นที่กดได้ */
+  { key:'CANCELLED', no:0, name:'ยกเลิกแล้ว', hidden:true,
+    who:'—', roles:[], todo:'ใบนี้ถูกยกเลิก', next:'', nextLabel:'', lineKey:'' }
 ];
 
 function stageDef_(key){
@@ -86,7 +101,17 @@ var ITEM_STAGE = {
 };
 
 /** ตัดสินว่าคนนี้แก้ช่องนี้ได้ไหม ณ ขั้นตอนปัจจุบัน — เหตุผลบอกเป็นภาษาคน */
-function canEditField_(curStage, field, map, me){
+/** ขั้นนี้ต้องกดรับเรื่องก่อนไหม และรับหรือยัง */
+/** ขั้นปัจจุบันของแถวนี้ ถูกกดรับเรื่องแล้วหรือยัง */
+function claimReceived_(d, row){
+  var key = claimStage_(d.claims, row);
+  if (!stageDef_(key).needReceive) return true;
+  return !!norm_(d.claims.getRange(row, colOf_('รับเรื่องเมื่อ')).getDisplayValue());
+}
+
+function needReceive_(key){ return !!stageDef_(key).needReceive; }
+
+function canEditField_(curStage, field, map, me, received){
   /* เบียร์: "ถึงเบียร์จะเป็น Admin ก็ต้องล้อตามกฎที่วางไว้นะ"
      → ผู้บริหารทำงานแทนแผนกไหนก็ได้ (จะได้ช่วยงานได้เวลาคนไม่อยู่)
        แต่ **ข้ามลำดับขั้นไม่ได้** เหมือนกันทุกคน
@@ -111,6 +136,9 @@ function canEditField_(curStage, field, map, me){
   }
   if (always) return { ok:true };
 
+  if (norm_(curStage) === key && needReceive_(key) && received === false){
+    return { ok:false, why:'ยังไม่ได้กดรับเรื่อง — กดปุ่ม "' + stageDef_(key).receiveLabel + '" ข้างบนก่อน แล้วช่องจะเปิดให้กรอก' };
+  }
   if (norm_(curStage) !== key){
     var cur = stageDef_(curStage);
     return { ok:false, why:'ตอนนี้เอกสารอยู่ขั้น ' + cur.no + ' (' + cur.name + ') แล้ว ' +
@@ -123,7 +151,7 @@ function canEditField_(curStage, field, map, me){
  * ต่อท้ายของเดิม แล้วเติมหัวตารางให้ชีตเก่าอัตโนมัติ (ensureCols_)
  * ⚠️ ห้ามใช้ HDR_CLAIM.length เป็น "คอลัมน์แก้ไขล่าสุด" อีกต่อไป
  *    เพราะพอเพิ่มคอลัมน์ ตัวเลขนั้นจะเลื่อนไปทับคอลัมน์ใหม่ — ใช้ colOf_() แทน */
-var HDR_FLOW = ['ขั้นตอน','รอใครทำ','เหตุผลที่ตีกลับ','ตีกลับโดย','ตีกลับเมื่อ','ประวัติขั้นตอน','ปริ้นส่งออกแล้วเมื่อ','ปริ้นโดย'];
+var HDR_FLOW = ['ขั้นตอน','รอใครทำ','เหตุผลที่ตีกลับ','ตีกลับโดย','ตีกลับเมื่อ','ประวัติขั้นตอน','ปริ้นส่งออกแล้วเมื่อ','ปริ้นโดย','รับเรื่องเมื่อ','รับเรื่องโดย','เหตุผลยกเลิก'];
 
 function claimHdr_(){ return HDR_CLAIM.concat(HDR_FLOW); }
 
@@ -158,14 +186,16 @@ function claimStage_(sh, row){
 
 /** สถานะของใบ = ผลของขั้นตอน ไม่ใช่ของที่ใครมานั่งเลือกเอง
  *  เบียร์ถามว่า "สถานะคืออะไร ใครต้องเป็นคนเปลี่ยน" — คำตอบคือ ไม่มีใครเปลี่ยน ระบบเปลี่ยนให้ */
-var STAGE_STATUS = { REQUEST:'DRAFT', STORE:'DRAFT', PURCHASE:'DRAFT',
-                     SUPPLIER:'SENT', RETURN:'REPLIED', CLOSED:'CLOSED' };
+var STAGE_STATUS = { REQUEST:'DRAFT', APPROVAL:'WAIT_APPROVE', STORE:'IN_STORE', PURCHASE:'IN_PURCHASE',
+                     SUPPLIER:'SENT', RETURN:'REPLIED', CLOSED:'CLOSED', CANCELLED:'CANCELLED' };
 function statusOfStage_(key){ return STAGE_STATUS[norm_(key)] || 'DRAFT'; }
 
 function setStage_(sh, row, key, me, note){
   var hist = norm_(sh.getRange(row, colOf_('ประวัติขั้นตอน')).getDisplayValue());
   var line = nowStamp_() + ' · ' + stageDef_(key).name + ' · ' + (me ? me.name : '') + (note ? ' · ' + note : '');
   sh.getRange(row, colOf_('ขั้นตอน')).setValue(key);
+  sh.getRange(row, colOf_('รับเรื่องเมื่อ')).setValue('');    // ขั้นใหม่ = ต้องกดรับเรื่องใหม่
+  sh.getRange(row, colOf_('รับเรื่องโดย')).setValue('');
   sh.getRange(row, colOf_('สถานะ')).setValue(statusOfStage_(key));   // สถานะเดินตามขั้นตอนเสมอ
   sh.getRange(row, colOf_('รอใครทำ')).setValue(stageDef_(key).who);
   sh.getRange(row, colOf_('ประวัติขั้นตอน')).setValue((hist ? hist + '\n' : '') + line);
@@ -185,37 +215,100 @@ function claimFlow(docNo, auth){
   var isOwner = isAdmin;
   for (var i = 0; i < mine.length; i++) if (st.roles.indexOf(mine[i]) >= 0) isOwner = true;
 
+  var rcvAt = norm_(d.claims.getRange(r, colOf_('รับเรื่องเมื่อ')).getDisplayValue());
+  var received = st.needReceive ? !!rcvAt : true;
+
   return {
+    needReceive: !!st.needReceive, receiveLabel: st.receiveLabel || '📥 กดรับเรื่อง',
+    received: received,
+    receivedAt: rcvAt,
+    receivedBy: norm_(d.claims.getRange(r, colOf_('รับเรื่องโดย')).getDisplayValue()),
+    isDraft: !!st.draft,
+    canCancel: isAdmin && key !== 'CANCELLED' && key !== 'CLOSED',
+    cancelReason: norm_(d.claims.getRange(r, colOf_('เหตุผลยกเลิก')).getDisplayValue()),
     stage:key, no:st.no, name:st.name, who:st.who, todo:st.todo,
     next:st.next, nextLabel:st.nextLabel,
     isOwner:isOwner,
-    canReject: (key === 'PURCHASE' || key === 'SUPPLIER') && isOwner,
+    canReject: (key === 'APPROVAL' || key === 'STORE' || key === 'PURCHASE' || key === 'SUPPLIER') && isOwner,
     rejectNote: norm_(d.claims.getRange(r, colOf_('เหตุผลที่ตีกลับ')).getDisplayValue()),
     rejectBy:   norm_(d.claims.getRange(r, colOf_('ตีกลับโดย')).getDisplayValue()),
     rejectAt:   norm_(d.claims.getRange(r, colOf_('ตีกลับเมื่อ')).getDisplayValue()),
     history:    norm_(d.claims.getRange(r, colOf_('ประวัติขั้นตอน')).getDisplayValue()),
     printedAt:  norm_(d.claims.getRange(r, colOf_('ปริ้นส่งออกแล้วเมื่อ')).getDisplayValue()),
     printedBy:  norm_(d.claims.getRange(r, colOf_('ปริ้นโดย')).getDisplayValue()),
-    stages: STAGES.map(function(s){ return { key:s.key, no:s.no, name:s.name, who:s.who }; }),
-    lock: lockMap_(key, me),
+    stages: STAGES.filter(function(s){ return !s.hidden; })
+                  .map(function(s){ return { key:s.key, no:s.no, name:s.name, who:s.who }; }),
+    lock: lockMap_(key, me, received),
     missing: claimMissing_(d, norm_(docNo), key)
   };
 }
 
 /** ช่องไหนคนนี้แก้ไม่ได้บ้าง + เพราะอะไร — ส่งให้หน้าเว็บทำเป็นช่องสีเทาพร้อมเหตุผล
  *  ส่งเฉพาะ "ช่องที่ล็อก" ไม่ต้องส่งทั้งหมด ข้อมูลจะได้ไม่บวม */
-function lockMap_(stageKey, me){
+function lockMap_(stageKey, me, received){
   var out = {};
   var f;
   for (f in FIELD_STAGE){
-    var g = canEditField_(stageKey, f, FIELD_STAGE, me);
+    var g = canEditField_(stageKey, f, FIELD_STAGE, me, received);
     if (!g.ok) out[f] = g.why;
   }
   for (f in ITEM_STAGE){
-    var g2 = canEditField_(stageKey, f, ITEM_STAGE, me);
+    var g2 = canEditField_(stageKey, f, ITEM_STAGE, me, received);
     if (!g2.ok) out['item.' + f] = g2.why;
   }
   return out;
+}
+
+/* ═══ กดรับเรื่อง / กดรับเอกสาร ═══════════════════════════════
+ * เบียร์: "ส่งต่อให้สโตร์ รับเรื่อง กรอก ... แล้วก็กดส่งหา จัดซื้อกดรับเอกสาร"
+ * ก่อนกดรับ = ช่องของขั้นนั้นยังล็อกอยู่ · กดรับแล้วถึงเปิด และรู้ว่าใครเป็นคนรับ เมื่อไหร่ */
+function receiveClaim(docNo, auth){
+  var me = requireLogin_(auth);
+  docNo = norm_(docNo);
+  var d = db_(), r = findClaimRow_(d.claims, docNo);
+  if (r < 0) throw new Error('ไม่พบใบเคลม ' + docNo);
+  ensureCols_(d.claims, claimHdr_());
+
+  var key = claimStage_(d.claims, r), st = stageDef_(key);
+  if (!st.needReceive) throw new Error('ขั้นนี้ไม่ต้องกดรับเรื่อง');
+  if (norm_(d.claims.getRange(r, colOf_('รับเรื่องเมื่อ')).getDisplayValue()))
+    throw new Error('ขั้นนี้มีคนกดรับไปแล้ว');
+
+  var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
+  var ok = mine.indexOf('ADMIN') >= 0;
+  for (var i = 0; i < mine.length; i++) if (st.roles.indexOf(mine[i]) >= 0) ok = true;
+  if (!ok) throw new Error('ขั้นนี้เป็นหน้าที่ของ ' + st.who + ' — สิทธิ์ของคุณคือ ' + mine.join(', '));
+
+  d.claims.getRange(r, colOf_('รับเรื่องเมื่อ')).setValue(nowStamp_());
+  d.claims.getRange(r, colOf_('รับเรื่องโดย')).setValue(me.name);
+  var hist = norm_(d.claims.getRange(r, colOf_('ประวัติขั้นตอน')).getDisplayValue());
+  d.claims.getRange(r, colOf_('ประวัติขั้นตอน'))
+   .setValue((hist ? hist + '\n' : '') + nowStamp_() + ' · ' + st.name + ' · ' + me.name + ' · รับเรื่องแล้ว');
+  log_('receiveClaim', docNo, key + ' · ' + me.name);
+  try { CacheService.getScriptCache().remove('CLAIM_HOME'); } catch(e){}
+  return { ok:true, at:nowStamp_(), by:me.name };
+}
+
+/* ═══ ยกเลิกใบเคลม — เบียร์เท่านั้น ═══════════════════════════
+ * เบียร์: "สามารถกดยกเลิกใบเคลมได้ จากเบียร์เท่านั้น"                */
+function cancelClaim(docNo, reason, auth){
+  var me = requireLogin_(auth);
+  var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
+  if (mine.indexOf('ADMIN') < 0) throw new Error('ยกเลิกใบเคลมได้เฉพาะผู้บริหารเท่านั้น');
+  reason = norm_(reason);
+  if (!reason) throw new Error('ต้องบอกเหตุผลที่ยกเลิก จะได้รู้ทีหลังว่าทำไมถึงยกเลิก');
+
+  docNo = norm_(docNo);
+  var d = db_(), r = findClaimRow_(d.claims, docNo);
+  if (r < 0) throw new Error('ไม่พบใบเคลม ' + docNo);
+  ensureCols_(d.claims, claimHdr_());
+  if (claimStage_(d.claims, r) === 'CANCELLED') throw new Error('ใบนี้ยกเลิกไปแล้ว');
+
+  setStage_(d.claims, r, 'CANCELLED', me, 'ยกเลิก: ' + reason);
+  d.claims.getRange(r, colOf_('เหตุผลยกเลิก')).setValue(reason);
+  log_('cancelClaim', docNo, reason);
+  try { CacheService.getScriptCache().remove('CLAIM_HOME'); } catch(e){}
+  return { ok:true, stage:'CANCELLED' };
 }
 
 /** ส่งงานต่อขั้นถัดไป — ตรวจให้ครบก่อน ไม่ให้ส่งของที่ยังขาด */
@@ -235,6 +328,9 @@ function advanceClaim(docNo, auth){
     for (var i = 0; i < mine.length; i++) if (st.roles.indexOf(mine[i]) >= 0) ok = true;
     if (!ok) throw new Error('ขั้นนี้เป็นหน้าที่ของ ' + st.who + ' — สิทธิ์ของคุณคือ ' + mine.join(', '));
   }
+
+  if (st.needReceive && !norm_(d.claims.getRange(r, colOf_('รับเรื่องเมื่อ')).getDisplayValue()))
+    throw new Error('ยังไม่ได้กด "' + st.receiveLabel + '" — ต้องกดรับก่อนถึงจะส่งต่อได้');
 
   var miss = claimMissing_(d, docNo, key);
   if (miss.length) throw new Error('ยังส่งต่อไม่ได้ — ' + miss.join(' · '));
@@ -271,11 +367,12 @@ function rejectClaim(docNo, toStage, reason, auth){
 
   var cur = claimStage_(d.claims, r);
   var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
-  if (mine.indexOf('ADMIN') < 0 && mine.indexOf('PURCHASE') < 0 && mine.indexOf('STORE') < 0){
-    throw new Error('ตีกลับได้เฉพาะจัดซื้อและสโตร์');
+  if (mine.indexOf('ADMIN') < 0 && mine.indexOf('PURCHASE') < 0 && mine.indexOf('STORE') < 0
+      && mine.indexOf('APPROVER') < 0){
+    throw new Error('ตีกลับได้เฉพาะผู้บังคับบัญชา สโตร์ และจัดซื้อ');
   }
   var to = stageDef_(toStage);
-  if (to.key !== 'REQUEST' && to.key !== 'STORE') throw new Error('ตีกลับได้เฉพาะขั้น 1 (คนเปิดใบ) หรือขั้น 2 (สโตร์)');
+  if (to.key !== 'REQUEST' && to.key !== 'STORE') throw new Error('ตีกลับได้เฉพาะไปหาต้นน้ำ (ทีมงานที่เปิดใบ) หรือสโตร์');
 
   setStage_(d.claims, r, to.key, me, 'ตีกลับ: ' + reason);
   d.claims.getRange(r, colOf_('เหตุผลที่ตีกลับ')).setValue(reason);
@@ -322,6 +419,7 @@ function claimMissing_(d, docNo, stageKey){
   }
 
   if (stageKey === 'STORE'){
+    if (!norm_(h['เลขใบส่งมอบ'])) miss.push('ยังไม่ใส่เลขใบส่งมอบ');
     var noPo = [], noSup = [];
     for (var m = 0; m < items.length; m++){
       if (!norm_(items[m][8]))  noPo.push(norm_(items[m][1]));    // PO

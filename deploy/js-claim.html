@@ -934,41 +934,57 @@ function zoomPhoto(view, thumb){
 /** เบียร์: "รูปที่โหลดมาใส่แล้ว เบียร์จะ Copy ไปให้ Supplier ยังไง"
  *  ให้ 3 ทาง: ปริ้น/PDF (รูปติดไปในเอกสารเลย) · ลิงก์โฟลเดอร์ · ก๊อปลิงก์รูปทีละรายการ */
 function sharePhotos(){
-  var lines = [], total = 0;
   var seqs = Object.keys(PHOTOS).sort(function(a,b){ return num2(a) - num2(b); });
-  for (var i = 0; i < seqs.length; i++){
-    var sq = seqs[i], list = PHOTOS[sq] || [];
-    if (!list.length) continue;
-    var name = '';
-    for (var k = 0; k < CLAIM.items.length; k++) if (String(CLAIM.items[k].seq) === String(sq)) name = CLAIM.items[k].name;
-    lines.push('ข้อ ' + sq + (name ? ' · ' + name : ''));
-    for (var j = 0; j < list.length; j++){ lines.push('   ' + list[j].view); total++; }
-  }
-  var txt = 'รูปหลักฐานการเคลม ' + CURDOC + ' (เลขจ๊อบ ' + CURJOB + ')\n\n' + lines.join('\n');
+  var total = 0;
+  for (var z = 0; z < seqs.length; z++) total += (PHOTOS[seqs[z]] || []).length;
 
   var t = '<div class="card"><div class="cardhd"><h3>📤 ส่งรูปให้ Supplier — ' + esc(CURDOC) + '</h3>' +
     '<span class="sub">' + total + ' รูป</span>' +
     '<button class="btn" onclick="go(\'claim\',CURDOC)">← กลับใบเคลม</button></div>';
-  t += '<ol class="sharelist">' +
-    '<li><b>วิธีที่ 1 — ส่งเป็นเอกสาร (แนะนำ)</b> รูปติดไปในใบเลย ไม่ต้องส่งแยก<br>' +
-      '<button class="btn primary" onclick="go(\'print\',CURDOC)">🖨️ ไปหน้าปริ้น → เลือกฉบับส่ง Supplier → บันทึกเป็น PDF</button></li>' +
-    '<li><b>วิธีที่ 2 — ส่งลิงก์โฟลเดอร์</b> Supplier กดดูรูปเต็มทุกใบได้เอง<br>' +
-      '<button class="btn ghost" onclick="openMediaFolder()">📁 เปิดโฟลเดอร์ใน Drive</button></li>' +
-    '<li><b>วิธีที่ 3 — ก๊อปลิงก์รูปไปวางในแชท</b> (LINE / อีเมล)<br>' +
-      '<button class="btn ghost" onclick="copyShare()">📋 คัดลอกลิงก์ทั้งหมด</button> ' +
-      '<span id="cpmsg" class="hint"></span>' +
-      '<textarea id="shareBox" class="sharebox" readonly>' + esc(txt) + '</textarea></li></ol>';
-  t += '<div class="hint">ไฟล์รูปตัวจริงอยู่ใน Drive ของบริษัท ลิงก์เปิดดูได้โดยไม่ต้องล็อกอิน — ' +
-       'ถ้า Supplier ขอไฟล์แยก ให้ดาวน์โหลดจากโฟลเดอร์ในวิธีที่ 2</div></div>';
+
+  t += '<div class="sharebar">' +
+    '<button class="btn primary" onclick="dlZip()">⬇️ ดาวน์โหลดรูปทั้งหมดเป็นไฟล์ .zip</button>' +
+    '<span class="hint">ได้ไฟล์รูปตัวจริงมาที่เครื่อง ลากเข้า LINE หรือแนบอีเมลได้เลย</span>' +
+    '<span id="zipmsg" class="hint"></span></div>';
+  t += '<div class="hint" style="margin:2px 0 12px">หรือกด ⬇️ ใต้รูปแต่ละใบ เพื่อโหลดเฉพาะรูปนั้น · ' +
+       'ถ้าอยากให้รูปติดไปในเอกสารเลย ใช้ <b>ปริ้น → บันทึกเป็น PDF</b> แทน</div>';
+
+  if (!total){
+    t += '<div class="empty">ใบนี้ยังไม่มีรูป</div></div>';
+    $('view').innerHTML = t; return;
+  }
+
+  for (var i = 0; i < seqs.length; i++){
+    var sq = seqs[i], list = PHOTOS[sq] || [];
+    if (!list.length) continue;
+    var nm = '';
+    for (var k = 0; k < CLAIM.items.length; k++) if (String(CLAIM.items[k].seq) === String(sq)) nm = CLAIM.items[k].name;
+    t += '<div class="shgrp"><div class="shhd">ข้อ ' + esc(sq) + (nm ? ' · ' + esc(nm) : '') +
+         ' <span>(' + list.length + ' รูป)</span></div><div class="phwrap">';
+    for (var j = 0; j < list.length; j++){
+      t += '<div class="phcell rep"><img src="' + list[j].thumb + '" ' +
+           'onclick="zoomPhoto(\'' + list[j].view + '\',\'' + list[j].thumb + '\')" ' +
+           'onerror="this.parentNode.classList.add(\'bad\')">' +
+           '<a class="phdl" title="ดาวน์โหลดรูปนี้" target="_blank" rel="noopener" ' +
+           'href="https://drive.google.com/uc?export=download&id=' + esc(list[j].id) + '">⬇️</a></div>';
+    }
+    t += '</div></div>';
+  }
+  t += '</div>';
   $('view').innerHTML = t;
 }
-function num2(v){ var n = parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n) ? 0 : n; }
-function copyShare(){
-  var el = $('shareBox'); el.select(); el.setSelectionRange(0, 999999);
-  var ok = false;
-  try { ok = document.execCommand('copy'); } catch(e){}
-  $('cpmsg').textContent = ok ? '✓ คัดลอกแล้ว เอาไปวางในแชทได้เลย' : 'กดค้างที่ข้อความแล้วเลือกคัดลอกเองได้ครับ';
+
+/** มัดรูปทั้งใบเป็น .zip แล้วเปิดให้โหลด */
+function dlZip(){
+  $('zipmsg').innerHTML = '<span class="spin"></span> กำลังมัดรูปเป็นไฟล์ zip…';
+  srv('zipPhotos', [CURDOC, AUTH], function(r){
+    $('zipmsg').innerHTML = '✓ ได้ไฟล์ <b>' + esc(r.name) + '</b> (' + r.n + ' รูป) — ' +
+      '<a href="' + r.url + '" target="_blank" rel="noopener">ถ้าไม่เริ่มโหลดเอง กดตรงนี้</a>';
+    window.open(r.url, '_blank');
+  }, function(m){ $('zipmsg').innerHTML = '<span class="bad">' + esc(m) + '</span>'; });
 }
+
+function num2(v){ var n = parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n) ? 0 : n; }
 function openMediaFolder(){
   srv('getMediaFolderLink', [CURDOC, CURJOB, AUTH], function(u){ window.open(u, '_blank'); });
 }

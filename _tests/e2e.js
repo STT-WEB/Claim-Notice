@@ -14,6 +14,7 @@ users.appendRow(['6100030','sasipa@suteetankers.com','คุณเบียร�
 users.appendRow(['6406013','somchai@suteetankers.com','คุณสมชาย','222222','Y','','QC / Production','']);
 users.appendRow(['6406020','store@suteetankers.com','คุณสโตร์','333333','Y','','Store','']);
 users.appendRow(['6406021','buy@suteetankers.com','คุณจัดซื้อ','444444','Y','','Purchase','']);
+users.appendRow(['6406099','boss@suteetankers.com','คุณหัวหน้า','555555','Y','','Approver','']);
 
 /* ทำให้ตารางจ๊อบ "ใหญ่จริง" เพื่อพิสูจน์ว่าแคชหั่นชิ้นทำงาน (ของจริงก็ใหญ่แบบนี้) */
 const wip = ms.insertSheet('All WIP JT/JM');
@@ -65,6 +66,7 @@ const AUTH = {emp:'6100030', pin:'111111'};
 const STORE = {emp:'6406020', pin:'333333'};
 const BUY   = {emp:'6406021', pin:'444444'};
 const QC    = {emp:'6406013', pin:'222222'};
+const BOSS  = {emp:'6406099', pin:'555555'};
 const px = 'data:image/jpeg;base64,'+Buffer.from('x'.repeat(500)).toString('base64');
 
 console.log('\n① เข้าสู่ระบบ + ข้อมูลกลาง');
@@ -107,21 +109,45 @@ T('เปิดใบเคลมที่บันทึกแล้ว (getCla
 T('ทะเบียนใบเคลม', ()=>call('listClaims',[{},QC]).length+' ใบ');
 T('หน้าแรก', ()=>{ const h=call('getHome2',[QC]); return 'เคลม '+h.clm.total+' ใบ'; });
 
-console.log('\n③ ส่งต่อทีละขั้น — ใครทำส่วนของใคร');
-T('QC กด "ส่งให้สโตร์"', ()=>{ const r=call('advanceClaim',[DOC,QC]); return r.stage||JSON.stringify(r); });
-T('สโตร์แก้ช่องของตัวเองได้ (เลขใบส่งมอบ)', ()=>{ call('saveClaimField',[DOC,'deliveryNote','DN-69/0455',STORE]); return 'ผ่าน'; });
-T('สโตร์แก้ช่องของขั้น 1 ไม่ได้ (ต้องโดนกัน)', ()=>{
-  try { call('saveClaimField',[DOC,'model','เปลี่ยนเอง',STORE]); }
-  catch(e){ return 'กันไว้ถูกแล้ว: '+e.message.slice(0,45)+'…'; }
-  throw new Error('สโตร์แก้ MODEL ได้ ทั้งที่เป็นของขั้น 1'); });
-T('จัดซื้อช่วยสโตร์ได้ (ใส่ PO ให้)', ()=>{ call('saveItemField',[DOC,1,'po','PO-69/0455',BUY]);
-  call('saveItemField',[DOC,1,'supplier','JINAN VALVE CO.,LTD',BUY]);
-  call('saveItemField',[DOC,2,'po','PO-69/0455',BUY]);
-  call('saveItemField',[DOC,2,'supplier','JINAN VALVE CO.,LTD',BUY]); return 'ผ่าน'; });
-T('สโตร์กด "ส่งให้จัดซื้อตรวจ"', ()=>call('advanceClaim',[DOC,STORE]).stage);
-T('จัดซื้อตีกลับหาสโตร์ได้', ()=>{ const r=call('rejectClaim',[DOC,'STORE','PO ไม่ตรง Supplier',BUY]); return r.stage; });
-T('สโตร์ส่งกลับมาใหม่ แล้วจัดซื้อ Accept', ()=>{ call('advanceClaim',[DOC,STORE]);
-  const r=call('advanceClaim',[DOC,BUY]); return 'ตอนนี้ขั้น '+r.stage; });
+console.log('\n③ Flow ตามที่เบียร์วางไว้ — ร่าง → อนุมัติ → สโตร์รับเรื่อง → จัดซื้อรับเอกสาร');
+T('ใบร่าง สโตร์กับจัดซื้อยังไม่เห็น', ()=>{
+  const seeStore=call('listClaims',[{},STORE]).filter(x=>x.docNo===DOC).length;
+  const seeBuy  =call('listClaims',[{},BUY]).filter(x=>x.docNo===DOC).length;
+  const seeQc   =call('listClaims',[{},QC]).filter(x=>x.docNo===DOC).length;
+  if(seeStore||seeBuy) throw new Error('ใบร่างหลุดให้สโตร์/จัดซื้อเห็นแล้ว');
+  if(!seeQc) throw new Error('คนเปิดใบกลับมองไม่เห็นใบตัวเอง');
+  return 'สโตร์/จัดซื้อไม่เห็น · คนเปิดใบเห็น'; });
+T('ทีมงานกด "ส่งขออนุมัติ"', ()=>call('advanceClaim',[DOC,QC]).stage);
+T('สโตร์ยังกดอนุมัติแทนไม่ได้', ()=>{
+  try { call('advanceClaim',[DOC,STORE]); } catch(e){ return 'กันไว้ถูกแล้ว'; }
+  throw new Error('สโตร์กดอนุมัติแทนผู้บังคับบัญชาได้'); });
+T('ผู้บังคับบัญชาอนุมัติ → ส่งให้สโตร์', ()=>call('advanceClaim',[DOC,BOSS]).stage);
+T('พ้นร่างแล้ว สโตร์เห็นใบนี้', ()=>{
+  if(!call('listClaims',[{},STORE]).filter(x=>x.docNo===DOC).length) throw new Error('สโตร์ยังไม่เห็น');
+  return 'เห็นแล้ว'; });
+T('ยังไม่กดรับเรื่อง = กรอกไม่ได้', ()=>{
+  try { call('saveClaimField',[DOC,'deliveryNote','DN-1',STORE]); }
+  catch(e){ return 'ล็อกถูกแล้ว: '+e.message.slice(0,44)+'…'; }
+  throw new Error('ยังไม่กดรับเรื่องแต่กรอกได้'); });
+T('สโตร์กดรับเรื่อง', ()=>'รับโดย '+call('receiveClaim',[DOC,STORE]).by);
+T('รับเรื่องแล้ว กรอกช่องของสโตร์ได้', ()=>{ call('saveClaimField',[DOC,'deliveryNote','DN-69/0455',STORE]); return 'ผ่าน'; });
+T('สโตร์แก้ช่องของทีมงานไม่ได้', ()=>{
+  try { call('saveClaimField',[DOC,'model','แก้เอง',STORE]); }
+  catch(e){ return 'กันไว้ถูกแล้ว'; }
+  throw new Error('สโตร์แก้ MODEL ได้'); });
+T('จัดซื้อช่วยสโตร์ใส่ PO ได้', ()=>{
+  call('saveItemField',[DOC,1,'po','PO-69/0455',BUY]); call('saveItemField',[DOC,1,'supplier','JINAN VALVE CO.,LTD',BUY]);
+  call('saveItemField',[DOC,2,'po','PO-69/0455',BUY]); call('saveItemField',[DOC,2,'supplier','JINAN VALVE CO.,LTD',BUY]);
+  return 'ผ่าน'; });
+T('สโตร์กด "ส่งให้จัดซื้อ"', ()=>call('advanceClaim',[DOC,STORE]).stage);
+T('จัดซื้อกดรับเอกสาร', ()=>'รับโดย '+call('receiveClaim',[DOC,BUY]).by);
+T('จัดซื้อตีกลับไปต้นน้ำ (ทีมงาน) ได้', ()=>call('rejectClaim',[DOC,'REQUEST','ข้อมูลรถไม่ครบ',BUY]).stage);
+T('ตีกลับแล้วกลับมาเป็นร่าง ทีมงานแก้ได้', ()=>{ call('saveClaimField',[DOC,'serialNo','SN-แก้ใหม่',QC]); return 'แก้ได้'; });
+T('เดินครบวงกลับมาถึงจัดซื้อ Accept', ()=>{
+  call('advanceClaim',[DOC,QC]); call('advanceClaim',[DOC,BOSS]);
+  call('receiveClaim',[DOC,STORE]); call('advanceClaim',[DOC,STORE]);
+  call('receiveClaim',[DOC,BUY]);
+  return 'ตอนนี้ขั้น '+call('advanceClaim',[DOC,BUY]).stage; });
 
 console.log('\n④ เงิน · คำตอบ Supplier · รับของกลับ');
 T('ใส่สกุลเงิน + เรท (ล็อกครั้งเดียว)', ()=>{ call('saveClaimField',[DOC,'currency','USD',BUY]);
@@ -183,6 +209,26 @@ T('ปริ้นฉบับส่ง Supplier แล้วล็อก เพ
   try { call('addClaimItem',[DOC,BUY]); }
   catch(e){ return 'ล็อกถูกแล้ว: '+e.message.slice(0,52)+'…'; }
   throw new Error('ปริ้นส่งออกแล้วยังเพิ่มรายการได้อยู่'); });
+
+T('มัดรูปทั้งใบเป็นไฟล์ .zip ให้ Supplier ได้', ()=>{
+  const r=call('zipPhotos',[DOC,AUTH]);
+  if(!r.ok || !r.n) throw new Error('ไม่ได้ไฟล์ zip');
+  if(!/^https:\/\/drive\.google\.com\/uc\?export=download/.test(r.url)) throw new Error('ลิงก์ดาวน์โหลดผิดรูปแบบ');
+  return r.name+' · '+r.n+' รูป'; });
+T('แผงตรวจคำแปล คืนคำแปลกลับมาให้เทียบ', ()=>{
+  const r=call('translateCheck',[[{seq:1,th:'วาล์วรั่ว',en:'valve leaking'}],AUTH]);
+  if(!r.length || !r[0].back) throw new Error('ไม่มีคำแปลกลับ');
+  return 'เทียบได้ '+r.length+' แถว'; });
+
+T('ยกเลิกใบเคลม — คนอื่นกดไม่ได้', ()=>{
+  try { call('cancelClaim',[DOC,'ลองยกเลิก',STORE]); } catch(e){ return 'กันไว้ถูกแล้ว'; }
+  throw new Error('สโตร์ยกเลิกใบเคลมได้'); });
+T('ยกเลิกใบเคลม — ผู้บริหารกดได้ และต้องบอกเหตุผล', ()=>{
+  try { call('cancelClaim',[DOC,'',AUTH]); } catch(e){}
+  const r=call('cancelClaim',[DOC,'ลูกค้ายกเลิกงาน',AUTH]);
+  const seen=call('listClaims',[{},AUTH]).filter(x=>x.docNo===DOC).length;
+  if(seen) throw new Error('ยกเลิกแล้วยังโผล่ในทะเบียน');
+  return r.stage+' · หายจากทะเบียนแล้ว'; });
 
 console.log('\n──────────────────────────────');
 console.log('ผ่าน '+pass+' · ไม่ผ่าน '+fail);
