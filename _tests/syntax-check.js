@@ -45,5 +45,30 @@ fs.readdirSync(DEPLOY).forEach(function (f) {
   });
 });
 
+
+/* ── v0.6.3 · เวอร์ชันหน้าเว็บต้องตรงกับเวอร์ชันเซิร์ฟเวอร์ ──
+   ป้ายเวอร์ชันเดิมอ่านจากเซิร์ฟเวอร์อย่างเดียว เบราว์เซอร์แคชหน้าเก่าไว้ก็ไม่มีใครรู้
+   เสียเวลาไปแล้ว 2 รอบเพราะเรื่องนี้ — ถ้า 2 ค่าไม่ตรง ห้าม push
+   ⚠️ ต้องอยู่ "ก่อน" process.exit ไม่งั้นโค้ดนี้ไม่เคยทำงานเลย (เจอมาแล้ว) */
+(function(){
+  var _dir = path.join(__dirname, '..', 'deploy');
+  var hub  = fs.readFileSync(path.join(_dir, 'CLAIM-Hub.js'), 'utf8');
+  var core = fs.readFileSync(path.join(_dir, 'js-core.html'), 'utf8');
+  var a = (hub.match(/var VERSION\s*=\s*'([^']+)'/) || [])[1];
+  var b = (core.match(/var CLIENT_VER\s*=\s*'([^']+)'/) || [])[1];
+  if (!a || !b){
+    console.error('!! หาเวอร์ชันไม่เจอ — VERSION=' + a + ' CLIENT_VER=' + b);
+    fail++;
+    return;
+  }
+  if (a !== b){
+    console.error('!! เวอร์ชันไม่ตรงกัน — CLAIM-Hub.js = ' + a + ' แต่ js-core.html = ' + b);
+    console.error('   แก้ CLIENT_VER ใน js-core.html ให้เป็น ' + a + ' ก่อน push');
+    fail++;
+    return;
+  }
+  console.log('version match: ' + a + ' (server = client)');
+})();
+
 console.log('checked ' + checked + ' script blocks, ' + fail + ' problem(s)');
 process.exit(fail ? 1 : 0);

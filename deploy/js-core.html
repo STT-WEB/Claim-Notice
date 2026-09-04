@@ -1,5 +1,18 @@
 <script>
 /* ═══ แกนกลาง: เข้าสู่ระบบ · เมนู · เรียก server · บันทึกอัตโนมัติ ═══ */
+/* ═══════════ กับดักที่เพิ่งเจอ (v0.6.3) — ต้องอ่าน ═══════════
+   ป้ายเวอร์ชันเดิมอ่านค่าจาก getVersion() ซึ่งเป็น **โค้ดฝั่งเซิร์ฟเวอร์**
+   แต่หน้าตาเว็บทั้งหมด (ปุ่ม ตาราง แถบขั้นตอน) อยู่ในไฟล์ .html ที่ **เบราว์เซอร์เก็บแคชไว้**
+
+   → เบราว์เซอร์จำหน้าเก่าไว้ได้ ทั้งที่เซิร์ฟเวอร์อัปเดตแล้ว
+     ป้ายขึ้นเวอร์ชันใหม่ (เพราะถามเซิร์ฟเวอร์) แต่หน้าจอยังเป็นของเก่า
+     = **"ป้ายบอกว่าใหม่" ไม่ได้แปลว่า "สิ่งที่เห็นบนจอใหม่"** — หลงกันมาแล้ว 2 รอบ
+
+   วิธีแก้: ฝังเลขเวอร์ชันไว้ในไฟล์หน้าเว็บเองด้วย (CLIENT_VER ข้างล่างนี้)
+   ถ้า 2 ค่าไม่ตรงกัน = จอที่เห็นเป็นของเก่าแน่นอน ระบบจะขึ้นแถบแดงบอกให้กด Ctrl+Shift+R
+   ⚠️ แก้ไฟล์หน้าเว็บทุกครั้ง ต้องเลื่อน CLIENT_VER ให้ตรงกับ VERSION ใน CLAIM-Hub.js */
+var CLIENT_VER = 'v0.6.3';
+
 var AUTH = null;        // {emp, pin} — อยู่ในหน่วยความจำหน้าเว็บเท่านั้น ไม่เก็บลงเครื่อง
 var ME   = null;
 var CURVIEW = 'home';
@@ -124,6 +137,28 @@ function sel(id, fn, field, val, opts){
   return t + '</select>';
 }
 
+/** เทียบเวอร์ชันหน้าเว็บกับเวอร์ชันเซิร์ฟเวอร์ — ไม่ตรง = เบราว์เซอร์ยังใช้หน้าเก่า */
+function checkVer(serverVer){
+  var el = $('loginVer');
+  if (el) el.textContent = 'STT CLAIM HUB · ' + CLIENT_VER;
+  var b = $('verBadge'); if (b) b.textContent = CLIENT_VER;
+  if (!serverVer || serverVer === CLIENT_VER) return;
+
+  /* ขึ้นเตือนแบบไม่ต้องเดา บอกไปเลยว่าเห็นของเก่าอยู่ ต้องทำอะไร */
+  var w = document.createElement('div');
+  w.className = 'stalebar';
+  w.innerHTML = '⚠️ <b>หน้าเว็บที่คุณเห็นเป็นของเก่า</b> — ' +
+    'หน้าจอเวอร์ชัน <b>' + esc(CLIENT_VER) + '</b> แต่ระบบอัปเดตเป็น <b>' + esc(serverVer) + '</b> แล้ว ' +
+    'เบราว์เซอร์ยังจำหน้าเดิมไว้ · กด <b>Ctrl+Shift+R</b> (หรือปุ่มนี้) เพื่อโหลดใหม่ ' +
+    '<button onclick="hardReload()">โหลดหน้าใหม่</button>';
+  document.body.insertBefore(w, document.body.firstChild);
+}
+/** บังคับโหลดใหม่โดยไม่เอาของในแคช — เติมพารามิเตอร์กันแคชไปด้วย */
+function hardReload(){
+  var u = location.href.split('#')[0].replace(/[?&]_r=\d+/, '');
+  location.href = u + (u.indexOf('?') >= 0 ? '&' : '?') + '_r=' + Date.now();
+}
+
 /* ─── หน้า login ─── */
 function loginTab(which){
   var isLogin = (which === 'login');
@@ -199,7 +234,8 @@ function go(v, arg){
 function loadHome(){
   busy(true, 'กำลังโหลดหน้าแรก…');
   srv('getHome2', [AUTH], function(h){
-    $('verBadge').textContent = h.version;
+    $('verBadge').textContent = CLIENT_VER;   // เวอร์ชันของหน้าจอ ไม่ใช่ของเซิร์ฟเวอร์
+    if (h.version && h.version !== CLIENT_VER) checkVer(h.version);
     var rs = (h.roles && h.roles.length) ? h.roles.join(' · ') : h.role;
 
     var t = '';
@@ -285,8 +321,8 @@ function box(no, ic, title, sub, lines, btns, foot){
 
 /* ─── ตอนเปิดหน้าเว็บ ─── */
 document.addEventListener('DOMContentLoaded', function(){
-  google.script.run.withSuccessHandler(function(v){ $('loginVer').textContent = 'STT CLAIM HUB · ' + v; })
-                   .withFailureHandler(function(){ $('loginVer').textContent = 'STT CLAIM HUB'; })
+  google.script.run.withSuccessHandler(function(v){ checkVer(v); })
+                   .withFailureHandler(function(){ $('loginVer').textContent = 'STT CLAIM HUB · ' + CLIENT_VER; })
                    .getVersion();
 
   $('loginErr').innerHTML = '<span class="spin"></span> กำลังตรวจบัญชี Google…';
