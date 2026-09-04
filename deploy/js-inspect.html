@@ -18,7 +18,8 @@ function newInspForm(){
     }
     var t = '<div class="card tight"><div class="cardhd"><h3>เปิดใบตรวจรับสินค้า (ใบใหม่)</h3>' +
       '<span class="sub">เลขที่ INS-YY/NNNN · คนละชุดกับใบเคลม</span>' +
-      '<button class="btn primary" id="insSave" onclick="submitInsp()">💾 เปิดใบตรวจ</button></div>';
+      '<button class="btn primary" id="insSave" onclick="submitInsp()">💾 บันทึกเป็นร่าง</button></div>';
+    t += flowBarNew('ins');
     t += '<div id="imsg"></div>';
     t += '<div class="phnote">📷 ตรวจแล้วต้อง<b>ถ่ายรูปทุกข้อที่ไม่ผ่าน</b> ระบบถึงจะยอมให้ส่งไปเปิดใบเคลม</div>';
     t += '<div class="fgrid">';
@@ -152,6 +153,9 @@ function openInspection(docNo){
       '<h3>' + esc(h['เลขที่เอกสาร']) + ' — ใบตรวจรับสินค้า</h3>' +
       '<span class="sub">' + esc(h['แม่แบบเช็คลิสต์']) + '</span>' +
       '<span class="savebar ok" id="savebar">✓ บันทึกอัตโนมัติ</span></div>';
+
+    INSFLOW = c.flow || null;
+    t += insFlowBar(INSFLOW);
 
     t += '<div class="fgrid">';
     t += fr('เลขที่ JOB', ip('i2_jobNo','saveInspHeadField','jobNo',h['เลขที่ JOB'])) +
@@ -343,5 +347,16 @@ function inspTranslate(){
     }
     $('insmsg').innerHTML = '<div class="msg good">แปลให้แล้ว ' + n + ' ช่อง — อ่านทวนก่อนส่ง Supplier นะครับ ศัพท์ช่างบางคำแปลไม่เนียน</div>';
   }, function(m){ $('insmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; });
+}
+
+var INSFLOW = null;
+/** แถบขั้นตอนของใบตรวจ — ใช้ flowBar ตัวเดียวกับใบเคลม แต่ปุ่มคนละชุด */
+function insFlowBar(f){
+  if (!f) return '';
+  var t = flowBar(f);
+  /* flowBar วาดปุ่มของใบเคลม (doAdvance / openReject) — ใบตรวจต้องเรียกคนละฟังก์ชัน */
+  t = t.replace(/onclick="doAdvance\(\)"/g, 'onclick="doAdvanceInsp()"')
+       .replace(/onclick="openReject\(\)"/g, 'onclick="openRejectInsp()"');
+  return t;
 }
 </script>

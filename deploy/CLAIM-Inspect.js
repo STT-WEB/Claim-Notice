@@ -15,6 +15,53 @@ var HDR_INSP = ['เลขที่เอกสาร','ชนิดเอกส
   'แม่แบบเช็คลิสต์','PO','Supplier','วันรับสินค้า','ผู้ตรวจ',
   'สถานะ','ใบเคลมที่ออกจากใบนี้','หมายเหตุ','สร้างโดย','สร้างเมื่อ','แก้ไขล่าสุด'];
 
+/* ═══ ขั้นตอนของใบตรวจรับ (v0.9.2) ═══════════════════════════
+ * เบียร์: "ในเรื่องของ Inspection ก็เหมือนกัน" — คอนเซ็ปต์เดียวกับใบเคลม
+ *   1 ร่าง · QC ตรวจ  (สโตร์/จัดซื้อยังไม่เห็น · ถ่ายรูปหน้างานแล้วค่อยมากรอกต่อได้)
+ *   2 รอผู้บังคับบัญชาอนุมัติ  (อนุมัติ หรือ ตีกลับให้ตรวจใหม่)
+ *   3 อนุมัติแล้ว → ถึงจะส่งข้อที่ไม่ผ่านไปเปิดใบเคลมได้                        */
+var INS_STAGES = [
+  { key:'IDRAFT', no:1, name:'ร่าง · QC ตรวจ', who:'QC / Production', draft:true,
+    roles:['QC','PRODUCTION','DESIGN'],
+    todo:'ตรวจทีละหัวข้อ ติ๊ก Acc / Un-Acc พร้อมถ่ายรูป · เซฟค้างไว้ก่อนได้',
+    next:'IAPPROVAL', nextLabel:'➜ ส่งขออนุมัติ', lineKey:'APPROVER' },
+  { key:'IAPPROVAL', no:2, name:'รอผู้บังคับบัญชาอนุมัติ', who:'ผู้บังคับบัญชา (Approver)',
+    roles:['APPROVER'],
+    todo:'ตรวจว่าผลตรวจครบและถูกต้องไหม · อนุมัติแล้วถึงเปิดใบเคลมจากข้อที่ไม่ผ่านได้',
+    next:'IDONE', nextLabel:'✓ อนุมัติผลตรวจ', lineKey:'QC' },
+  { key:'IDONE', no:3, name:'อนุมัติแล้ว', who:'—', roles:[],
+    todo:'ผลตรวจถูกอนุมัติแล้ว · ข้อที่ Un-Acc กดส่งไปเปิดใบเคลมได้', next:'', nextLabel:'', lineKey:'' }
+];
+var HDR_INSP_FLOW = ['ขั้นตอน','รอใครทำ','เหตุผลที่ตีกลับ','ตีกลับโดย','ตีกลับเมื่อ','ประวัติขั้นตอน'];
+function inspHdr_(){ return HDR_INSP.concat(HDR_INSP_FLOW); }
+function insStage_(key){
+  key = norm_(key) || 'IDRAFT';
+  for (var i = 0; i < INS_STAGES.length; i++) if (INS_STAGES[i].key === key) return INS_STAGES[i];
+  return INS_STAGES[0];
+}
+function insStageList(){
+  return INS_STAGES.map(function(s){ return { key:s.key, no:s.no, name:s.name, who:s.who,
+                                              todo:s.todo, nextLabel:s.nextLabel, draft:!!s.draft }; });
+}
+/** ⚠️ ห้ามใช้ HDR_INSP.length เป็นเลขคอลัมน์อีก — พอเพิ่มคอลัมน์ขั้นตอนแล้วมันจะเขียนผิดช่องเงียบ ๆ */
+function colOfI_(name){
+  var h = inspHdr_();
+  for (var i = 0; i < h.length; i++) if (h[i] === name) return i + 1;
+  throw new Error('ไม่รู้จักคอลัมน์ ' + name + ' ในใบตรวจรับ');
+}
+function insStageOf_(sh, row){
+  return norm_(sh.getRange(row, colOfI_('ขั้นตอน')).getDisplayValue()) || 'IDRAFT';
+}
+function setInsStage_(sh, row, key, me, note){
+  var st = insStage_(key);
+  var hist = norm_(sh.getRange(row, colOfI_('ประวัติขั้นตอน')).getDisplayValue());
+  sh.getRange(row, colOfI_('ขั้นตอน')).setValue(key);
+  sh.getRange(row, colOfI_('รอใครทำ')).setValue(st.who);
+  sh.getRange(row, colOfI_('ประวัติขั้นตอน'))
+    .setValue((hist ? hist + '\n' : '') + nowStamp_() + ' · ' + st.name + ' · ' + (me ? me.name : '') + (note ? ' · ' + note : ''));
+  sh.getRange(row, colOfI_('แก้ไขล่าสุด')).setValue(nowStamp_());
+}
+
 var HDR_INSPIT = ['เลขที่เอกสาร','ลำดับ','หมวด','หัวข้อตรวจ','หัวข้อ (EN)','ผลตรวจ',
   'สิ่งที่พบ (ไทย)','สิ่งที่พบ (EN)','จำนวน','หน่วย','ส่งไปเคลมแล้ว','ผู้ตรวจ','เมื่อ'];
 
@@ -82,7 +129,7 @@ function inspDb_(){
   var ss = ss_(), be = yearBE_();
   _IDB = {
     ss    : ss,
-    head  : ensureTab_(ss, 'INSP_'    + be, HDR_INSP),
+    head  : ensureCols_(ensureTab_(ss, 'INSP_' + be, inspHdr_()), inspHdr_()),
     items : ensureTab_(ss, 'INSPIT_'  + be, HDR_INSPIT)
   };
   return _IDB;
@@ -141,6 +188,7 @@ function createInspection(h, auth){
   if (rows.length) d.items.getRange(d.items.getLastRow()+1, 1, rows.length, HDR_INSPIT.length).setValues(rows);
 
   log_('createInspection', docNo, norm_(h.jobNo) + ' · ' + tpl.name);
+  setInsStage_(d.head, d.head.getLastRow(), 'IDRAFT', me, 'เปิดใบตรวจ');
   return { ok:true, docNo:docNo, n:rows.length };
 }
 
@@ -174,12 +222,14 @@ function getInspection(docNo, auth){
 
 /** ทะเบียนใบตรวจ + นับผลตรวจให้เห็นตั้งแต่ยังไม่เปิดใบ */
 function listInspections(filter, auth){
-  requireLogin_(auth);
+  var meL = requireLogin_(auth);
   filter = filter || {};
   var d = inspDb_(), lr = d.head.getLastRow();
   if (lr < 2) return [];
+  var full = inspHdr_();
   var hdr = d.head.getRange(1,1,1,HDR_INSP.length).getDisplayValues()[0];
-  var rows = d.head.getRange(2,1,lr-1,HDR_INSP.length).getDisplayValues();
+  var rows = d.head.getRange(2,1,lr-1,full.length).getDisplayValues();
+  var iSt = colOfI_('ขั้นตอน') - 1;
 
   /* นับผลตรวจของทุกใบทีเดียว แล้วค่อยแจก — ไม่วนอ่านทีละใบ */
   var cnt = {}, lrI = d.items.getLastRow();
@@ -201,6 +251,10 @@ function listInspections(filter, auth){
   for (var i = rows.length - 1; i >= 0; i--){
     var o = {};
     for (var j = 0; j < hdr.length; j++) o[hdr[j]] = norm_(rows[i][j]);
+    var stg = norm_(rows[i][iSt]) || 'IDRAFT';
+    /* ใบตรวจที่ยังเป็นร่าง เห็นเฉพาะคนตรวจ · แผนกเดียวกัน · ผู้บังคับบัญชา · ผู้บริหาร */
+    if (insStage_(stg).draft && !canSeeDraft_(meL, o['สร้างโดย'], 'QC')) continue;
+    o.stage = stg; o.stageNo = insStage_(stg).no; o.stageName = insStage_(stg).name;
     if (filter.jobNo && o['เลขที่ JOB'].toUpperCase() !== norm_(filter.jobNo).toUpperCase()) continue;
     if (filter.q){
       var q = norm_(filter.q).toLowerCase();
@@ -213,6 +267,7 @@ function listInspections(filter, auth){
       jobNo:o['เลขที่ JOB'], jobName:o['ชื่อลูกค้า'], model:o['MODEL'],
       supplier:o['Supplier'], template:o['แม่แบบเช็คลิสต์'], status:o['สถานะ'],
       claimNo:o['ใบเคลมที่ออกจากใบนี้'], by:o['สร้างโดย'],
+      stage:o.stage, stageNo:o.stageNo, stageName:o.stageName,
       n:c.n, acc:c.acc, un:c.un, todo:c.todo,
       nPhoto:(pho[o['เลขที่เอกสาร']] || 0)
     });
@@ -246,22 +301,37 @@ function saveInspHeadField(docNo, field, value, auth){
   requireAny_(auth, ['QC','PRODUCTION','STORE','PURCHASE','DESIGN','APPROVER']);
   var col = INSP_FIELD_COL[field];
   if (!col) throw new Error('ไม่รู้จักช่อง ' + field);
-  var d = inspDb_(), r = findInspRow_(d.head, norm_(docNo));
+  var d = inspDb_();
+  var r = insEditable_(d, docNo, null);       // อนุมัติแล้วแก้ไม่ได้
   if (r < 0) throw new Error('ไม่พบใบตรวจ ' + docNo);
   var v = norm_(value);
   if (field === 'recv') v = fmtDMY_(v);
   if (field === 'jobNo') v = v.toUpperCase();
   d.head.getRange(r, col).setValue(v);
-  d.head.getRange(r, HDR_INSP.length).setValue(nowStamp_());
+  d.head.getRange(r, colOfI_('แก้ไขล่าสุด')).setValue(nowStamp_());
   return { ok:true };
 }
 
 var INSPIT_FIELD_COL = { cat:3, title:4, titleEn:5, acc:6, found:7, foundEn:8, qty:9, unit:10 };
+/** แก้ผลตรวจได้เฉพาะตอนยังเป็นร่าง — อนุมัติแล้วต้องให้ตีกลับก่อน */
+function insEditable_(d, docNo, me){
+  var r = findInspRow_(d.head, norm_(docNo));
+  if (r < 0) throw new Error('ไม่พบใบตรวจ ' + docNo);
+  var key = insStageOf_(d.head, r);
+  if (key !== 'IDRAFT'){
+    throw new Error('ใบนี้อยู่ขั้น "' + insStage_(key).name + '" แล้ว แก้ไม่ได้ — ' +
+                    'ถ้าต้องแก้ ให้ผู้บังคับบัญชาตีกลับมาก่อน');
+  }
+  return r;
+}
+
 function saveInspItemField(docNo, seq, field, value, auth){
   var me = requireAny_(auth, ['QC','PRODUCTION','STORE','PURCHASE','DESIGN','APPROVER']);
   var col = INSPIT_FIELD_COL[field];
   if (!col) throw new Error('ไม่รู้จักช่อง ' + field);
-  var d = inspDb_(), lr = d.items.getLastRow();
+  var d = inspDb_();
+  insEditable_(d, docNo, me);                 // อนุมัติแล้วแก้ไม่ได้
+  var lr = d.items.getLastRow();
   if (lr < 2) throw new Error('ไม่พบหัวข้อตรวจ');
   var v = d.items.getRange(2,1,lr-1,2).getDisplayValues();
   for (var i = 0; i < v.length; i++){
@@ -303,6 +373,101 @@ function delInspItem(docNo, seq, auth){
 }
 
 /** ตรวจว่าใบนี้พร้อมส่งเคลมไหม — ทุกข้อที่ Un-Acc ต้องมีรูป */
+/** ข้อมูลขั้นตอนของใบตรวจ สำหรับหน้าเว็บ */
+function inspFlow(docNo, auth){
+  var me = requireLogin_(auth);
+  var d = inspDb_(), r = findInspRow_(d.head, norm_(docNo));
+  if (r < 0) return null;
+  var key = insStageOf_(d.head, r), st = insStage_(key);
+  var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
+  var isAdmin = mine.indexOf('ADMIN') >= 0;
+  var isOwner = isAdmin;
+  for (var i = 0; i < mine.length; i++) if (st.roles.indexOf(mine[i]) >= 0) isOwner = true;
+  var miss = insMissing_(d, norm_(docNo), key);
+  return {
+    stage:key, no:st.no, name:st.name, who:st.who, todo:st.todo,
+    next:st.next, nextLabel:st.nextLabel, isOwner:isOwner, isDraft:!!st.draft,
+    canReject: key === 'IAPPROVAL' && isOwner,
+    needReceive:false, received:true, canCancel:false,
+    rejectNote: norm_(d.head.getRange(r, colOfI_('เหตุผลที่ตีกลับ')).getDisplayValue()),
+    rejectBy:   norm_(d.head.getRange(r, colOfI_('ตีกลับโดย')).getDisplayValue()),
+    rejectAt:   norm_(d.head.getRange(r, colOfI_('ตีกลับเมื่อ')).getDisplayValue()),
+    history:    norm_(d.head.getRange(r, colOfI_('ประวัติขั้นตอน')).getDisplayValue()),
+    stages: insStageList(), lock:{}, missing:miss,
+    canEdit: (key === 'IDRAFT') && isOwner,
+    canSendClaim: key === 'IDONE'
+  };
+}
+
+/** ยังตรวจไม่ครบตรงไหน — บอกก่อนกดส่งขออนุมัติ */
+function insMissing_(d, docNo, key){
+  var miss = [];
+  if (key !== 'IDRAFT') return miss;
+  var items = inspItemsOf_(d, docNo), todo = [], noPhoto = [];
+  var ph = photosOf_(docNo);
+  for (var i = 0; i < items.length; i++){
+    if (!norm_(items[i].acc)) todo.push(items[i].seq);
+    else if (norm_(items[i].acc) === 'UNACC' && (!ph[String(items[i].seq)] || !ph[String(items[i].seq)].length))
+      noPhoto.push(items[i].seq);
+  }
+  if (!items.length) miss.push('ยังไม่มีหัวข้อตรวจ');
+  if (todo.length)    miss.push('ข้อ ' + todo.join(', ') + ' ยังไม่ได้ติ๊กผลตรวจ');
+  if (noPhoto.length) miss.push('ข้อ ' + noPhoto.join(', ') + ' ไม่ผ่านแต่ยังไม่มีรูป');
+  return miss;
+}
+
+/** ส่งใบตรวจไปขั้นถัดไป */
+function advanceInsp(docNo, auth){
+  var me = requireLogin_(auth);
+  docNo = norm_(docNo);
+  var d = inspDb_(), r = findInspRow_(d.head, docNo);
+  if (r < 0) throw new Error('ไม่พบใบตรวจ ' + docNo);
+  var key = insStageOf_(d.head, r), st = insStage_(key);
+  if (!st.next) throw new Error('ใบนี้อนุมัติแล้ว');
+
+  var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
+  var ok = mine.indexOf('ADMIN') >= 0;
+  for (var i = 0; i < mine.length; i++) if (st.roles.indexOf(mine[i]) >= 0) ok = true;
+  if (!ok) throw new Error('ขั้นนี้เป็นหน้าที่ของ ' + st.who + ' — สิทธิ์ของคุณคือ ' + mine.join(', '));
+
+  var miss = insMissing_(d, docNo, key);
+  if (miss.length) throw new Error('ยังส่งต่อไม่ได้ — ' + miss.join(' · '));
+
+  setInsStage_(d.head, r, st.next, me, '');
+  d.head.getRange(r, colOfI_('เหตุผลที่ตีกลับ')).setValue('');
+  d.head.getRange(r, colOfI_('สถานะ')).setValue(st.next === 'IDONE' ? 'อนุมัติแล้ว' : 'รออนุมัติ');
+  if (st.lineKey){
+    var nx = insStage_(st.next);
+    lineToStage_(st.lineKey, '🔍 ใบตรวจรับถึงคิวคุณแล้ว\nเลขที่ ' + docNo +
+      '\nขั้นที่ ' + nx.no + ' ' + nx.name + '\nส่งต่อโดย ' + me.name);
+  }
+  log_('advanceInsp', docNo, key + ' → ' + st.next);
+  try { CacheService.getScriptCache().remove('CLAIM_HOME'); } catch(e){}
+  return { ok:true, stage:st.next };
+}
+
+/** ตีกลับใบตรวจให้ QC ตรวจใหม่ */
+function rejectInsp(docNo, reason, auth){
+  var me = requireLogin_(auth);
+  reason = norm_(reason);
+  if (!reason) throw new Error('ต้องบอกเหตุผลที่ตีกลับ');
+  var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
+  if (mine.indexOf('ADMIN') < 0 && mine.indexOf('APPROVER') < 0)
+    throw new Error('ตีกลับใบตรวจได้เฉพาะผู้บังคับบัญชา');
+
+  docNo = norm_(docNo);
+  var d = inspDb_(), r = findInspRow_(d.head, docNo);
+  if (r < 0) throw new Error('ไม่พบใบตรวจ ' + docNo);
+  setInsStage_(d.head, r, 'IDRAFT', me, 'ตีกลับ: ' + reason);
+  d.head.getRange(r, colOfI_('เหตุผลที่ตีกลับ')).setValue(reason);
+  d.head.getRange(r, colOfI_('ตีกลับโดย')).setValue(me.name);
+  d.head.getRange(r, colOfI_('ตีกลับเมื่อ')).setValue(nowStamp_());
+  d.head.getRange(r, colOfI_('สถานะ')).setValue('ถูกตีกลับ');
+  lineToStage_('QC', '↩ ใบตรวจ ' + docNo + ' ถูกตีกลับ\nเหตุผล: ' + reason + '\nโดย ' + me.name);
+  log_('rejectInsp', docNo, reason);
+  return { ok:true, stage:'IDRAFT' };
+}
+
 function inspCheck(docNo, auth){
   requireLogin_(auth);
   docNo = norm_(docNo);
@@ -330,6 +495,12 @@ function inspCheck(docNo, auth){
 
 /** ส่งข้อที่ Un-Acc ไปเปิดใบเคลมให้อัตโนมัติ + ก๊อปรูปตามไปด้วย */
 function sendUnAccToClaim(docNo, auth){
+  /* เบียร์: Inspection ก็ต้องผ่านอนุมัติก่อน ถึงจะเปิดใบเคลมจากข้อที่ไม่ผ่านได้ */
+  (function(){
+    var dd = inspDb_(), rr = findInspRow_(dd.head, norm_(docNo));
+    if (rr >= 0 && insStageOf_(dd.head, rr) !== 'IDONE')
+      throw new Error('ใบตรวจนี้ยังไม่ได้รับอนุมัติ — ให้ผู้บังคับบัญชาอนุมัติก่อน แล้วค่อยเปิดใบเคลม');
+  })();
   var me = requireAny_(auth, ['QC','PRODUCTION','STORE','PURCHASE','APPROVER']);
   docNo = norm_(docNo);
   var chk = inspCheck(docNo, auth);
@@ -375,7 +546,7 @@ function sendUnAccToClaim(docNo, auth){
   }
   d.head.getRange(r, 18).setValue(res.docNo);
   d.head.getRange(r, 17).setValue('ส่งเคลมแล้ว');
-  d.head.getRange(r, HDR_INSP.length).setValue(nowStamp_());
+  d.head.getRange(r, colOfI_('แก้ไขล่าสุด')).setValue(nowStamp_());
 
   log_('sendUnAccToClaim', docNo, '→ ' + res.docNo + ' (' + claimItems.length + ' ข้อ)');
   return { ok:true, claimNo:res.docNo, n:claimItems.length };

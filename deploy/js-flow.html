@@ -161,11 +161,11 @@ function applyGridLocks(gridId){
 /** แถบขั้นตอนสำหรับ "ใบที่ยังไม่ได้บันทึก" — ยังไม่มีเลขเอกสาร ยังไม่มีข้อมูลจากเซิร์ฟเวอร์
  *  แต่คนกรอกต้องเห็นตั้งแต่แรกว่ากำลังทำขั้นไหน และงานจะเดินไปทางไหนต่อ
  *  (เบียร์จะเอาไป present — ต้องเห็นภาพรวมทั้งกระบวนการตั้งแต่หน้าแรกที่เปิด) */
-function flowBarNew(){
+function flowBarNew(which){
   /* ⚠️ รายชื่อขั้นตอนมาจากเซิร์ฟเวอร์ (STAGES_C) เท่านั้น
      ห้ามเขียนลิสต์ขั้นตอนซ้ำไว้ตรงนี้ — v0.9.0 เคยพลาดเพราะทำแบบนั้น
      แก้ขั้นตอนฝั่งหลังบ้านครบ แต่หน้านี้ยังโชว์ของเก่าอยู่ เบียร์เลยไม่เห็นอะไรเปลี่ยน */
-  var stages = STAGES_C || [];
+  var stages = (which === 'ins' ? STAGES_I : STAGES_C) || [];
   if (!stages.length) return '';
   var st1 = stages[0];
 
@@ -181,7 +181,8 @@ function flowBarNew(){
        '<span class="fwho">คุณกำลังทำขั้นนี้</span></div>' +
        '<div class="ftodo">' + esc(st1.todo || '') + '</div>' +
        '<div class="fdraft">📝 กดบันทึกแล้วใบนี้จะเป็น <b>ร่าง</b> — ' +
-       'สโตร์กับจัดซื้อยังไม่เห็น · กลับมาแก้เพิ่มได้เรื่อย ๆ · ' +
+       (which === 'ins' ? 'คนอื่นยังไม่เห็น · ' : 'สโตร์กับจัดซื้อยังไม่เห็น · ') +
+       'กลับมาแก้เพิ่มได้เรื่อย ๆ · ' +
        'ครบแล้วค่อยกด <b>"' + esc(st1.nextLabel || 'ส่งขออนุมัติ') + '"</b> ในใบนั้น</div>' +
        '</div></div>';
   return t;
@@ -201,5 +202,16 @@ function openCancel(){
   if (!String(why).trim()){ alert('ต้องบอกเหตุผลครับ'); return; }
   srv('cancelClaim', [CURDOC, why, AUTH], function(){ alert('ยกเลิกใบ ' + CURDOC + ' แล้ว'); go('list'); },
       function(m){ alert(m); });
+}
+
+/* ── ใบตรวจรับ: ส่งขออนุมัติ / ตีกลับ ── */
+function doAdvanceInsp(){
+  srv('advanceInsp', [CURDOC, AUTH], function(){ openInspection(CURDOC); }, function(m){ alert(m); });
+}
+function openRejectInsp(){
+  var why = prompt('ตีกลับใบตรวจ ' + CURDOC + ' ให้ QC ตรวจใหม่\n\nบอกเหตุผล:');
+  if (why === null) return;
+  if (!String(why).trim()){ alert('ต้องบอกเหตุผลครับ'); return; }
+  srv('rejectInsp', [CURDOC, why, AUTH], function(){ openInspection(CURDOC); }, function(m){ alert(m); });
 }
 </script>

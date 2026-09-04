@@ -468,14 +468,14 @@ function getHome2(auth){
   var hit = cacheGet_('CLAIM_HOME');
   if (hit){
     try { var o = JSON.parse(hit); o.name = me.name; o.role = me.role; o.roles = me.roles || [];
-          o.stages = stageList(); return o; }
+          o.stages = stageList(); o.insStages = insStageList(); return o; }
     catch(e){}
   }
 
   var d = db_(), di = inspDb_();
   var out = {
     version:VERSION, name:me.name, role:me.role, roles:me.roles || [], year:yearBE_(),
-    stages: stageList(),
+    stages: stageList(), insStages: insStageList(),
     ins:{ total:0, open:0, noPhoto:0 },
     clm:{ total:0, open:0, noPhoto:0 },
     rep:{ photos:0, jobs:0 }
@@ -577,6 +577,7 @@ function getInspFull(docNo, auth){
   var c = getInspection(docNo, auth);
   if (!c) return null;
   c.vendors = listVendors();
+  c.flow = inspFlow(docNo, auth);      // ใบตรวจก็มีขั้นตอนเหมือนใบเคลม
   return c;
 }
 

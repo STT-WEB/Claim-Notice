@@ -165,11 +165,32 @@ T('เปิดใบตรวจรับจากแม่แบบ', ()=>{ co
     {area:'for',kind:'tanker',template:'tanker',jobNo:'JT-69/0001',jobName:'บริษัท ทดสอบ',
      model:'M',chassisStt:'',chassisMaker:'',serialNo:'',po:'',supplier:'',recv:''},QC]);
   INS=r.docNo; return INS; });
-T('ตรวจไม่ผ่าน 1 ข้อ แล้วส่งไปเปิดใบเคลม', ()=>{
+T('ใบตรวจที่ยังเป็นร่าง คนอื่นไม่เห็น', ()=>{
+  if(call('listInspections',[{},STORE]).filter(x=>x.docNo===INS).length) throw new Error('ใบร่างหลุดให้สโตร์เห็น');
+  if(!call('listInspections',[{},QC]).filter(x=>x.docNo===INS).length) throw new Error('คนตรวจมองไม่เห็นใบตัวเอง');
+  return 'ซ่อนถูกแล้ว'; });
+T('ตรวจยังไม่ครบ ส่งขออนุมัติไม่ได้', ()=>{
+  try { call('advanceInsp',[INS,QC]); } catch(e){ return 'กันไว้ถูกแล้ว: '+e.message.slice(0,44)+'…'; }
+  throw new Error('ตรวจไม่ครบแต่ส่งขออนุมัติได้'); });
+T('ตรวจครบ + ถ่ายรูปข้อที่ไม่ผ่าน แล้วส่งขออนุมัติ', ()=>{
   const it=call('getInspection',[INS,QC]).items;
   call('saveInspItemField',[INS,it[0].seq,'acc','UNACC',QC]);
   call('saveInspItemField',[INS,it[0].seq,'found','พบรอยเชื่อมไม่เต็ม',QC]);
   call('savePhoto',[INS,'JT-69/0001',String(it[0].seq),px,'ins.jpg',QC]);
+  for (let k=1;k<it.length;k++) call('saveInspItemField',[INS,it[k].seq,'acc','ACC',QC]);
+  return call('advanceInsp',[INS,QC]).stage; });
+T('ยังไม่อนุมัติ เปิดใบเคลมจากใบตรวจไม่ได้', ()=>{
+  try { call('sendUnAccToClaim',[INS,QC]); } catch(e){ return 'กันไว้ถูกแล้ว'; }
+  throw new Error('ยังไม่อนุมัติแต่เปิดใบเคลมได้'); });
+T('รออนุมัติแล้ว QC แก้ผลตรวจไม่ได้', ()=>{
+  try { call('saveInspItemField',[INS,1,'acc','ACC',QC]); } catch(e){ return 'ล็อกถูกแล้ว'; }
+  throw new Error('อนุมัติแล้วยังแก้ผลตรวจได้'); });
+T('ผู้บังคับบัญชาตีกลับใบตรวจได้', ()=>call('rejectInsp',[INS,'รูปไม่ชัด ถ่ายใหม่',BOSS]).stage);
+T('ตีกลับแล้ว QC แก้ได้ แล้วส่งใหม่ · หัวหน้าอนุมัติ', ()=>{
+  call('saveInspItemField',[INS,1,'found','พบรอยเชื่อมไม่เต็ม (แก้)',QC]);
+  call('advanceInsp',[INS,QC]);
+  return call('advanceInsp',[INS,BOSS]).stage; });
+T('อนุมัติแล้ว ส่งข้อที่ไม่ผ่านไปเปิดใบเคลมได้', ()=>{
   const r=call('sendUnAccToClaim',[INS,QC]); return 'ได้ใบเคลม '+r.claimNo; });
 
 console.log('\n⑥ รายงาน + ข้อมูลสำหรับหน้าปริ้น');

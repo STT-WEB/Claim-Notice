@@ -78,7 +78,8 @@ console.log('checked ' + checked + ' script blocks, ' + fail + ' problem(s)');
    กฎ: ชื่อขั้นตอนมีได้ที่เดียวคือ CLAIM-Flow.js เท่านั้น                      */
 (function(){
   var _d = path.join(__dirname, '..', 'deploy');
-  var flow = fs.readFileSync(path.join(_d, 'CLAIM-Flow.js'), 'utf8');
+  var flow = fs.readFileSync(path.join(_d, 'CLAIM-Flow.js'), 'utf8') +
+             fs.readFileSync(path.join(_d, 'CLAIM-Inspect.js'), 'utf8');
   var names = [];
   var re = /\{\s*key:'[A-Z_]+',\s*no:\d+,\s*name:'([^']+)'/g, m;
   while ((m = re.exec(flow))) names.push(m[1]);
@@ -97,7 +98,7 @@ console.log('checked ' + checked + ' script blocks, ' + fail + ' problem(s)');
     bad.forEach(function(b){ console.error('   ' + b); });
     fail++; return;
   }
-  console.log('stage names: อยู่ที่ CLAIM-Flow.js ที่เดียว (' + names.length + ' ขั้น) ไม่มีซ้ำในหน้าเว็บ');
+  console.log('stage names: อยู่ที่ไฟล์หลังบ้านที่เดียว (' + names.length + ' ขั้น) ไม่มีซ้ำในหน้าเว็บ');
 })();
 
 process.exit(fail ? 1 : 0);
