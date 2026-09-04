@@ -71,4 +71,33 @@ fs.readdirSync(DEPLOY).forEach(function (f) {
 })();
 
 console.log('checked ' + checked + ' script blocks, ' + fail + ' problem(s)');
+
+/* ── ห้ามก๊อปรายชื่อขั้นตอนไปเขียนซ้ำในไฟล์หน้าเว็บ (v0.9.1) ─────────────
+   เคยพลาดมาแล้ว: แก้ STAGES ฝั่งเซิร์ฟเวอร์ครบ แต่ js-flow.html มีลิสต์เก่าซ้ำอยู่
+   เบียร์เลยเห็นแถบขั้นตอนเป็นของเดิมทั้งที่ deploy สำเร็จ
+   กฎ: ชื่อขั้นตอนมีได้ที่เดียวคือ CLAIM-Flow.js เท่านั้น                      */
+(function(){
+  var _d = path.join(__dirname, '..', 'deploy');
+  var flow = fs.readFileSync(path.join(_d, 'CLAIM-Flow.js'), 'utf8');
+  var names = [];
+  var re = /\{\s*key:'[A-Z_]+',\s*no:\d+,\s*name:'([^']+)'/g, m;
+  while ((m = re.exec(flow))) names.push(m[1]);
+  if (names.length < 5){ console.error('!! อ่านชื่อขั้นตอนจาก CLAIM-Flow.js ไม่ได้'); fail++; return; }
+  var htmls = fs.readdirSync(_d).filter(function(f){ return /\.html$/.test(f); });
+  /* ชื่อขั้นเดี่ยว ๆ ใช้เป็นข้อความปกติได้ (เช่นชื่อแท็บ) แต่ถ้าไฟล์เดียวมี 3 ชื่อขึ้นไป
+     = มีคนก๊อป "ลิสต์ขั้นตอน" ไปวางไว้ ซึ่งจะหลุดจากของจริงทันทีที่แก้ฝั่งเซิร์ฟเวอร์ */
+  var bad = [];
+  htmls.forEach(function(f){
+    var body = fs.readFileSync(path.join(_d, f), 'utf8');
+    var hit = names.filter(function(n){ return body.indexOf(n) >= 0; });
+    if (hit.length >= 3) bad.push(f + ' → ' + hit.join(' · '));
+  });
+  if (bad.length){
+    console.error('!! เจอลิสต์ขั้นตอนถูกก๊อปไปเขียนซ้ำในไฟล์หน้าเว็บ — ต้องดึงจากเซิร์ฟเวอร์เท่านั้น:');
+    bad.forEach(function(b){ console.error('   ' + b); });
+    fail++; return;
+  }
+  console.log('stage names: อยู่ที่ CLAIM-Flow.js ที่เดียว (' + names.length + ' ขั้น) ไม่มีซ้ำในหน้าเว็บ');
+})();
+
 process.exit(fail ? 1 : 0);

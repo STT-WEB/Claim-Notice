@@ -467,13 +467,15 @@ function getHome2(auth){
 
   var hit = cacheGet_('CLAIM_HOME');
   if (hit){
-    try { var o = JSON.parse(hit); o.name = me.name; o.role = me.role; o.roles = me.roles || []; return o; }
+    try { var o = JSON.parse(hit); o.name = me.name; o.role = me.role; o.roles = me.roles || [];
+          o.stages = stageList(); return o; }
     catch(e){}
   }
 
   var d = db_(), di = inspDb_();
   var out = {
     version:VERSION, name:me.name, role:me.role, roles:me.roles || [], year:yearBE_(),
+    stages: stageList(),
     ins:{ total:0, open:0, noPhoto:0 },
     clm:{ total:0, open:0, noPhoto:0 },
     rep:{ photos:0, jobs:0 }

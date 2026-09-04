@@ -11,7 +11,7 @@
    วิธีแก้: ฝังเลขเวอร์ชันไว้ในไฟล์หน้าเว็บเองด้วย (CLIENT_VER ข้างล่างนี้)
    ถ้า 2 ค่าไม่ตรงกัน = จอที่เห็นเป็นของเก่าแน่นอน ระบบจะขึ้นแถบแดงบอกให้กด Ctrl+Shift+R
    ⚠️ แก้ไฟล์หน้าเว็บทุกครั้ง ต้องเลื่อน CLIENT_VER ให้ตรงกับ VERSION ใน CLAIM-Hub.js */
-var CLIENT_VER = 'v0.9.0';
+var CLIENT_VER = 'v0.9.1';
 
 var AUTH = null;        // {emp, pin} — อยู่ในหน่วยความจำหน้าเว็บเท่านั้น ไม่เก็บลงเครื่อง
 var ME   = null;
@@ -255,10 +255,15 @@ function go(v, arg){
    → วาดหน้าให้ก่อนเลยด้วยตัวเลขจำล่าสุด กดใช้งานได้ทันที แล้วค่อยเติมตัวเลขจริงทีหลัง
    HOME_LAST เก็บไว้ในหน่วยความจำหน้าเว็บ กลับมาหน้าแรกรอบสองจึงขึ้นทันที */
 var HOME_LAST = null;
+var STAGES_C = null;      // รายชื่อขั้นตอนจากเซิร์ฟเวอร์ — ห้ามเขียนซ้ำในหน้าเว็บ
 function loadHome(){
   if (HOME_LAST){ drawHome(HOME_LAST, true); }        // มีของเก่า = ขึ้นทันที ไม่ต้องรอ
   else busy(true, 'กำลังเปิดหน้าแรก…');
-  srv('getHome2', [AUTH], function(h){ HOME_LAST = h; if (CURVIEW === 'home') drawHome(h, false); });
+  srv('getHome2', [AUTH], function(h){
+    HOME_LAST = h;
+    if (h.stages && h.stages.length) STAGES_C = h.stages;
+    if (CURVIEW === 'home') drawHome(h, false);
+  });
 }
 function drawHome(h, stale){
   (function(h){

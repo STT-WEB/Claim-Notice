@@ -162,14 +162,13 @@ function applyGridLocks(gridId){
  *  แต่คนกรอกต้องเห็นตั้งแต่แรกว่ากำลังทำขั้นไหน และงานจะเดินไปทางไหนต่อ
  *  (เบียร์จะเอาไป present — ต้องเห็นภาพรวมทั้งกระบวนการตั้งแต่หน้าแรกที่เปิด) */
 function flowBarNew(){
-  var stages = [
-    { no:1, name:'แจ้งเคลม',            who:'Production / Sales / QC / Design' },
-    { no:2, name:'สโตร์เติมข้อมูล',      who:'สโตร์' },
-    { no:3, name:'จัดซื้อตรวจข้อมูล',    who:'จัดซื้อ' },
-    { no:4, name:'ส่ง Supplier · รอคำตอบ', who:'จัดซื้อ' },
-    { no:5, name:'รับของกลับ + QC',      who:'QC / Production' },
-    { no:6, name:'ปิดงานแล้ว',           who:'—' }
-  ];
+  /* ⚠️ รายชื่อขั้นตอนมาจากเซิร์ฟเวอร์ (STAGES_C) เท่านั้น
+     ห้ามเขียนลิสต์ขั้นตอนซ้ำไว้ตรงนี้ — v0.9.0 เคยพลาดเพราะทำแบบนั้น
+     แก้ขั้นตอนฝั่งหลังบ้านครบ แต่หน้านี้ยังโชว์ของเก่าอยู่ เบียร์เลยไม่เห็นอะไรเปลี่ยน */
+  var stages = STAGES_C || [];
+  if (!stages.length) return '';
+  var st1 = stages[0];
+
   var t = '<div class="flowwrap"><div class="flowsteps">';
   for (var i = 0; i < stages.length; i++){
     t += '<div class="fstep ' + (i === 0 ? 'now' : '') + '" title="' + esc(stages[i].who) + '">' +
@@ -178,11 +177,13 @@ function flowBarNew(){
     if (i < stages.length - 1) t += '<span class="farrow">›</span>';
   }
   t += '</div>';
-  t += '<div class="flownow"><div><b>ขั้นที่ 1 · แจ้งเคลม</b>' +
+  t += '<div class="flownow"><div><b>ขั้นที่ ' + st1.no + ' · ' + esc(st1.name) + '</b>' +
        '<span class="fwho">คุณกำลังทำขั้นนี้</span></div>' +
-       '<div class="ftodo">กรอกข้อมูลรถและรายการที่เคลม แนบรูปทุกรายการ แล้วกดบันทึก · ' +
-       'บันทึกแล้วระบบจะให้ส่งต่อไปให้สโตร์เติม PO และเด้งแจ้งเตือนเข้า LINE ให้เอง</div></div>';
-  t += '</div>';
+       '<div class="ftodo">' + esc(st1.todo || '') + '</div>' +
+       '<div class="fdraft">📝 กดบันทึกแล้วใบนี้จะเป็น <b>ร่าง</b> — ' +
+       'สโตร์กับจัดซื้อยังไม่เห็น · กลับมาแก้เพิ่มได้เรื่อย ๆ · ' +
+       'ครบแล้วค่อยกด <b>"' + esc(st1.nextLabel || 'ส่งขออนุมัติ') + '"</b> ในใบนั้น</div>' +
+       '</div></div>';
   return t;
 }
 

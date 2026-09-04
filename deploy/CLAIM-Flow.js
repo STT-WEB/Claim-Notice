@@ -67,6 +67,15 @@ var STAGES = [
     who:'—', roles:[], todo:'ใบนี้ถูกยกเลิก', next:'', nextLabel:'', lineKey:'' }
 ];
 
+/** รายชื่อขั้นตอนสำหรับหน้าเว็บ — **แหล่งเดียว** คือ STAGES ข้างบนนี้เท่านั้น
+ *  ห้ามก๊อปรายชื่อขั้นตอนไปเขียนซ้ำในไฟล์หน้าเว็บอีก (เคยพลาดมาแล้ว v0.9.0:
+ *  แก้ขั้นตอนฝั่งเซิร์ฟเวอร์ครบ แต่หน้าเปิดใบใหม่ยังโชว์ของเก่าเพราะมีลิสต์ซ้ำอยู่ใน js-flow.html) */
+function stageList(){
+  return STAGES.filter(function(s){ return !s.hidden; })
+               .map(function(s){ return { key:s.key, no:s.no, name:s.name, who:s.who, todo:s.todo,
+                                          nextLabel:s.nextLabel, draft:!!s.draft }; });
+}
+
 function stageDef_(key){
   key = norm_(key) || 'REQUEST';
   for (var i = 0; i < STAGES.length; i++) if (STAGES[i].key === key) return STAGES[i];

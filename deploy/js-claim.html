@@ -48,8 +48,8 @@ function newClaimForm(){
 
   var t = '';
   t += '<div class="card tight"><div class="cardhd"><h3>เปิดใบแจ้งเคลม (ใบใหม่)</h3>' +
-       '<span class="sub">กรอกให้ครบในหน้านี้หน้าเดียว แล้วกดบันทึกครั้งเดียวจบ</span>' +
-       '<button class="btn primary" id="saveBtn" onclick="submitClaim()">💾 บันทึกใบแจ้งเคลม</button></div>';
+       '<span class="sub">กรอกของตัวเองให้ครบ + แนบรูป · ช่องของสโตร์ยังไม่ต้องกรอก · บันทึกเป็นร่างไว้ก่อนได้</span>' +
+       '<button class="btn primary" id="saveBtn" onclick="submitClaim()">💾 บันทึกเป็นร่าง</button></div>';
   t += flowBarNew();
   t += '<div id="fmsg"></div>';
   t += '<div class="whokey">' +
@@ -343,14 +343,14 @@ function submitClaim(){
     wantDate:$('f_wantDate').value,
     items: rows
   };
-  $('saveBtn').disabled = true; $('saveBtn').textContent = 'กำลังบันทึก…';
+  $('saveBtn').disabled = true; $('saveBtn').textContent = 'กำลังบันทึกร่าง…';
   srv('createClaimWithPhotos', [h, DRAFTID, seqMap, AUTH], function(r){
-    $('saveBtn').disabled = false; $('saveBtn').textContent = '💾 บันทึกใบแจ้งเคลม';
+    $('saveBtn').disabled = false; $('saveBtn').textContent = '💾 บันทึกเป็นร่าง';
     if (!r || !r.ok){ $('fmsg').innerHTML = '<div class="msg bad">บันทึกไม่สำเร็จ</div>'; return; }
     DRAFTID = '';
     go('claim', r.docNo);
   }, function(m){
-    $('saveBtn').disabled = false; $('saveBtn').textContent = '💾 บันทึกใบแจ้งเคลม';
+    $('saveBtn').disabled = false; $('saveBtn').textContent = '💾 บันทึกเป็นร่าง';
     $('fmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>';
   });
 }
