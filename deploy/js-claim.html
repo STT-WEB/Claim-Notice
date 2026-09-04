@@ -153,6 +153,12 @@ function jobTypeOf(jobNo){
   var m = String(jobNo || '').toUpperCase().match(/^([A-Z]{2,4})-/);
   return m ? m[1] : '';
 }
+/** สถานะเป็นผลของขั้นตอน ไม่ใช่ของที่ใครมาเลือกเอง (เบียร์ถามว่าใครเป็นคนเปลี่ยน) */
+function statusText(v){
+  var m = { DRAFT:'ร่าง / กำลังเตรียมข้อมูล', SENT:'ส่ง Supplier แล้ว รอคำตอบ',
+            REPLIED:'Supplier ตอบแล้ว · ของกลับมา', BILLED:'ออกใบเรียกเก็บแล้ว', CLOSED:'ปิดงานแล้ว' };
+  return m[String(v || 'DRAFT').toUpperCase()] || String(v || '');
+}
 function hasRole(r){
   if (!ME) return false;
   var rs = (ME.roles && ME.roles.length) ? ME.roles : [ME.role];
@@ -189,6 +195,18 @@ function missingFields(){
   }
   return miss;
 }
+/** ใบที่บันทึกแล้ว: เปลี่ยนในประเทศ↔ต่างประเทศ ต้องให้คอลัมน์แปลอังกฤษเข้า/ออกตามด้วย
+ *  เบียร์: "เปลี่ยนเป็นต่างประเทศ มันไม่มีช่องแปลภาษามาให้ ข้อมูลมันไม่ล้อกัน" */
+function areaChangedSaved(){
+  if (!GEDIT) return;
+  var keep = gridData(GEDIT.id);
+  GEDIT = makeGrid('gridEdit', claimCols(), keep, GEDIT.opt);
+  drawTrBtns('GEDIT');
+  applyGridLocks(GEDIT.id);
+  drawAllPhotos();
+  if (isForeign()) gridTranslate(GEDIT.id);      // เติมคำแปลให้เลย ไม่ต้องมากดเอง
+}
+
 function areaChanged(){
   var isFor = ($('f_area').value === 'for');
   $('f_fkwrap').style.display = isFor ? '' : 'none';
@@ -495,7 +513,8 @@ function paneClaim(c, docNo){
   t += fr('ประเภทการเคลม', sel('c_claimType','saveClaimField','claimType',h['ประเภทการเคลม'],
             [['after','หลังส่งมอบ (After-Sales)'],['pre','ก่อนส่งมอบ (Pre-Delivery)']]), W1, true) +
        fr('สถานที่ผลิต', sel('c_area','saveClaimField','area',h['สถานที่ผลิต'],
-            [['dom','ในประเทศ'],['for','ต่างประเทศ']]), W1, true) +
+            [['dom','ในประเทศ'],['for','ต่างประเทศ']]).replace('<select ', '<select onchange="areaChangedSaved()" '),
+            W1, true) +
        fr('วันที่', '<input value="' + esc(h['วันที่']) + '" disabled>', 'อัตโนมัติ|วันที่เปิดใบ');
   t += fr('เลขที่ JOB', ip('c_jobNo','saveClaimField','jobNo',h['เลขที่ JOB']), W1, true) +
        fr('ชื่อลูกค้า', ip('c_jobName','saveClaimField','jobName',h['ชื่อลูกค้า']), 'อัตโนมัติ|ขึ้นเองจากเลขที่ JOB') +
@@ -510,13 +529,13 @@ function paneClaim(c, docNo){
   t += fr('แผนกที่ขอเคลม', sel('c_dept','saveClaimField','dept',h['แผนก'], deptPairs(h['แผนก'])),
             'อัตโนมัติ|ขึ้นเองตามสิทธิ์ของคนที่เปิดใบ · เปลี่ยนได้', true) +
        fr('วันที่ต้องการของ', ip('c_wantDate','saveClaimField','wantDate',h['วันที่ต้องการของ'],'DD/MM/YYYY'), W1, true) +
-       fr('สถานะ', sel('c_status','saveClaimField','status',h['สถานะ'],
-            [['DRAFT','ร่าง'],['SENT','ส่ง Supplier แล้ว'],['REPLIED','Supplier ตอบแล้ว'],
-             ['BILLED','ออกใบเรียกเก็บแล้ว'],['CLOSED','ปิดงานแล้ว']]), 'ทุกขั้น|ทุกขั้นตอนแก้ได้');
+       fr('สถานะ', '<input value="' + esc(statusText(h['สถานะ'])) + '" disabled>',
+            'อัตโนมัติ|สถานะขึ้นเองตามขั้นตอน ไม่มีใครเปลี่ยนเอง — กดปุ่มส่งต่อขั้นถัดไปแทน');
   t += '</div>';
   t += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
     '<button class="btn ghost" onclick="addClaimRow()">+ เพิ่มรายการ</button>' +
     '<button class="btn ghost" onclick="openMediaFolder()">📁 โฟลเดอร์รูปใน Drive</button>' +
+    '<button class="btn ghost" onclick="sharePhotos()">📤 ส่งรูปให้ Supplier</button>' +
     '<button class="btn dark" onclick="go(\'print\',CURDOC)">🖨️ ปริ้นเอกสาร</button></div></div>';
 
   t += '<div class="card tight"><div class="cardhd"><h3>รายการที่เคลม (' + c.items.length + ' รายการ)</h3>' +
@@ -568,6 +587,15 @@ function paneSupplier(c, docNo){
     '<textarea class="tall" data-save="saveClaimField" data-f="resultDetail" placeholder="สรุปว่าตกลงกันได้ยังไง">' + esc(h['รายละเอียดผลการเคลม']) + '</textarea></div>';
   t += '<div class="frow"><label>หมายเหตุ / ข้อความจาก Supplier</label>' +
     '<textarea class="tall" data-save="saveClaimField" data-f="supplierNote" placeholder="ก๊อปข้อความ/อีเมลที่ Supplier ตอบมาไว้ตรงนี้ได้">' + esc(h['หมายเหตุจาก Supplier']) + '</textarea></div>';
+
+  /* เบียร์: "รายละเอียดผลการเคลม และ หมายเหตุ/ข้อความจาก Supplier
+     สามารถพิมพ์ และ/หรือ ใส่รูป Chat ที่คุยกับ supplier ได้"
+     → กล่องรูปของแท็บนี้ ใช้คีย์ "S" แยกจากรูปของรายการสินค้า
+       (photoCoverage_ นับเฉพาะรูปที่ผูกกับลำดับรายการจริง รูปแชทจึงไม่ไปปนกับ "รูปครบไหม") */
+  t += '<div class="card tight" style="margin-top:14px"><div class="cardhd">' +
+       '<h3>📷 รูปแชท / อีเมลที่คุยกับ Supplier</h3>' +
+       '<span class="sub">แคปหน้าจอ LINE · WeChat · อีเมล มาแปะไว้เป็นหลักฐานได้ (ไม่บังคับ)</span></div>' +
+       '<div data-phbox="S" data-phreq="soft"></div></div>';
   t += '</div>';
   return t;
 }
@@ -819,10 +847,11 @@ function shrinkImage(file, maxW, quality){
   });
 }
 
-function pickPhotos(seq){
+function pickPhotos(seq, cam){
   if (!CURDOC){ alert('เปิดเอกสารก่อน แล้วค่อยแนบรูปครับ'); return; }
   var inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
+  inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = !cam;
+  if (cam) inp.setAttribute('capture', 'environment');
   inp.onchange = function(){ uploadList(seq, Array.prototype.slice.call(inp.files)); };
   inp.click();
 }
@@ -901,6 +930,44 @@ function zoomPhoto(view, thumb){
                 '<img src="' + thumb.replace('sz=w1000','sz=w2000') + '">';
   d.onclick = function(e){ if (e.target === d) d.remove(); };
   document.body.appendChild(d);
+}
+/** เบียร์: "รูปที่โหลดมาใส่แล้ว เบียร์จะ Copy ไปให้ Supplier ยังไง"
+ *  ให้ 3 ทาง: ปริ้น/PDF (รูปติดไปในเอกสารเลย) · ลิงก์โฟลเดอร์ · ก๊อปลิงก์รูปทีละรายการ */
+function sharePhotos(){
+  var lines = [], total = 0;
+  var seqs = Object.keys(PHOTOS).sort(function(a,b){ return num2(a) - num2(b); });
+  for (var i = 0; i < seqs.length; i++){
+    var sq = seqs[i], list = PHOTOS[sq] || [];
+    if (!list.length) continue;
+    var name = '';
+    for (var k = 0; k < CLAIM.items.length; k++) if (String(CLAIM.items[k].seq) === String(sq)) name = CLAIM.items[k].name;
+    lines.push('ข้อ ' + sq + (name ? ' · ' + name : ''));
+    for (var j = 0; j < list.length; j++){ lines.push('   ' + list[j].view); total++; }
+  }
+  var txt = 'รูปหลักฐานการเคลม ' + CURDOC + ' (เลขจ๊อบ ' + CURJOB + ')\n\n' + lines.join('\n');
+
+  var t = '<div class="card"><div class="cardhd"><h3>📤 ส่งรูปให้ Supplier — ' + esc(CURDOC) + '</h3>' +
+    '<span class="sub">' + total + ' รูป</span>' +
+    '<button class="btn" onclick="go(\'claim\',CURDOC)">← กลับใบเคลม</button></div>';
+  t += '<ol class="sharelist">' +
+    '<li><b>วิธีที่ 1 — ส่งเป็นเอกสาร (แนะนำ)</b> รูปติดไปในใบเลย ไม่ต้องส่งแยก<br>' +
+      '<button class="btn primary" onclick="go(\'print\',CURDOC)">🖨️ ไปหน้าปริ้น → เลือกฉบับส่ง Supplier → บันทึกเป็น PDF</button></li>' +
+    '<li><b>วิธีที่ 2 — ส่งลิงก์โฟลเดอร์</b> Supplier กดดูรูปเต็มทุกใบได้เอง<br>' +
+      '<button class="btn ghost" onclick="openMediaFolder()">📁 เปิดโฟลเดอร์ใน Drive</button></li>' +
+    '<li><b>วิธีที่ 3 — ก๊อปลิงก์รูปไปวางในแชท</b> (LINE / อีเมล)<br>' +
+      '<button class="btn ghost" onclick="copyShare()">📋 คัดลอกลิงก์ทั้งหมด</button> ' +
+      '<span id="cpmsg" class="hint"></span>' +
+      '<textarea id="shareBox" class="sharebox" readonly>' + esc(txt) + '</textarea></li></ol>';
+  t += '<div class="hint">ไฟล์รูปตัวจริงอยู่ใน Drive ของบริษัท ลิงก์เปิดดูได้โดยไม่ต้องล็อกอิน — ' +
+       'ถ้า Supplier ขอไฟล์แยก ให้ดาวน์โหลดจากโฟลเดอร์ในวิธีที่ 2</div></div>';
+  $('view').innerHTML = t;
+}
+function num2(v){ var n = parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n) ? 0 : n; }
+function copyShare(){
+  var el = $('shareBox'); el.select(); el.setSelectionRange(0, 999999);
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch(e){}
+  $('cpmsg').textContent = ok ? '✓ คัดลอกแล้ว เอาไปวางในแชทได้เลย' : 'กดค้างที่ข้อความแล้วเลือกคัดลอกเองได้ครับ';
 }
 function openMediaFolder(){
   srv('getMediaFolderLink', [CURDOC, CURJOB, AUTH], function(u){ window.open(u, '_blank'); });

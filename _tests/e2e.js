@@ -163,6 +163,27 @@ T('ทะเบียน LOG มีจริงในไฟล์ฐานข้
   const n = vm.runInContext('db_().log.getLastRow()', sandbox);
   if(n<2) throw new Error('LOG ว่าง'); return (n-1)+' แถว'; });
 
+console.log('\n⑦ กฎที่ต้องบังคับจริง (v0.8.0)');
+T('สถานะขึ้นเองตามขั้นตอน ไม่ใช่ให้เลือกเอง', ()=>{
+  const c=call('getClaim',[DOC,AUTH]);
+  if(c.head['สถานะ']!=='SENT') throw new Error('ขั้น SUPPLIER แต่สถานะเป็น '+c.head['สถานะ']+' (ควรเป็น SENT)');
+  try { call('saveClaimField',[DOC,'status','CLOSED',AUTH]); }
+  catch(e){ return 'สถานะ = SENT · แก้มือไม่ได้ ถูกแล้ว'; }
+  throw new Error('ยังเปลี่ยนสถานะเองได้อยู่'); });
+T('ผู้บริหาร (ADMIN) ก็ข้ามลำดับขั้นไม่ได้', ()=>{
+  /* ADMIN ทำงานแทนแผนกไหนก็ได้ แต่ห้ามแก้ช่องของขั้นที่ยังไม่ถึง/เลยไปแล้ว */
+  try { call('saveClaimField',[DOC,'model','แอดมินแก้ข้ามขั้น',AUTH]); }
+  catch(e){ return 'กันไว้ถูกแล้ว: '+e.message.slice(0,50)+'…'; }
+  throw new Error('ADMIN ยังแก้ช่องของขั้น 1 ได้ ทั้งที่เอกสารเลยไปขั้น 4 แล้ว'); });
+T('ปริ้นฉบับภายใน ไม่ล็อก', ()=>{ const r=call('markPrinted',[DOC,'int',AUTH]);
+  if(r.locked) throw new Error('ฉบับภายในไม่ควรล็อก'); return 'ไม่ล็อก ถูกแล้ว'; });
+T('เพิ่มรายการก่อนปริ้นส่งออก = ได้', ()=>'ลำดับที่ '+call('addClaimItem',[DOC,BUY]).seq);
+T('ปริ้นฉบับส่ง Supplier แล้วล็อก เพิ่มรายการไม่ได้', ()=>{
+  call('markPrinted',[DOC,'notice',AUTH]);
+  try { call('addClaimItem',[DOC,BUY]); }
+  catch(e){ return 'ล็อกถูกแล้ว: '+e.message.slice(0,52)+'…'; }
+  throw new Error('ปริ้นส่งออกแล้วยังเพิ่มรายการได้อยู่'); });
+
 console.log('\n──────────────────────────────');
 console.log('ผ่าน '+pass+' · ไม่ผ่าน '+fail);
 console.log('เปิดไฟล์ '+G.STATS.openById+' ครั้ง · เขียนแคช '+G.STATS.cachePut+' ครั้ง · ไฟล์รูปใน Drive '+G.STATS.driveFiles);

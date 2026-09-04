@@ -216,7 +216,9 @@ function gridPhotoStrip(g, rid){
          '<button class="phdel" title="เอาออก" onclick="gridDelPhoto(\'' + g.id + '\',\'' + rid + '\',\'' + list[k].id + '\')">&#10005;</button></div>';
   }
   if (list.length < max){
-    h += '<div class="phadd xs" onclick="gridPickPhotos(\'' + g.id + '\',\'' + rid + '\')"><b>+</b></div>';
+    h += '<div class="phadd xs" title="เลือกรูป" onclick="gridPickPhotos(\'' + g.id + '\',\'' + rid + '\')"><b>+</b></div>';
+    if (isTouch()) h += '<div class="phadd xs cam" title="ถ่ายรูปหน้างาน" ' +
+         'onclick="gridPickPhotos(\'' + g.id + '\',\'' + rid + '\',1)"><b>📷</b></div>';
   }
   h += '</div>';
   if (!list.length) h += '<div class="phwarn sm">ต้องมีรูป</div>';
@@ -224,12 +226,14 @@ function gridPhotoStrip(g, rid){
   h += '<div class="phmsg" id="phmsg_' + rid + '"></div>';
   return h;
 }
-function gridPickPhotos(gid, rid){
+function gridPickPhotos(gid, rid, cam){
   var g = GRIDS[gid], max = g.opt.maxPhoto || 5;
   var have = (PHOTOS[rid] || []).length;
   if (have >= max){ alert('แถวนี้ใส่ได้มากสุด ' + max + ' รูปครับ'); return; }
   var inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
+  inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = !cam;
+  /* cam = เปิดกล้องหลังเลย ใช้ตอนอยู่หน้างาน · ไม่ใส่ = เลือกจากคลังรูปได้ด้วย */
+  if (cam) inp.setAttribute('capture', 'environment');
   inp.onchange = function(){
     var files = Array.prototype.slice.call(inp.files);
     if (files.length > max - have){

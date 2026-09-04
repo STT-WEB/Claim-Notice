@@ -74,7 +74,7 @@ var FIELD_STAGE = {
   currency:'SUPPLIER', rate:'SUPPLIER', rateDate:'SUPPLIER', billCase:'SUPPLIER',
   result:'SUPPLIER', resultDetail:'SUPPLIER', supplierNote:'SUPPLIER',
 
-  status:'*'
+  status:'AUTO'          // ขึ้นเองตามขั้นตอน ไม่มีใครเลือกเอง
 };
 
 var ITEM_STAGE = {
@@ -87,18 +87,24 @@ var ITEM_STAGE = {
 
 /** ตัดสินว่าคนนี้แก้ช่องนี้ได้ไหม ณ ขั้นตอนปัจจุบัน — เหตุผลบอกเป็นภาษาคน */
 function canEditField_(curStage, field, map, me){
+  /* เบียร์: "ถึงเบียร์จะเป็น Admin ก็ต้องล้อตามกฎที่วางไว้นะ"
+     → ผู้บริหารทำงานแทนแผนกไหนก็ได้ (จะได้ช่วยงานได้เวลาคนไม่อยู่)
+       แต่ **ข้ามลำดับขั้นไม่ได้** เหมือนกันทุกคน
+       ของเดิม Admin ผ่านทุกอย่าง = กฎที่วางไว้ไม่มีผลกับคนที่ทดสอบระบบ
+       เลยดูเหมือนระบบไม่มีขั้นตอน */
   var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
-  if (mine.indexOf('ADMIN') >= 0) return { ok:true };
+  var isAdmin = mine.indexOf('ADMIN') >= 0;
 
   var spec = map[field];
   if (!spec) return { ok:false, why:'ไม่รู้จักช่องนี้' };
   if (spec === '*') return { ok:true };
+  if (spec === 'AUTO') return { ok:false, why:'สถานะขึ้นเองตามขั้นตอน ไม่ต้องเปลี่ยนเอง — กดปุ่มส่งต่อขั้นถัดไปแทน' };
 
   var always = false, key = spec;
   if (spec.indexOf('ALWAYS:') === 0){ always = true; key = spec.slice(7); }
 
   var owner = stageDef_(key);
-  var isOwner = false;
+  var isOwner = isAdmin;
   for (var i = 0; i < mine.length; i++) if (owner.roles.indexOf(mine[i]) >= 0) isOwner = true;
   if (!isOwner){
     return { ok:false, why:'ช่องนี้เป็นหน้าที่ของ ' + owner.who + ' — สิทธิ์ของคุณคือ ' + mine.join(', ') };
@@ -117,7 +123,7 @@ function canEditField_(curStage, field, map, me){
  * ต่อท้ายของเดิม แล้วเติมหัวตารางให้ชีตเก่าอัตโนมัติ (ensureCols_)
  * ⚠️ ห้ามใช้ HDR_CLAIM.length เป็น "คอลัมน์แก้ไขล่าสุด" อีกต่อไป
  *    เพราะพอเพิ่มคอลัมน์ ตัวเลขนั้นจะเลื่อนไปทับคอลัมน์ใหม่ — ใช้ colOf_() แทน */
-var HDR_FLOW = ['ขั้นตอน','รอใครทำ','เหตุผลที่ตีกลับ','ตีกลับโดย','ตีกลับเมื่อ','ประวัติขั้นตอน'];
+var HDR_FLOW = ['ขั้นตอน','รอใครทำ','เหตุผลที่ตีกลับ','ตีกลับโดย','ตีกลับเมื่อ','ประวัติขั้นตอน','ปริ้นส่งออกแล้วเมื่อ','ปริ้นโดย'];
 
 function claimHdr_(){ return HDR_CLAIM.concat(HDR_FLOW); }
 
@@ -150,10 +156,17 @@ function claimStage_(sh, row){
   return v || 'REQUEST';                       // ใบเก่าที่ยังไม่มีค่า = เพิ่งแจ้ง
 }
 
+/** สถานะของใบ = ผลของขั้นตอน ไม่ใช่ของที่ใครมานั่งเลือกเอง
+ *  เบียร์ถามว่า "สถานะคืออะไร ใครต้องเป็นคนเปลี่ยน" — คำตอบคือ ไม่มีใครเปลี่ยน ระบบเปลี่ยนให้ */
+var STAGE_STATUS = { REQUEST:'DRAFT', STORE:'DRAFT', PURCHASE:'DRAFT',
+                     SUPPLIER:'SENT', RETURN:'REPLIED', CLOSED:'CLOSED' };
+function statusOfStage_(key){ return STAGE_STATUS[norm_(key)] || 'DRAFT'; }
+
 function setStage_(sh, row, key, me, note){
   var hist = norm_(sh.getRange(row, colOf_('ประวัติขั้นตอน')).getDisplayValue());
   var line = nowStamp_() + ' · ' + stageDef_(key).name + ' · ' + (me ? me.name : '') + (note ? ' · ' + note : '');
   sh.getRange(row, colOf_('ขั้นตอน')).setValue(key);
+  sh.getRange(row, colOf_('สถานะ')).setValue(statusOfStage_(key));   // สถานะเดินตามขั้นตอนเสมอ
   sh.getRange(row, colOf_('รอใครทำ')).setValue(stageDef_(key).who);
   sh.getRange(row, colOf_('ประวัติขั้นตอน')).setValue((hist ? hist + '\n' : '') + line);
   sh.getRange(row, colOf_('แก้ไขล่าสุด')).setValue(nowStamp_());
@@ -181,6 +194,8 @@ function claimFlow(docNo, auth){
     rejectBy:   norm_(d.claims.getRange(r, colOf_('ตีกลับโดย')).getDisplayValue()),
     rejectAt:   norm_(d.claims.getRange(r, colOf_('ตีกลับเมื่อ')).getDisplayValue()),
     history:    norm_(d.claims.getRange(r, colOf_('ประวัติขั้นตอน')).getDisplayValue()),
+    printedAt:  norm_(d.claims.getRange(r, colOf_('ปริ้นส่งออกแล้วเมื่อ')).getDisplayValue()),
+    printedBy:  norm_(d.claims.getRange(r, colOf_('ปริ้นโดย')).getDisplayValue()),
     stages: STAGES.map(function(s){ return { key:s.key, no:s.no, name:s.name, who:s.who }; }),
     lock: lockMap_(key, me),
     missing: claimMissing_(d, norm_(docNo), key)

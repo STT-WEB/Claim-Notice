@@ -130,9 +130,38 @@ function saveItemField(docNo, seq, field, value, auth){
 }
 
 /** เพิ่มรายการเคลม 1 บรรทัด */
+/* ═══ ปริ้นแล้ว = ล็อกรายการ (v0.8.0) ═══════════════════════════
+ * เบียร์: "เมื่อไหร่ที่ปริ้นเอกสารแล้ว จะไม่สามารถเพิ่มรายการสินค้าได้ ต้องเปิดใบใหม่เท่านั้น"
+ * ล็อกเฉพาะตอนปริ้น "ฉบับที่ส่งออกไปข้างนอก" (ให้ Supplier / ใบเรียกเก็บ)
+ * ฉบับภายในปริ้นดูกี่รอบก็ได้ ไม่ล็อก — เพราะไม่ได้ออกไปถึงมือใคร             */
+function printedAt_(d, r){
+  return norm_(d.claims.getRange(r, colOf_('ปริ้นส่งออกแล้วเมื่อ')).getDisplayValue());
+}
+
+/** หน้าเว็บเรียกตอนสั่งปริ้นฉบับที่ส่งออก — บันทึกว่าใบนี้ออกไปแล้ว */
+function markPrinted(docNo, kind, auth){
+  var me = requireLogin_(auth);
+  if (norm_(kind) === 'int') return { ok:true, locked:false };   // ฉบับภายใน ไม่ล็อก
+  var d = db_(), r = findClaimRow_(d.claims, norm_(docNo));
+  if (r < 0) throw new Error('ไม่พบใบเคลม ' + docNo);
+  ensureCols_(d.claims, claimHdr_());
+  if (!printedAt_(d, r)){
+    d.claims.getRange(r, colOf_('ปริ้นส่งออกแล้วเมื่อ')).setValue(nowStamp_());
+    d.claims.getRange(r, colOf_('ปริ้นโดย')).setValue(me.name);
+    log_('markPrinted', docNo, norm_(kind) + ' · ' + me.name);
+  }
+  return { ok:true, locked:true, at:printedAt_(d, r) };
+}
+
 function addClaimItem(docNo, auth){
   requireAny_(auth, ['PRODUCTION','QC','DESIGN','STORE','PURCHASE','APPROVER']);
-  var d = db_(), lr = d.items.getLastRow(), seq = 1;
+  var d = db_();
+  var rc = findClaimRow_(d.claims, norm_(docNo));
+  if (rc >= 0){
+    var pat = printedAt_(d, rc);
+    if (pat) throw new Error('ใบนี้ปริ้นส่งออกไปแล้วเมื่อ ' + pat + ' — เพิ่มรายการไม่ได้ ต้องเปิดใบเคลมใบใหม่');
+  }
+  var lr = d.items.getLastRow(), seq = 1;
   if (lr > 1){
     var v = d.items.getRange(2,1,lr-1,2).getDisplayValues();
     for (var i = 0; i < v.length; i++){

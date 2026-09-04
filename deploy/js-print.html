@@ -37,7 +37,7 @@ function drawPrint(){
 
   var t = '<div class="card noprint"><div class="cardhd"><h3>ปริ้นเอกสาร ' + esc(h['เลขที่เอกสาร']) + '</h3>' +
     '<button class="btn" onclick="go(\'claim\',CURDOC)">← กลับใบเคลม</button>' +
-    '<button class="btn dark" onclick="window.print()">🖨️ ปริ้น / บันทึกเป็น PDF</button></div>';
+    '<button class="btn dark" onclick="doPrint()">🖨️ ปริ้น / บันทึกเป็น PDF</button></div>';
 
   t += '<div class="prbar">';
   t += '<div class="prgrp"><span>ฉบับ</span>' +
@@ -68,6 +68,19 @@ function drawPrint(){
   $('view').innerHTML = t;
   buildPages(sups);
 }
+/** ปริ้นฉบับที่ส่งออกไปข้างนอก = บันทึกว่าใบนี้ออกไปแล้ว → เพิ่มรายการไม่ได้อีก
+ *  เบียร์: "ปริ้นเอกสารแล้ว จะไม่สามารถเพิ่มรายการสินค้าได้ ต้องเปิดใบใหม่เท่านั้น" */
+function doPrint(){
+  if (PR.kind === 'int'){ window.print(); return; }        // ฉบับภายใน ปริ้นดูได้ไม่จำกัด
+  var already = FLOW && FLOW.printedAt;
+  if (!already && !confirm('ปริ้นฉบับที่ส่งให้ Supplier แล้ว จะ "เพิ่มรายการสินค้าไม่ได้อีก"\n' +
+      'ถ้ามีของเพิ่มทีหลัง ต้องเปิดใบเคลมใบใหม่\n\nยืนยันปริ้นเลยไหม?')) return;
+  srv('markPrinted', [CURDOC, PR.kind, AUTH], function(){
+    if (FLOW) FLOW.printedAt = FLOW.printedAt || 'เพิ่งปริ้น';
+    window.print();
+  }, function(m){ alert(m); });
+}
+
 function prBtn(k, label, sub){
   return '<button class="prb' + (PR.kind === k ? ' on' : '') + '" title="' + esc(sub) + '" ' +
          'onclick="PR.kind=\'' + k + '\';drawPrint()">' + label + '</button>';
