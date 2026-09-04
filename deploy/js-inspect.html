@@ -172,6 +172,7 @@ function openInspection(docNo){
     t += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
       '<button class="btn" onclick="go(\'inslist\')">← ใบตรวจทั้งหมด</button>' +
       '<button class="btn ghost" onclick="addInspRow()">+ เพิ่มหัวข้อตรวจ</button>' +
+      '<button class="btn ghost" onclick="inspTranslate()">🌐 แปลไทย → EN</button>' +
       '<button class="btn ghost" onclick="openMediaFolder()">📁 โฟลเดอร์รูปใน Drive</button>';
     if (h['ใบเคลมที่ออกจากใบนี้']){
       t += '<button class="btn dark" onclick="go(\'claim\',\'' + esc(h['ใบเคลมที่ออกจากใบนี้']) + '\')">' +
@@ -310,5 +311,34 @@ function sendToClaim(){
       $('insmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>';
     });
   });
+}
+
+/** แปล "สิ่งที่พบ" ของทุกข้อที่ Un-Acc — เติมเฉพาะช่องที่ยังว่าง แล้วบันทึกลงชีตให้เลย */
+function inspTranslate(){
+  var boxes = document.querySelectorAll('[id^="unbox_"]');
+  var seqs = [], texts = [], els = [];
+  for (var i = 0; i < boxes.length; i++){
+    var seq = boxes[i].id.replace('unbox_','');
+    var th = boxes[i].querySelector('[data-f="found"]');
+    var en = boxes[i].querySelector('[data-f="foundEn"]');
+    if (!th || !en) continue;
+    if (String(th.value).trim() && !String(en.value).trim()){
+      seqs.push(seq); texts.push(th.value); els.push(en);
+    }
+  }
+  if (!texts.length){ $('insmsg').innerHTML = '<div class="msg good">ไม่มีช่องที่ต้องแปล — ช่องที่พิมพ์อังกฤษไว้แล้วระบบไม่ทับให้</div>'; return; }
+  $('insmsg').innerHTML = '<div class="msg"><span class="spin"></span> กำลังแปล ' + texts.length + ' ช่อง…</div>';
+  srv('translateBatch', [texts, 'th', 'en', AUTH], function(res){
+    var n = 0;
+    for (var k = 0; k < els.length; k++){
+      if (res && res[k]){
+        els[k].value = res[k];
+        fieldMark(els[k], 'ok');
+        google.script.run.saveInspItemField(CURDOC, seqs[k], 'foundEn', res[k], AUTH);
+        n++;
+      }
+    }
+    $('insmsg').innerHTML = '<div class="msg good">แปลให้แล้ว ' + n + ' ช่อง — อ่านทวนก่อนส่ง Supplier นะครับ ศัพท์ช่างบางคำแปลไม่เนียน</div>';
+  }, function(m){ $('insmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; });
 }
 </script>

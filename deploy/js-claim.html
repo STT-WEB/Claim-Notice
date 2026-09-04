@@ -59,7 +59,10 @@ function newClaimForm(){
 
   t += '<div class="card tight"><div class="cardhd"><h3>รายการที่เคลม</h3>' +
        '<span class="sub">ก๊อปจาก Google Sheets มาวางได้เลย · ทุกแถวต้องมีรูปอย่างน้อย 1 รูป</span>' +
+       '<button class="btn ghost" onclick="gridTranslate(GNEW.id)">🌐 แปลไทย → EN</button>' +
+       '<button class="btn ghost" onclick="gridTrCheck(GNEW.id)">🔎 ตรวจคำแปล</button>' +
        '<span class="phbar" id="phbar">—</span></div>';
+  t += '<div class="phmsg" id="trmsg"></div>';
   t += '<div id="gridBox"></div></div>';
 
   $('view').innerHTML = t;
@@ -67,8 +70,9 @@ function newClaimForm(){
   GNEW = makeGrid('gridBox', claimCols(), null, {
     photos:true, maxPhoto:5,
     requireKeys:['code','name','th'],
+    trFrom:'th', trTo:'en',           // พิมพ์ไทยเสร็จ → เติม EN ให้เอง (ถ้าช่อง EN ยังว่าง)
     onChange:function(r, k){ if (k === 'code') autoGoods(GNEW); if (k === 'po') autoPo(GNEW); },
-    onPaste:function(){ autoGoods(GNEW); autoPo(GNEW); updateNewPhBar(); },
+    onPaste:function(){ autoGoods(GNEW); autoPo(GNEW); updateNewPhBar(); gridTranslate(GNEW.id); },
     onPhoto:updateNewPhBar
   });
   updateNewPhBar();
@@ -281,6 +285,15 @@ function drawClaim(){
   }
   GEDIT = makeGrid('gridEdit', claimCols(), rows, {
     photos:true, maxPhoto:5, requireKeys:['code','name','th'],
+    trFrom:'th', trTo:'en',
+    /* ระบบเติม EN ให้ในใบที่บันทึกแล้ว ต้องบันทึกลงชีตด้วย ไม่งั้นรีเฟรชแล้วหาย */
+    onFill:function(rowsFilled, g){
+      for (var i = 0; i < rowsFilled.length; i++){
+        var rr = rowsFilled[i], sq = g.rows[rr]._seq;
+        if (!sq) continue;
+        google.script.run.saveItemField(CURDOC, sq, 'en', g.rows[rr].en, AUTH);
+      }
+    },
     onChange:function(r, k, v, g){
       var seq = g.rows[r]._seq;
       if (!seq) return;                               // แถวใหม่ต้องกด "+ เพิ่มรายการ" ก่อน
@@ -343,7 +356,10 @@ function paneClaim(c, docNo){
 
   t += '<div class="card tight"><div class="cardhd"><h3>รายการที่เคลม (' + c.items.length + ' รายการ)</h3>' +
        '<span class="sub">แก้ในตารางได้เลย บันทึกเอง · ก๊อปจาก Sheets มาวางได้</span>' +
+       '<button class="btn ghost" onclick="gridTranslate(GEDIT.id)">🌐 แปลไทย → EN</button>' +
+       '<button class="btn ghost" onclick="gridTrCheck(GEDIT.id)">🔎 ตรวจคำแปล</button>' +
        '<span class="phbar" id="phbar">—</span></div>';
+  t += '<div class="phmsg" id="trmsg"></div>';
   t += '<div id="gridEdit"></div></div>';
   return t;
 }

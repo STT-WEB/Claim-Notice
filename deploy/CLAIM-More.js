@@ -705,3 +705,50 @@ function photoCoverage_(){
   }
   return res;
 }
+
+/* ═══════════ แปลไทย → อังกฤษ (v0.4.1) ═══════════
+ * เบียร์: "Claim description (EN) จะแปลให้เลยปะ"
+ *
+ * ใช้ LanguageApp ที่ติดมากับ Apps Script — ฟรี ไม่ต้องต่อ API ข้างนอก ไม่ต้องมีบัตร
+ * ข้อจำกัดที่ต้องรู้ (ไม่ปิดบัง):
+ *   · ศัพท์ช่างเฉพาะทางมันแปลได้ไม่เนียน เช่น "ประเก็น" อาจได้ "gasket" (ถูก)
+ *     แต่ "หน้าแปลน" บางทีได้ "front flange" (เพี้ยน) — เอกสารส่ง Supplier ต้องอ่านทวนก่อนส่งเสมอ
+ *   · จึงมีปุ่ม "ตรวจคำแปล" แปลกลับเป็นไทยให้ดู ถ้าแปลกลับแล้วความหมายเพี้ยน = คำแปลนั้นใช้ไม่ได้
+ *   · มีโควตาต่อวัน จึงแปลทีเดียวทั้งตาราง + จำคำที่เคยแปลไว้ ไม่ยิงซ้ำ
+ * ทุกช่องยังพิมพ์ทับเองได้เสมอ ระบบไม่เคยล็อก                                        */
+
+function tr_(text, from, to){
+  text = norm_(text);
+  if (!text) return '';
+  var key = 'TR_' + from + to + '_' + Utilities.base64Encode(
+              Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, text));
+  var cache = CacheService.getScriptCache();
+  var hit = cache.get(key);
+  if (hit != null) return hit;
+  var out = '';
+  try { out = LanguageApp.translate(text, from, to); } catch(e){ out = ''; }
+  if (out) { try { cache.put(key, out, 21600); } catch(e){} }   // จำไว้ 6 ชม.
+  return out;
+}
+
+/** แปลทีเดียวหลายช่อง — ส่งมาเป็น array คืนเป็น array ตำแหน่งตรงกัน */
+function translateBatch(texts, from, to, auth){
+  requireLogin_(auth);
+  texts = texts || [];
+  var out = [];
+  for (var i = 0; i < texts.length; i++) out.push(tr_(texts[i], from || 'th', to || 'en'));
+  return out;
+}
+
+/** แปลกลับเป็นไทยให้ตรวจ — ถ้าแปลกลับแล้วความหมายเพี้ยน แปลว่าคำอังกฤษนั้นใช้ไม่ได้ */
+function translateCheck(pairs, auth){
+  requireLogin_(auth);
+  pairs = pairs || [];
+  var out = [];
+  for (var i = 0; i < pairs.length; i++){
+    var th = norm_(pairs[i].th), en = norm_(pairs[i].en);
+    if (!en) continue;
+    out.push({ seq:pairs[i].seq, th:th, en:en, back:tr_(en, 'en', 'th') });
+  }
+  return out;
+}

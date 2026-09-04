@@ -106,6 +106,7 @@ function bindGrid(id){
       var r = +this.getAttribute('data-r'), c = +this.getAttribute('data-c');
       g.rows[r][g.cols[c].k] = this.value;
       if (g.opt.onChange) g.opt.onChange(r, g.cols[c].k, this.value, g);
+      if (g.opt.trFrom && g.cols[c].k === g.opt.trFrom) gridTranslate(id, r);
       gridGrowIfNeeded(id, r);
     });
   }
@@ -270,5 +271,84 @@ function gridFilledRows(id){
   var out = [];
   for (var r = 0; r < g.rows.length; r++) if (gridRowFilled(g, r)) out.push(g.rows[r]);
   return out;
+}
+
+/* ─── แปลไทย → EN ───
+   เติมให้เฉพาะช่องที่ยังว่าง — ถ้าเบียร์พิมพ์อังกฤษเองไว้แล้ว ระบบไม่ทับของเดิม */
+function gridTranslate(id, onlyRow){
+  var g = GRIDS[id];
+  if (!g.opt.trFrom || !g.opt.trTo) return;
+  syncGrid(id);
+  var idx = [], texts = [];
+  for (var r = 0; r < g.rows.length; r++){
+    if (onlyRow != null && r !== onlyRow) continue;
+    var src = String(g.rows[r][g.opt.trFrom] || '').trim();
+    var dst = String(g.rows[r][g.opt.trTo]   || '').trim();
+    if (src && !dst){ idx.push(r); texts.push(src); }
+  }
+  if (!texts.length){
+    if (onlyRow == null) setTrMsg('ไม่มีช่องที่ต้องแปล — ช่องที่พิมพ์อังกฤษไว้แล้วระบบไม่ทับให้', '');
+    return;
+  }
+  if (onlyRow == null) setTrMsg('กำลังแปล ' + texts.length + ' ช่อง…', 'wait');
+  srv('translateBatch', [texts, 'th', 'en', AUTH], function(res){
+    var n = 0, filled = [];
+    for (var i = 0; i < idx.length; i++){
+      if (res && res[i]){ g.rows[idx[i]][g.opt.trTo] = res[i]; filled.push(idx[i]); n++; }
+    }
+    if (n){ drawGrid(id); if (g.opt.onFill) g.opt.onFill(filled, g); }
+    if (onlyRow == null){
+      setTrMsg(n ? ('แปลให้แล้ว ' + n + ' ช่อง — อ่านทวนก่อนส่ง Supplier นะครับ ศัพท์ช่างบางคำแปลไม่เนียน')
+                 : 'แปลไม่สำเร็จ ลองใหม่อีกครั้ง', n ? 'good' : 'bad');
+    }
+  }, function(m){ if (onlyRow == null) setTrMsg(m, 'bad'); });
+}
+function setTrMsg(msg, cls){
+  var el = $('trmsg'); if (!el) return;
+  el.className = 'phmsg ' + (cls || '');
+  el.innerHTML = (cls === 'wait' ? '<span class="spin"></span> ' : '') + esc(msg);
+}
+
+/** แปลกลับเป็นไทยให้ตรวจ — กันคำแปลเพี้ยนหลุดไปถึง Supplier */
+function gridTrCheck(id){
+  var g = GRIDS[id];
+  syncGrid(id);
+  var pairs = [];
+  for (var r = 0; r < g.rows.length; r++){
+    var th = String(g.rows[r][g.opt.trFrom] || '').trim();
+    var en = String(g.rows[r][g.opt.trTo]   || '').trim();
+    if (en) pairs.push({ seq:r + 1, th:th, en:en });
+  }
+  if (!pairs.length){ alert('ยังไม่มีข้อความอังกฤษให้ตรวจครับ'); return; }
+  setTrMsg('กำลังแปลกลับเป็นไทยเพื่อตรวจ…', 'wait');
+  srv('translateCheck', [pairs, AUTH], function(res){
+    setTrMsg('', '');
+    var t = '<div class="lightbox trbox"><div class="trpanel"><div class="trhd">' +
+      '<b>ตรวจคำแปล</b><span>อ่าน “แปลกลับเป็นไทย” เทียบกับต้นฉบับ — ถ้าความหมายเพี้ยน แปลว่าคำอังกฤษนั้นใช้ไม่ได้ ให้พิมพ์แก้เอง</span>' +
+      '<button onclick="this.closest(\'.lightbox\').remove()">ปิด ✕</button></div>' +
+      '<table class="t"><thead><tr><th style="width:34px">แถว</th><th>ต้นฉบับ (ไทย)</th>' +
+      '<th>คำแปล (EN)</th><th>แปลกลับเป็นไทย</th></tr></thead><tbody>';
+    for (var i = 0; i < res.length; i++){
+      var x = res[i];
+      var same = looksClose(x.th, x.back);
+      t += '<tr><td class="c">' + x.seq + '</td><td>' + esc(x.th) + '</td>' +
+        '<td>' + esc(x.en) + '</td>' +
+        '<td class="' + (same ? '' : 'trbad') + '">' + esc(x.back) +
+        (same ? '' : ' <span class="pill red">ตรวจดูอีกที</span>') + '</td></tr>';
+    }
+    t += '</tbody></table></div></div>';
+    var d = document.createElement('div'); d.innerHTML = t;
+    var node = d.firstChild;
+    node.onclick = function(e){ if (e.target === node) node.remove(); };
+    document.body.appendChild(node);
+  }, function(m){ setTrMsg(m, 'bad'); });
+}
+/** เทียบหยาบ ๆ ว่าแปลกลับแล้วยังใกล้ของเดิมไหม — ใช้แค่ชี้จุดที่ควรอ่านซ้ำ ไม่ได้ตัดสินแทนคน */
+function looksClose(a, b){
+  a = String(a || '').replace(/\s+/g, ''); b = String(b || '').replace(/\s+/g, '');
+  if (!a || !b) return false;
+  var hit = 0, n = 0;
+  for (var i = 0; i + 2 <= a.length; i += 2){ n++; if (b.indexOf(a.substr(i, 2)) >= 0) hit++; }
+  return n ? (hit / n) >= 0.45 : false;
 }
 </script>
