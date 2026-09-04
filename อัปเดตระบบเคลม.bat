@@ -5,14 +5,19 @@ echo    STT CLAIM - Update System
 echo ============================================
 echo.
 
-echo [1/4] Syntax check + guard tests (never push broken code)...
+echo [1/5] Syntax check + guard tests (never push broken code)...
 node "_tests\syntax-check.js"
 if errorlevel 1 goto SYNTAXFAIL
 node "_tests\guard-v0100.js"
 if errorlevel 1 goto SYNTAXFAIL
 echo.
 
-echo [2/4] Backup (git local + GitHub)...
+echo [2/5] Run the WHOLE program end to end (login - claim - stages - print data)...
+node "_tests\e2e.js"
+if errorlevel 1 goto E2EFAIL
+echo.
+
+echo [3/5] Backup (git local + GitHub)...
 git config user.name  "Beer"
 git config user.email "sasipa@suteetankers.com"
 git add -A
@@ -21,13 +26,13 @@ git push origin master
 if errorlevel 1 echo *** WARNING: git push failed - code is safe locally
 echo.
 
-echo [3/4] Upload code (clasp push)...
+echo [4/5] Upload code (clasp push)...
 cd deploy
 call clasp push -f
 if errorlevel 1 goto PUSHFAIL
 echo.
 
-echo [4/4] Publish to the SAME web address...
+echo [5/5] Publish to the SAME web address...
 call clasp deploy -i AKfycbyps-WDVmA_FkR76GQlL_wvEsVIL3j2ZTmamQGZMjjhM4CWYQAjhvNcfEioYbB_AsVVww -d "auto update"
 if errorlevel 1 goto DEPLOYFAIL
 echo.
@@ -43,6 +48,13 @@ echo ============================================
 echo.
 pause
 exit /b 0
+
+:E2EFAIL
+echo.
+echo *** END-TO-END TEST FAILED - nothing was uploaded.
+echo *** The program does not work when run for real. Read the list above.
+pause
+exit /b 1
 
 :SYNTAXFAIL
 echo.
