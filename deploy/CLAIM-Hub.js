@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v0.4.1';
+var VERSION = 'v0.5.0';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -328,7 +328,7 @@ function listVendors(){
 /* ─────────── ฐานข้อมูลของเราเอง (STT-CLAIM-DB) ─────────── */
 /* โครง 1 ไฟล์ แท็บแยกตามปี พ.ศ. → ขึ้นปีใหม่ระบบสร้างแท็บเองอัตโนมัติ ใช้ได้ 10-20 ปี */
 
-var HDR_CLAIM = ['เลขที่เอกสาร','ชนิดเอกสาร','วันที่','ประเภทการเคลม','พื้นที่','ชนิดงานต่างประเทศ',
+var HDR_CLAIM = ['เลขที่เอกสาร','ชนิดเอกสาร','วันที่','ประเภทการเคลม','สถานที่ผลิต','ชนิดงานต่างประเทศ',
   'เลขที่ JOB','ชื่อลูกค้า','MODEL','CHASSIS NO. (STT)','CHASSIS NO. (ผู้ผลิต)','SERIAL NO.',
   'JMC ที่ผูก','เลขใบส่งมอบ','ผู้ขอเคลม','แผนก','วันที่ต้องการของ',
   'สกุลเงิน','อัตราแลกเปลี่ยน','เรท ณ วันที่','กรณีเรียกเก็บ',
@@ -394,7 +394,7 @@ function db_(){
   var be = yearBE_();
   var o = {
     ss     : ss,
-    claims : ensureTab_(ss, 'CLAIMS_' + be, HDR_CLAIM),
+    claims : ensureCols_(ensureTab_(ss, 'CLAIMS_' + be, claimHdr_()), claimHdr_()),
     items  : ensureTab_(ss, 'ITEMS_'  + be, HDR_ITEM),
     labour : ensureTab_(ss, 'LABOUR_' + be, HDR_LAB),
     ack    : ensureTab_(ss, 'ACK_'    + be, HDR_ACK),
@@ -463,7 +463,7 @@ function findClaimRow_(sh, docNo){
 
 /** เปิดใบแจ้งเคลมใหม่ */
 function createClaim(h, auth){
-  var me = requireAny_(auth, ['PRODUCTION','QC','DESIGN','STORE','PURCHASE','APPROVER']);
+  var me = requireAny_(auth, ['PRODUCTION','SALES','QC','DESIGN','STORE','PURCHASE','APPROVER']);
   h = h || {};
   if (!norm_(h.jobNo)) throw new Error('ต้องระบุเลขที่ JOB');
 
@@ -521,7 +521,7 @@ function saveClaim(docNo, h, auth){
     if (i >= 0) d.claims.getRange(r, i + 1).setValue(val);
   }
   put('ประเภทการเคลม', norm_(h.claimType));
-  put('พื้นที่', norm_(h.area));
+  put('สถานที่ผลิต', norm_(h.area));
   put('ชนิดงานต่างประเทศ', norm_(h.foreignKind));
   put('เลขที่ JOB', norm_(h.jobNo).toUpperCase());
   put('ชื่อลูกค้า', norm_(h.jobName));
@@ -590,7 +590,7 @@ function listClaims(filter, auth){
     }
     out.push({
       docNo:o['เลขที่เอกสาร'], docKind:o['ชนิดเอกสาร'], date:o['วันที่'],
-      claimType:o['ประเภทการเคลม'], area:o['พื้นที่'],
+      claimType:o['ประเภทการเคลม'], area:o['สถานที่ผลิต'],
       jobNo:o['เลขที่ JOB'], jobName:o['ชื่อลูกค้า'], model:o['MODEL'],
       status:o['สถานะ'], by:o['สร้างโดย'],
       nItem: (pho.item[o['เลขที่เอกสาร']] || 0),

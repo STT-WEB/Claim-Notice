@@ -386,4 +386,38 @@ table.t textarea{min-height:34px;resize:vertical}
 .trhd button{background:var(--red);color:#fff;border:none;border-radius:8px;padding:7px 15px;
              font-weight:700;cursor:pointer;font-family:inherit}
 .trbad{background:#fdeeed}
+
+/* ═══════════ แถบขั้นตอนงาน (v0.5.0) ═══════════ */
+.flowwrap{margin-top:12px;border:1px solid var(--line);border-radius:11px;padding:12px 14px;background:#fafafb}
+.flowsteps{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:10px}
+.fstep{display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:99px;
+       border:1px solid var(--line);background:#fff;font-size:12px;color:#999;white-space:nowrap}
+.fstep .fno{width:17px;height:17px;border-radius:50%;background:#dcdce0;color:#fff;
+            font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+.fstep.done{border-color:#a9dcb8;background:#f2fbf5;color:#14612e}
+.fstep.done .fno{background:#1e9e4a}
+.fstep.now{border-color:var(--red);background:#fff;color:var(--ink);font-weight:800;
+           box-shadow:0 2px 8px rgba(226,35,26,.15)}
+.fstep.now .fno{background:var(--red)}
+.farrow{color:#ccc;font-size:15px}
+.flownow{display:flex;flex-direction:column;gap:3px;padding:9px 12px;background:#fff;
+         border:1px solid var(--line);border-radius:9px;margin-bottom:9px}
+.flownow b{font-size:14px}
+.fwho{margin-left:9px;font-size:12px;color:var(--red);font-weight:700}
+.ftodo{font-size:12.5px;color:var(--muted);line-height:1.55}
+.flowreject{background:#fdeeed;border:1px solid #e6a9a4;border-radius:9px;padding:9px 12px;
+            margin-bottom:9px;font-size:12.5px;color:#8f130c}
+.rjnote{margin-top:5px;font-size:13.5px;font-weight:700;line-height:1.5}
+.flowmiss{background:#fff7e8;border:1px solid #e8c89a;border-radius:9px;padding:8px 12px;
+          margin-bottom:9px;font-size:12.5px;color:#7a4e00;line-height:1.55}
+.flowbtn{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fview{font-size:12.5px;color:var(--muted)}
+.hist{margin:0;padding-left:22px}
+.hist li{font-size:12.5px;line-height:1.7;color:#444;margin-bottom:3px}
+
+/* ช่องที่ไม่ใช่หน้าที่ของเรา — เห็นข้อมูลได้ แต่แก้ไม่ได้ */
+input.locked,textarea.locked,select.locked{
+  background:#f4f4f6!important;color:#8a8a90!important;cursor:not-allowed;
+  border-color:#e6e6ea!important;box-shadow:none!important}
+.xt input.locked,.xt textarea.locked{background:#f4f4f6!important}
 </style>

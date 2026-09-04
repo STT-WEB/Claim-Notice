@@ -10,7 +10,7 @@
  *      ไม่เขียนระบบรูปซ้ำ — ตรวจกับเคลมใช้กลไกเดียวกันตามที่ตกลงไว้
  */
 
-var HDR_INSP = ['เลขที่เอกสาร','ชนิดเอกสาร','วันที่','พื้นที่','ชนิดงาน',
+var HDR_INSP = ['เลขที่เอกสาร','ชนิดเอกสาร','วันที่','สถานที่ผลิต','ชนิดงาน',
   'เลขที่ JOB','ชื่อลูกค้า','MODEL','CHASSIS NO. (STT)','CHASSIS NO. (ผู้ผลิต)','SERIAL NO.',
   'แม่แบบเช็คลิสต์','PO','Supplier','วันรับสินค้า','ผู้ตรวจ',
   'สถานะ','ใบเคลมที่ออกจากใบนี้','หมายเหตุ','สร้างโดย','สร้างเมื่อ','แก้ไขล่าสุด'];
@@ -209,7 +209,7 @@ function listInspections(filter, auth){
     }
     var c = cnt[o['เลขที่เอกสาร']] || { n:0, acc:0, un:0, todo:0 };
     out.push({
-      docNo:o['เลขที่เอกสาร'], date:o['วันที่'], area:o['พื้นที่'], kind:o['ชนิดงาน'],
+      docNo:o['เลขที่เอกสาร'], date:o['วันที่'], area:o['สถานที่ผลิต'], kind:o['ชนิดงาน'],
       jobNo:o['เลขที่ JOB'], jobName:o['ชื่อลูกค้า'], model:o['MODEL'],
       supplier:o['Supplier'], template:o['แม่แบบเช็คลิสต์'], status:o['สถานะ'],
       claimNo:o['ใบเคลมที่ออกจากใบนี้'], by:o['สร้างโดย'],
@@ -358,7 +358,7 @@ function sendUnAccToClaim(docNo, auth){
   }
 
   var res = createClaim({
-    claimType:'pre', area:H['พื้นที่'], foreignKind:H['ชนิดงาน'],
+    claimType:'pre', area:H['สถานที่ผลิต'], foreignKind:H['ชนิดงาน'],
     jobNo:H['เลขที่ JOB'], jobName:H['ชื่อลูกค้า'], model:H['MODEL'],
     chassisStt:H['CHASSIS NO. (STT)'], chassisMaker:H['CHASSIS NO. (ผู้ผลิต)'],
     serialNo:H['SERIAL NO.'], dept:'QC / ตรวจรับ',

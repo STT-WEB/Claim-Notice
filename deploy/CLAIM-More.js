@@ -40,6 +40,13 @@ function saveClaimField(docNo, field, value, auth){
 
   var d = db_(), r = findClaimRow_(d.claims, norm_(docNo));
   if (r < 0) throw new Error('ไม่พบใบเคลม ' + docNo);
+
+  /* v0.5.0 — "ทำงานแทนกันไม่ได้" ตามที่เบียร์สั่ง
+     เช็คที่หลังบ้านด้วย ไม่ใช่แค่ทำช่องเป็นสีเทาบนหน้าจอ
+     หน้าจอกันคนพลาด · หลังบ้านกันคนตั้งใจ */
+  var gate = canEditField_(claimStage_(d.claims, r), field, FIELD_STAGE, me);
+  if (!gate.ok) throw new Error(gate.why);
+
   var v = norm_(value);
 
   /* ── เรทแลกเปลี่ยน: ใส่ได้ครั้งเดียว ล็อกติดใบถาวร ── */
@@ -63,7 +70,7 @@ function saveClaimField(docNo, field, value, auth){
   if (field === 'jobNo') v = v.toUpperCase();
 
   d.claims.getRange(r, col).setValue(v);
-  d.claims.getRange(r, HDR_CLAIM.length).setValue(nowStamp_());
+  d.claims.getRange(r, colOf_('แก้ไขล่าสุด')).setValue(nowStamp_());
   return { ok:true };
 }
 
@@ -92,11 +99,15 @@ function calcPrice_(cost, margin){
 }
 
 function saveItemField(docNo, seq, field, value, auth){
-  requireAny_(auth, ['PRODUCTION','QC','DESIGN','STORE','PURCHASE','APPROVER']);
+  var me = requireAny_(auth, ['PRODUCTION','SALES','QC','DESIGN','STORE','PURCHASE','APPROVER']);
   var col = ITEM_FIELD_COL[field];
   if (!col) throw new Error('ไม่รู้จักช่อง ' + field);
   var d = db_(), r = itemRow_(d, docNo, seq);
   if (r < 0) throw new Error('ไม่พบรายการที่ ' + seq);
+
+  var cr = findClaimRow_(d.claims, norm_(docNo));
+  var gate = canEditField_(claimStage_(d.claims, cr), field, ITEM_STAGE, me);
+  if (!gate.ok) throw new Error(gate.why);
 
   var v = norm_(value);
   if (field === 'recv') v = fmtDMY_(v);
@@ -114,7 +125,7 @@ function saveItemField(docNo, seq, field, value, auth){
     price = norm_(cost) === '' ? '' : calcPrice_(cost, margin);
     d.items.getRange(r, 14).setValue(price);
   }
-  d.claims.getRange(findClaimRow_(d.claims, norm_(docNo)), HDR_CLAIM.length).setValue(nowStamp_());
+  d.claims.getRange(findClaimRow_(d.claims, norm_(docNo)), colOf_('แก้ไขล่าสุด')).setValue(nowStamp_());
   return { ok:true, price:price };
 }
 
@@ -268,7 +279,7 @@ function reclaimFromReturn(docNo, auth){
       note:'เคลมรอบใหม่ ต่อจาก ' + docNo + ' ข้อ ' + it.seq });
   }
   var res = createClaim({
-    claimType:H['ประเภทการเคลม'], area:H['พื้นที่'], foreignKind:H['ชนิดงานต่างประเทศ'],
+    claimType:H['ประเภทการเคลม'], area:H['สถานที่ผลิต'], foreignKind:H['ชนิดงานต่างประเทศ'],
     jobNo:H['เลขที่ JOB'], jobName:H['ชื่อลูกค้า'], model:H['MODEL'],
     chassisStt:H['CHASSIS NO. (STT)'], chassisMaker:H['CHASSIS NO. (ผู้ผลิต)'],
     serialNo:H['SERIAL NO.'], jmc:H['JMC ที่ผูก'], dept:'QC / รับของกลับ',
@@ -524,6 +535,7 @@ function getClaimFull(docNo, auth){
   c.labour  = listLabour(docNo, auth);
   c.returns = listReturns(docNo, auth);
   c.vendors = listVendors();
+  c.flow    = claimFlow(docNo, auth);
   return c;
 }
 

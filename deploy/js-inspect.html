@@ -4,6 +4,7 @@
    ข้อที่ Un-Acc กดส่งไปเปิดใบเคลมได้เลย รูปตามไปด้วย                  */
 
 var INSTPL = null;
+var INSFOREIGN = false;   // งานในประเทศไม่ต้องมีช่องภาษาอังกฤษให้รก
 
 /* ─────────── เปิดใบตรวจใหม่ ─────────── */
 function newInspForm(){
@@ -21,7 +22,7 @@ function newInspForm(){
     t += '<div id="imsg"></div>';
     t += '<div class="phnote">📷 ตรวจแล้วต้อง<b>ถ่ายรูปทุกข้อที่ไม่ผ่าน</b> ระบบถึงจะยอมให้ส่งไปเปิดใบเคลม</div>';
     t += '<div class="fgrid">';
-    t += fr('พื้นที่', '<select id="i_area" onchange="inspAreaChanged()"><option value="for">ต่างประเทศ</option><option value="dom">ในประเทศ</option></select>');
+    t += fr('สถานที่ผลิต', '<select id="i_area" onchange="inspAreaChanged()"><option value="for">ต่างประเทศ</option><option value="dom">ในประเทศ</option></select>');
     t += fr('เลขที่ JOB', '<input id="i_jobNo" placeholder="JT-69/0009" onblur="inspJobLookup()">');
     t += fr('ชื่อลูกค้า', '<input id="i_jobName">');
 
@@ -133,6 +134,7 @@ function openInspection(docNo){
     var h = c.head;
     CURDOC = docNo; CURJOB = h['เลขที่ JOB'] || '';
     PHOTOS = c.photos || {};
+    INSFOREIGN = (h['สถานที่ผลิต'] === 'for');
 
     var acc = 0, un = 0, todo = 0, unNoPhoto = [];
     for (var i = 0; i < c.items.length; i++){
@@ -172,7 +174,7 @@ function openInspection(docNo){
     t += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
       '<button class="btn" onclick="go(\'inslist\')">← ใบตรวจทั้งหมด</button>' +
       '<button class="btn ghost" onclick="addInspRow()">+ เพิ่มหัวข้อตรวจ</button>' +
-      '<button class="btn ghost" onclick="inspTranslate()">🌐 แปลไทย → EN</button>' +
+      (INSFOREIGN ? '<button class="btn ghost" onclick="inspTranslate()">🌐 แปลไทย → EN</button>' : '') +
       '<button class="btn ghost" onclick="openMediaFolder()">📁 โฟลเดอร์รูปใน Drive</button>';
     if (h['ใบเคลมที่ออกจากใบนี้']){
       t += '<button class="btn dark" onclick="go(\'claim\',\'' + esc(h['ใบเคลมที่ออกจากใบนี้']) + '\')">' +
@@ -227,12 +229,13 @@ function inspCard(it, docNo){
     '<button class="rowbtn" style="margin-left:auto" title="ลบหัวข้อนี้" onclick="delInspRow(\'' + s + '\')">&#10005;</button>' +
     '</div>';
 
-  /* ช่องบรรยายสิ่งที่พบ — โผล่เมื่อไม่ผ่าน (ข้อมูลนี้จะไหลไปเป็นรายละเอียดในใบเคลม) */
+  /* ช่องบรรยายสิ่งที่พบ — โผล่เมื่อไม่ผ่าน (ข้อมูลนี้จะไหลไปเป็นรายละเอียดในใบเคลม)
+     ช่อง EN โผล่เฉพาะงานต่างประเทศ — เบียร์: "ถ้าเลือกเป็นในประเทศ ไม่ต้องมีตารางแปลงอังกฤษ" */
   t += '<div class="unbox" id="unbox_' + s + '" style="display:' + (it.acc === 'UNACC' ? '' : 'none') + '">' +
     '<div class="frow"><label>สิ่งที่พบ (ไทย)</label>' +
       '<textarea data-save="saveInspItemField" data-seq="' + s + '" data-f="found" placeholder="บรรยายให้ละเอียด ข้อความนี้จะไปอยู่ในใบเคลม">' + esc(it.found) + '</textarea></div>' +
-    '<div class="frow"><label>Finding (EN)</label>' +
-      '<textarea data-save="saveInspItemField" data-seq="' + s + '" data-f="foundEn" placeholder="ส่งให้ Supplier ต่างประเทศอ่าน">' + esc(it.foundEn) + '</textarea></div>' +
+    (INSFOREIGN ? ('<div class="frow"><label>Finding (EN)</label>' +
+      '<textarea data-save="saveInspItemField" data-seq="' + s + '" data-f="foundEn" placeholder="แปลให้อัตโนมัติ · ส่งให้ Supplier ต่างประเทศอ่าน">' + esc(it.foundEn) + '</textarea></div>') : '') +
     '<div class="frow2"><label>จำนวน</label>' +
       '<input class="r" data-save="saveInspItemField" data-seq="' + s + '" data-f="qty" value="' + esc(it.qty) + '">' +
       '<label>หน่วย</label>' +

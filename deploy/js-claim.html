@@ -11,12 +11,25 @@ var DRAFTID = '';         // คีย์ชั่วคราวสำหรั
 
 /* คอลัมน์ของตารางรายการเคลม — ลำดับนี้ตรงกับตารางใน GGS ที่เบียร์ใช้อยู่
    จะได้ก๊อปจาก GGS มาวางทับได้ตรง ๆ ไม่ต้องสลับคอลัมน์ */
+/* เบียร์: "ถ้าเลือกเป็นในประเทศ ไม่ต้องมีตารางแปลงอังกฤษ ขึ้นมาเลยก็ได้นะ ทั้ง Inspec และก็ Claim"
+   → คอลัมน์ EN โผล่เฉพาะงานต่างประเทศ · งานในประเทศไม่ต้องเห็นเลย ตารางจะได้ไม่รก */
+function isForeign(){
+  var el = $('f_area') || $('c_area');
+  if (el) return el.value === 'for';
+  if (CLAIM && CLAIM.head) return CLAIM.head['สถานที่ผลิต'] === 'for';
+  return false;
+}
 function claimCols(){
-  return [
+  var c = [
     { k:'code',     label:'รหัสสินค้า', w:104, ph:'ใส่แล้วชื่อ+หน่วยขึ้นเอง' },
     { k:'name',     label:'ชื่อสินค้า',  w:170 },
-    { k:'th',       label:'รายละเอียดการเคลม (ไทย)', type:'area' },
-    { k:'en',       label:'Claim description (EN)',  type:'area' },
+    { k:'th',       label:'รายละเอียดการเคลม (ไทย)', type:'area' }
+  ];
+  if (isForeign()) c.push({ k:'en', label:'Claim description (EN)', sub:'แปลให้อัตโนมัติ', type:'area' });
+  return c.concat(claimColsTail());
+}
+function claimColsTail(){
+  return [
     { k:'qty',      label:'จำนวน',  w:64, type:'num' },
     { k:'unit',     label:'หน่วย',  w:62 },
     { k:'po',       label:'PO',     w:112, ph:'ใส่แล้ววันรับขึ้นเอง' },
@@ -43,7 +56,7 @@ function newClaimForm(){
   t += fr('เลขที่ JOB', '<input id="f_jobNo" placeholder="JT-69/0009" onblur="jobLookup()">');
   t += fr('ชื่อลูกค้า', '<input id="f_jobName">');
 
-  t += fr('พื้นที่', '<select id="f_area" onchange="areaChanged()"><option value="dom">ในประเทศ</option><option value="for">ต่างประเทศ</option></select>');
+  t += fr('สถานที่ผลิต', '<select id="f_area" onchange="areaChanged()"><option value="dom">ในประเทศ</option><option value="for">ต่างประเทศ</option></select>');
   t += fr('MODEL', '<input id="f_model">');
   t += fr('SERIAL NO.', '<input id="f_serialNo">');
 
@@ -59,29 +72,46 @@ function newClaimForm(){
 
   t += '<div class="card tight"><div class="cardhd"><h3>รายการที่เคลม</h3>' +
        '<span class="sub">ก๊อปจาก Google Sheets มาวางได้เลย · ทุกแถวต้องมีรูปอย่างน้อย 1 รูป</span>' +
-       '<button class="btn ghost" onclick="gridTranslate(GNEW.id)">🌐 แปลไทย → EN</button>' +
-       '<button class="btn ghost" onclick="gridTrCheck(GNEW.id)">🔎 ตรวจคำแปล</button>' +
+       '<span id="trbtns"></span>' +
        '<span class="phbar" id="phbar">—</span></div>';
   t += '<div class="phmsg" id="trmsg"></div>';
   t += '<div id="gridBox"></div></div>';
 
   $('view').innerHTML = t;
 
-  GNEW = makeGrid('gridBox', claimCols(), null, {
-    photos:true, maxPhoto:5,
-    requireKeys:['code','name','th'],
-    trFrom:'th', trTo:'en',           // พิมพ์ไทยเสร็จ → เติม EN ให้เอง (ถ้าช่อง EN ยังว่าง)
-    onChange:function(r, k){ if (k === 'code') autoGoods(GNEW); if (k === 'po') autoPo(GNEW); },
-    onPaste:function(){ autoGoods(GNEW); autoPo(GNEW); updateNewPhBar(); gridTranslate(GNEW.id); },
-    onPhoto:updateNewPhBar
-  });
+  GNEW = makeGrid('gridBox', claimCols(), null, gridOptsNew());
+  drawTrBtns('GNEW');
   updateNewPhBar();
 
   if (!VENDORS) srv('listVendors', [], function(v){ VENDORS = v || []; fillVendorList(); });
   else fillVendorList();
 }
 
-function areaChanged(){ $('f_fkwrap').style.display = ($('f_area').value === 'for') ? '' : 'none'; }
+/** ปุ่มแปลโผล่เฉพาะงานต่างประเทศ — งานในประเทศไม่ต้องเห็นให้รก */
+function drawTrBtns(which){
+  var box = $('trbtns'); if (!box) return;
+  if (!isForeign()){ box.innerHTML = ''; return; }
+  box.innerHTML = '<button class="btn ghost" onclick="gridTranslate(' + which + '.id)">🌐 แปลไทย → EN</button>' +
+                  '<button class="btn ghost" onclick="gridTrCheck(' + which + '.id)">🔎 ตรวจคำแปล</button>';
+}
+function areaChanged(){
+  $('f_fkwrap').style.display = ($('f_area').value === 'for') ? '' : 'none';
+  /* สลับในประเทศ↔ต่างประเทศ = คอลัมน์ EN เข้า/ออก → สร้างตารางใหม่โดยเก็บข้อมูลที่กรอกไว้ */
+  if (GNEW){
+    var keep = gridData(GNEW.id);
+    GNEW = makeGrid('gridBox', claimCols(), keep, gridOptsNew());
+    updateNewPhBar();
+  }
+}
+function gridOptsNew(){
+  return {
+    photos:true, maxPhoto:5, requireKeys:['code','name','th'],
+    trFrom: isForeign() ? 'th' : '', trTo: isForeign() ? 'en' : '',
+    onChange:function(r, k){ if (k === 'code') autoGoods(GNEW); if (k === 'po') autoPo(GNEW); },
+    onPaste:function(){ autoGoods(GNEW); autoPo(GNEW); updateNewPhBar(); if (isForeign()) gridTranslate(GNEW.id); },
+    onPhoto:updateNewPhBar
+  };
+}
 
 function updateNewPhBar(){
   var bar = $('phbar'); if (!bar || !GNEW) return;
@@ -239,6 +269,7 @@ function openClaim(docNo){
   srv('getClaimFull', [docNo, AUTH], function(c){
     if (!c){ $('view').innerHTML = '<div class="msg bad">ไม่พบเอกสาร ' + esc(docNo) + '</div>'; return; }
     CLAIM = c;
+    FLOW = c.flow || null;
     CURDOC = docNo;
     CURJOB = c.head['เลขที่ JOB'] || '';
     PHOTOS = c.photos || {};
@@ -255,9 +286,10 @@ function drawClaim(){
     '<h3>' + esc(docNo) + '</h3>' +
     '<span class="sub">' + esc(h['เลขที่ JOB']) + ' · ' + esc(h['ชื่อลูกค้า']) + ' · ' +
       (h['ประเภทการเคลม'] === 'pre' ? 'ก่อนส่งมอบ' : 'หลังส่งมอบ') + ' · ' +
-      (h['พื้นที่'] === 'for' ? 'ต่างประเทศ' : 'ในประเทศ') + '</span>' +
+      (h['สถานที่ผลิต'] === 'for' ? 'ต่างประเทศ' : 'ในประเทศ') + '</span>' +
     '<span class="savebar ok" id="savebar">✓ บันทึกอัตโนมัติ</span>' +
     '<button class="btn" onclick="go(\'list\')">← ทะเบียน</button></div>';
+  t += flowBar(FLOW);
 
   t += '<div class="tabs">' +
     tab(1, '① ใบแจ้งเคลม', 'แจ้งปัญหา ไม่มีราคา') +
@@ -274,6 +306,7 @@ function drawClaim(){
   $('view').innerHTML = t;
   fillVendorList();
   bindAll($('view'), docNo);
+  applyLocks($('view'));
 
   /* ตารางรายการของใบที่บันทึกแล้ว — รูปผูกกับ "ลำดับรายการ" ตรง ๆ */
   var rows = [];
@@ -285,7 +318,8 @@ function drawClaim(){
   }
   GEDIT = makeGrid('gridEdit', claimCols(), rows, {
     photos:true, maxPhoto:5, requireKeys:['code','name','th'],
-    trFrom:'th', trTo:'en',
+    trFrom: isForeign() ? 'th' : '', trTo: isForeign() ? 'en' : '',
+    onDraw:function(g){ applyGridLocks(g.id); },
     /* ระบบเติม EN ให้ในใบที่บันทึกแล้ว ต้องบันทึกลงชีตด้วย ไม่งั้นรีเฟรชแล้วหาย */
     onFill:function(rowsFilled, g){
       for (var i = 0; i < rowsFilled.length; i++){
@@ -308,6 +342,8 @@ function drawClaim(){
   });
   drawAllPhotos();
   drawLabour();
+  drawTrBtns('GEDIT');
+  applyGridLocks(GEDIT.id);
   showTab(CURTAB);
   updatePhBar();
 }
@@ -356,8 +392,7 @@ function paneClaim(c, docNo){
 
   t += '<div class="card tight"><div class="cardhd"><h3>รายการที่เคลม (' + c.items.length + ' รายการ)</h3>' +
        '<span class="sub">แก้ในตารางได้เลย บันทึกเอง · ก๊อปจาก Sheets มาวางได้</span>' +
-       '<button class="btn ghost" onclick="gridTranslate(GEDIT.id)">🌐 แปลไทย → EN</button>' +
-       '<button class="btn ghost" onclick="gridTrCheck(GEDIT.id)">🔎 ตรวจคำแปล</button>' +
+       '<span id="trbtns"></span>' +
        '<span class="phbar" id="phbar">—</span></div>';
   t += '<div class="phmsg" id="trmsg"></div>';
   t += '<div id="gridEdit"></div></div>';

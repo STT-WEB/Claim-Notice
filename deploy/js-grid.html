@@ -61,6 +61,7 @@ function drawGrid(id){
   $(g.host).innerHTML = t;
   bindGrid(id);
   if (g.opt.photos) gridDrawPhotos(id);
+  if (g.opt.onDraw) g.opt.onDraw(g);      // ตารางวาดใหม่บ่อย — ล็อกช่องต้องกลับมาทุกครั้ง
 }
 
 function gridRowHtml(g, r){

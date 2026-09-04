@@ -1,0 +1,142 @@
+<script>
+/* ═══════════ แถบขั้นตอนงาน + สิทธิ์รายช่อง (v0.5.0) ═══════════
+   เบียร์: "ไม่ต้องแยกกล่อง · ทุกคนเห็นข้อมูลทุกอย่างได้อยู่ดี แต่ทำงานแทนกันไม่ได้"
+           "สโตร์กับจัดซื้อทำงานช่วยกันได้นะ"
+
+   แถบนี้อยู่บนหัวเอกสาร บอก 3 อย่างเสมอ
+     1. ตอนนี้อยู่ขั้นไหน จาก 6 ขั้น
+     2. รอใครทำ และต้องทำอะไร
+     3. ปุ่มที่ "คุณ" กดได้ตอนนี้ — ถ้าไม่ใช่ขั้นของคุณจะไม่มีปุ่ม แต่ยังดูข้อมูลได้ครบ   */
+
+var FLOW = null;
+
+function flowBar(f){
+  if (!f) return '';
+  var t = '<div class="flowwrap">';
+
+  /* ขั้นทั้งหมด — เห็นภาพรวมว่างานเดินมาถึงไหนแล้ว */
+  t += '<div class="flowsteps">';
+  for (var i = 0; i < f.stages.length; i++){
+    var s = f.stages[i];
+    var cls = s.no < f.no ? 'done' : (s.no === f.no ? 'now' : '');
+    t += '<div class="fstep ' + cls + '" title="' + esc(s.who) + '">' +
+         '<span class="fno">' + (s.no < f.no ? '✓' : s.no) + '</span>' +
+         '<span class="fnm">' + esc(s.name) + '</span></div>';
+    if (i < f.stages.length - 1) t += '<span class="farrow">›</span>';
+  }
+  t += '</div>';
+
+  /* ตีกลับมา = ต้องเห็นก่อนอย่างอื่น ไม่งั้นคนไม่รู้ว่าต้องแก้อะไร */
+  if (f.rejectNote){
+    t += '<div class="flowreject">↩ <b>ถูกตีกลับ</b> โดย ' + esc(f.rejectBy) + ' เมื่อ ' + esc(f.rejectAt) +
+         '<div class="rjnote">' + esc(f.rejectNote) + '</div></div>';
+  }
+
+  t += '<div class="flownow">' +
+       '<div><b>ขั้นที่ ' + f.no + ' · ' + esc(f.name) + '</b>' +
+       '<span class="fwho">รอ ' + esc(f.who) + '</span></div>' +
+       '<div class="ftodo">' + esc(f.todo) + '</div></div>';
+
+  /* ยังขาดอะไร — บอกก่อนที่จะกดส่งต่อ ไม่ใช่บอกตอนกดแล้วไม่ผ่าน */
+  if (f.isOwner && f.missing && f.missing.length){
+    t += '<div class="flowmiss">ยังส่งต่อไม่ได้ — ' + f.missing.map(esc).join(' · ') + '</div>';
+  }
+
+  t += '<div class="flowbtn">';
+  if (f.isOwner && f.next){
+    var can = !(f.missing && f.missing.length);
+    t += '<button class="btn primary" ' + (can ? '' : 'disabled ') +
+         'onclick="doAdvance()">' + esc(f.nextLabel) + '</button>';
+  }
+  if (f.canReject){
+    t += '<button class="btn ghost" onclick="openReject()">↩ ตีกลับให้แก้ไข</button>';
+  }
+  if (!f.isOwner){
+    t += '<span class="fview">👁 คุณดูได้ทุกอย่าง แต่ขั้นนี้เป็นหน้าที่ของ ' + esc(f.who) + '</span>';
+  }
+  if (f.history){
+    t += '<button class="btn ghost" onclick="showHistory()">🕘 ประวัติการส่งต่อ</button>';
+  }
+  t += '</div></div>';
+  return t;
+}
+
+function doAdvance(){
+  if (!confirm('ส่งงานต่อไปขั้นถัดไป?\n' + FLOW.nextLabel)) return;
+  srv('advanceClaim', [CURDOC, AUTH], function(){ go('claim', CURDOC); },
+      function(m){ alert(m); });
+}
+
+function openReject(){
+  var d = document.createElement('div');
+  d.className = 'lightbox trbox';
+  d.innerHTML = '<div class="trpanel" style="max-width:560px">' +
+    '<div class="trhd"><b>ตีกลับให้แก้ไข</b>' +
+    '<span>เลือกว่าจะส่งกลับหาใคร แล้วบอกให้ชัดว่าต้องแก้อะไร — คนรับจะเห็นข้อความนี้บนหัวเอกสาร และเด้งเข้า LINE</span>' +
+    '<button onclick="this.closest(\'.lightbox\').remove()">ปิด ✕</button></div>' +
+    '<div class="frow"><label>ส่งกลับหา</label>' +
+      '<select id="rjTo"><option value="STORE">ขั้น 2 · สโตร์ (เลขใบส่งมอบ · PO · Supplier)</option>' +
+      '<option value="REQUEST">ขั้น 1 · คนเปิดใบ (ข้อมูลรถ · รายการที่เคลม · รูป)</option></select></div>' +
+    '<div class="frow"><label>ต้องแก้อะไร</label>' +
+      '<textarea id="rjWhy" class="tall" placeholder="เช่น PO ของรายการที่ 2 ไม่ตรงกับ Supplier · รูปรายการที่ 3 ถ่ายไม่ชัด"></textarea></div>' +
+    '<div id="rjMsg"></div>' +
+    '<div style="margin-top:10px"><button class="btn primary" onclick="doReject()">↩ ตีกลับ</button></div>' +
+    '</div>';
+  d.onclick = function(e){ if (e.target === d) d.remove(); };
+  document.body.appendChild(d);
+}
+function doReject(){
+  var to = $('rjTo').value, why = $('rjWhy').value.trim();
+  if (!why){ $('rjMsg').innerHTML = '<div class="msg bad">ต้องบอกเหตุผล ไม่งั้นคนรับไม่รู้ว่าต้องแก้อะไร</div>'; return; }
+  srv('rejectClaim', [CURDOC, to, why, AUTH], function(){
+    var lb = document.querySelector('.lightbox'); if (lb) lb.remove();
+    go('claim', CURDOC);
+  }, function(m){ $('rjMsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; });
+}
+
+function showHistory(){
+  var d = document.createElement('div');
+  d.className = 'lightbox trbox';
+  var lines = String(FLOW.history || '').split('\n').filter(function(x){ return x.trim(); });
+  var h = '<div class="trpanel" style="max-width:660px"><div class="trhd"><b>ประวัติการส่งต่อ</b>' +
+          '<span>ใครส่งต่อเมื่อไหร่ ตีกลับเพราะอะไร</span>' +
+          '<button onclick="this.closest(\'.lightbox\').remove()">ปิด ✕</button></div><ol class="hist">';
+  for (var i = 0; i < lines.length; i++) h += '<li>' + esc(lines[i]) + '</li>';
+  h += '</ol></div>';
+  d.innerHTML = h;
+  d.onclick = function(e){ if (e.target === d) d.remove(); };
+  document.body.appendChild(d);
+}
+
+/* ─── ทำช่องที่ไม่ใช่ขั้นของเราให้เป็นสีเทา + บอกเหตุผลตอนเอาเมาส์ชี้ ───
+   หน้าจอกันคนพลาด · หลังบ้านกันคนตั้งใจ — เช็คทั้งสองที่ */
+function applyLocks(scope){
+  if (!FLOW || !FLOW.lock) return;
+  var els = (scope || document).querySelectorAll('[data-f]');
+  for (var i = 0; i < els.length; i++){
+    var f = els[i].getAttribute('data-f');
+    var isItem = els[i].hasAttribute('data-seq');
+    var why = FLOW.lock[isItem ? ('item.' + f) : f];
+    if (!why) continue;
+    els[i].disabled = true;
+    els[i].classList.add('locked');
+    els[i].title = '🔒 ' + why;
+  }
+}
+/** ล็อกช่องในตาราง Excel ด้วย (ตารางวาดใหม่บ่อย ต้องเรียกซ้ำทุกครั้งที่วาด) */
+function applyGridLocks(gridId){
+  if (!FLOW || !FLOW.lock) return;
+  var g = GRIDS[gridId]; if (!g) return;
+  var tb = $(gridId); if (!tb) return;
+  for (var c = 0; c < g.cols.length; c++){
+    var why = FLOW.lock['item.' + g.cols[c].k];
+    if (!why) continue;
+    var cells = tb.querySelectorAll('[data-c="' + c + '"]');
+    for (var i = 0; i < cells.length; i++){
+      cells[i].disabled = true;
+      cells[i].classList.add('locked');
+      cells[i].title = '🔒 ' + why;
+    }
+  }
+}
+</script>
