@@ -1,0 +1,149 @@
+<script>
+/* ═══ ③ All Data and Report ═══
+   3.1 รูปและวิดีโอ · 3.2 สรุปงานเคลมตามจ๊อบ · 3.3 ทะเบียนเอกสาร · 3.4 สรุปต้นทุน */
+
+function loadReportHome(){
+  var t = '<div class="card"><div class="cardhd"><h3>All Data and Report</h3>' +
+    '<button class="btn" onclick="go(\'home\')">← หน้าแรก</button></div>';
+  t += '<div class="repgrid">';
+  t += rep('repmedia','📷','3.1 รูปและวิดีโอ','รูปทั้งหมดในระบบ จัดตามจ๊อบ → เอกสาร กดดูใหญ่ได้ทันที');
+  t += rep('repjob','🚛','3.2 สรุปงานเคลมตามจ๊อบงาน','จ๊อบไหนมีใบตรวจ/ใบเคลมกี่ใบ ค้างกี่ใบ — เลขจ๊อบคือแกนหลักของทั้งระบบ');
+  t += rep('repdocs','🗂️','3.3 ทะเบียนเอกสาร','ใบตรวจรับ + ใบเคลม อยู่ในตารางเดียว เรียงตามเลขที่');
+  t += rep('repcost','💰','3.4 สรุปต้นทุนการเคลม','ยอดเงินรวมทุกใบ แยกบาท / สกุลต่างประเทศ — เห็นเฉพาะผู้บริหารและจัดซื้อ');
+  t += '</div></div>';
+  $('view').innerHTML = t;
+}
+function rep(v, ic, title, sub){
+  return '<div class="repcard" onclick="go(\'' + v + '\')"><div class="ic">' + ic + '</div>' +
+         '<h4>' + esc(title) + '</h4><p>' + esc(sub) + '</p></div>';
+}
+function repHead(title, sub){
+  return '<div class="cardhd"><h3>' + esc(title) + '</h3><span class="sub">' + esc(sub) + '</span>' +
+         '<button class="btn" onclick="go(\'reports\')">← รายงานทั้งหมด</button></div>';
+}
+
+/* ─── 3.1 รูปและวิดีโอ ─── */
+function loadRepMedia(){
+  busy(true, 'กำลังรวบรวมรูปทั้งระบบ…');
+  srv('reportMedia', [AUTH], function(jobs){
+    var t = '<div class="card">' + repHead('3.1 รูปและวิดีโอ', 'จัดตามจ๊อบ → เอกสาร · กดที่รูปเพื่อดูใหญ่');
+    if (!jobs || !jobs.length){
+      t += '<div class="empty">ยังไม่มีรูปในระบบ<br><span>รูปจะขึ้นที่นี่อัตโนมัติเมื่อแนบรูปในใบตรวจรับหรือใบเคลม</span></div></div>';
+      $('view').innerHTML = t; return;
+    }
+    t += '</div>';
+    for (var i = 0; i < jobs.length; i++){
+      var j = jobs[i];
+      t += '<div class="card"><div class="cardhd"><h3>' + esc(j.jobNo) + '</h3>' +
+           '<span class="sub">' + esc(j.jobName) + ' · ' + j.n + ' รูป</span></div>';
+      for (var k = 0; k < j.docs.length; k++){
+        var d = j.docs[k];
+        t += '<div class="mediadoc"><div class="mdhd">' +
+             '<span class="pill ' + (d.kind === 'ใบตรวจรับ' ? '' : 'red') + '">' + esc(d.kind) + '</span> ' +
+             '<a onclick="go(\'' + (d.kind === 'ใบตรวจรับ' ? 'ins' : 'claim') + '\',\'' + esc(d.docNo) + '\')">' +
+             esc(d.docNo) + ' ↗</a></div><div class="phwrap">';
+        for (var p = 0; p < d.photos.length; p++){
+          var ph = d.photos[p];
+          t += '<div class="phcell sm"><img src="' + ph.thumb + '" title="ข้อ ' + esc(ph.seq) + '" ' +
+               'onclick="zoomPhoto(\'' + ph.view + '\',\'' + ph.thumb + '\')"' +
+               ' onerror="this.parentNode.classList.add(\'bad\')"><span class="phseq">' + esc(ph.seq) + '</span></div>';
+        }
+        t += '</div></div>';
+      }
+      t += '</div>';
+    }
+    $('view').innerHTML = t;
+  });
+}
+
+/* ─── 3.2 สรุปงานเคลมตามจ๊อบงาน ─── */
+function loadRepJob(){
+  busy(true, 'กำลังสรุปตามจ๊อบงาน…');
+  srv('reportByJob', [AUTH], function(rows){
+    var t = '<div class="card">' + repHead('3.2 สรุปงานเคลมตามจ๊อบงาน', 'เลขจ๊อบคือแกนหลัก · กดที่เลขเอกสารเพื่อเปิดใบ');
+    if (!rows || !rows.length){
+      t += '<div class="empty">ยังไม่มีข้อมูล<br><span>เปิดใบตรวจรับหรือใบเคลมสักใบ แล้วข้อมูลจะมาสรุปที่นี่</span></div></div>';
+      $('view').innerHTML = t; return;
+    }
+    t += '<table class="t"><thead><tr><th style="width:120px">เลขที่ JOB</th><th style="width:60px">ชนิด</th>' +
+      '<th>ชื่อลูกค้า</th><th style="width:82px">ใบตรวจ</th><th style="width:82px">ใบเคลม</th>' +
+      '<th style="width:88px">ยังไม่ปิด</th><th style="width:74px">รูป</th><th>เอกสารในจ๊อบนี้</th></tr></thead><tbody>';
+    for (var i = 0; i < rows.length; i++){
+      var r = rows[i], docs = '';
+      for (var k = 0; k < r.docs.length; k++){
+        var d = r.docs[k];
+        docs += '<a class="doclink" onclick="go(\'' + (d.kind === 'INS' ? 'ins' : 'claim') + '\',\'' + esc(d.docNo) + '\')">' +
+                esc(d.docNo) + '</a> ';
+      }
+      t += '<tr><td><b>' + esc(r.jobNo) + '</b></td><td class="c">' + esc(r.type) + '</td>' +
+        '<td>' + esc(r.jobName) + '</td>' +
+        '<td class="c">' + (r.inspections || '—') + '</td><td class="c">' + (r.claims || '—') + '</td>' +
+        '<td class="c">' + (r.open ? '<span class="pill red">' + r.open + '</span>' : '<span class="pill green">ปิดหมด</span>') + '</td>' +
+        '<td class="c">' + (r.photos || '—') + '</td><td>' + docs + '</td></tr>';
+    }
+    t += '</tbody></table></div>';
+    $('view').innerHTML = t;
+  });
+}
+
+/* ─── 3.3 ทะเบียนเอกสาร ─── */
+function loadRepDocs(){
+  busy(true, 'กำลังโหลดทะเบียนเอกสาร…');
+  srv('reportDocs', [AUTH], function(rows){
+    var t = '<div class="card">' + repHead('3.3 ทะเบียนเอกสาร', 'ใบตรวจรับ + ใบเคลม รวมกัน · ' + ((rows && rows.length) || 0) + ' ฉบับ');
+    if (!rows || !rows.length){
+      t += '<div class="empty">ยังไม่มีเอกสารในระบบ</div></div>'; $('view').innerHTML = t; return;
+    }
+    t += '<table class="t"><thead><tr><th style="width:88px">ชนิด</th><th style="width:116px">เลขที่</th>' +
+      '<th style="width:88px">วันที่</th><th style="width:110px">เลขที่ JOB</th><th>ชื่อลูกค้า</th>' +
+      '<th style="width:210px">รายละเอียด</th><th style="width:60px">รายการ</th>' +
+      '<th style="width:60px">รูป</th><th style="width:110px">สถานะ</th></tr></thead><tbody>';
+    for (var i = 0; i < rows.length; i++){
+      var r = rows[i], isIns = (r.kind === 'ใบตรวจรับ');
+      t += '<tr style="cursor:pointer" onclick="go(\'' + (isIns ? 'ins' : 'claim') + '\',\'' + esc(r.docNo) + '\')">' +
+        '<td><span class="pill' + (isIns ? '' : ' red') + '">' + esc(r.kind) + '</span></td>' +
+        '<td><b>' + esc(r.docNo) + '</b></td><td class="c">' + esc(r.date) + '</td>' +
+        '<td>' + esc(r.jobNo) + '</td><td>' + esc(r.jobName) + '</td>' +
+        '<td class="hint">' + esc(r.detail) + '</td>' +
+        '<td class="c">' + (r.n || '—') + '</td><td class="c">' + (r.photos || '—') + '</td>' +
+        '<td class="c">' + esc(r.status) + '</td></tr>';
+    }
+    t += '</tbody></table></div>';
+    $('view').innerHTML = t;
+  });
+}
+
+/* ─── 3.4 สรุปต้นทุนการเคลม (จำกัดสิทธิ์) ─── */
+function loadRepCost(){
+  busy(true, 'กำลังสรุปต้นทุน…');
+  srv('reportCost', [AUTH], function(r){
+    var t = '<div class="card">' + repHead('3.4 สรุปต้นทุนการเคลม', 'เฉพาะใบที่ออกใบเรียกเก็บแล้ว · ไม่มี VAT');
+    if (!r.rows.length){
+      t += '<div class="empty">ยังไม่มีใบไหนใส่ราคา<br><span>ใส่ต้นทุนในแท็บ ③ ใบเรียกเก็บค่าเคลม แล้วยอดจะมาสรุปที่นี่</span></div></div>';
+      $('view').innerHTML = t; return;
+    }
+    t += '<table class="t"><thead><tr><th style="width:116px">เลขที่</th><th style="width:88px">วันที่</th>' +
+      '<th style="width:110px">เลขที่ JOB</th><th>ชื่อลูกค้า</th><th style="width:100px">JMC</th>' +
+      '<th style="width:110px">ค่าของ</th><th style="width:110px">ค่าแรง</th>' +
+      '<th style="width:120px">รวม (บาท)</th><th style="width:130px">สกุลต่างประเทศ</th></tr></thead><tbody>';
+    for (var i = 0; i < r.rows.length; i++){
+      var x = r.rows[i];
+      t += '<tr style="cursor:pointer" onclick="go(\'claim\',\'' + esc(x.docNo) + '\')">' +
+        '<td><b>' + esc(x.docNo) + '</b></td><td class="c">' + esc(x.date) + '</td>' +
+        '<td>' + esc(x.jobNo) + '</td><td>' + esc(x.jobName) + '</td>' +
+        '<td>' + esc(x.jmc || '—') + '</td>' +
+        '<td class="r">' + money(x.items) + '</td><td class="r">' + money(x.labour) + '</td>' +
+        '<td class="r b">' + money(x.thb) + '</td>' +
+        '<td class="r">' + (x.foreign === '' ? '—' : (money(x.foreign) + ' ' + esc(x.currency))) + '</td></tr>';
+    }
+    t += '</tbody><tfoot><tr><th colspan="7">รวมทั้งหมด</th>' +
+      '<th class="r">' + money(r.grand) + '</th><th></th></tr></tfoot></table>';
+    t += '<div class="hint" style="margin-top:8px">ต้นทุน JMC จาก NOVA และค่าแรงคนจาก HR จะต่อเข้ามาในรอบถัดไป</div>';
+    t += '</div>';
+    $('view').innerHTML = t;
+  }, function(m){
+    $('view').innerHTML = '<div class="card">' + repHead('3.4 สรุปต้นทุนการเคลม', '') +
+      '<div class="empty">🔒 ' + esc(m) + '<br><span>หน้านี้เห็นเฉพาะผู้บริหารและจัดซื้อ เพราะมีตัวเลขเงิน</span></div></div>';
+  });
+}
+</script>

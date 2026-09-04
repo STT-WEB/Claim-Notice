@@ -202,4 +202,139 @@ table.t textarea{min-height:34px;resize:vertical}
       border:1px solid var(--line);color:var(--muted);background:#fafafb;white-space:nowrap}
 .pill.red{background:#fdeeed;border-color:#e6a9a4;color:#8f130c}
 .pill.green{background:#eefaf1;border-color:#a9dcb8;color:#14612e}
+
+/* ═══════════ v0.3.0 · ทั้งระบบ ═══════════ */
+
+/* ── แถบ KPI เล็ก ๆ บนหน้าแรก (เบียร์: "กล่องเล็กๆ พอ · ต้นทุนเอาออก") ── */
+.kpirow{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.kpi{display:inline-flex;align-items:baseline;gap:6px;font-size:12px;color:var(--muted);
+     background:#fff;border:1px solid var(--line);border-radius:8px;padding:5px 11px;white-space:nowrap}
+.kpi b{font-size:15px;font-weight:800;color:var(--ink)}
+.kpi.warn{border-color:#e8c89a;background:#fff9ef}
+.kpi.warn b{color:#8a5a00}
+.kpi.bad{border-color:#e6a9a4;background:#fdeeed}
+.kpi.bad b{color:#8f130c}
+.kpiwho{margin-left:auto;font-size:12px;color:var(--muted)}
+
+/* ── 3 กล่องหลักหน้าแรก ── */
+.boxes{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
+@media(max-width:1100px){.boxes{grid-template-columns:1fr}}
+.box{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px 16px;
+     display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:.15s}
+.box:hover{box-shadow:0 6px 20px rgba(0,0,0,.08);transform:translateY(-2px)}
+.boxhd{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+.boxno{width:24px;height:24px;border-radius:7px;background:var(--red);color:#fff;
+       font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none}
+.boxic{font-size:26px;line-height:1}
+.boxhd h3{margin:0;font-size:17px;font-weight:800}
+.boxhd p{margin:1px 0 0;font-size:12px;color:var(--muted)}
+.boxul{margin:0 0 14px;padding-left:17px;flex:1}
+.boxul li{font-size:12.5px;line-height:1.65;color:#555;margin-bottom:4px}
+.boxbtn{display:flex;gap:7px;flex-wrap:wrap}
+.boxfoot{margin-top:11px;padding-top:9px;border-top:1px dotted var(--line);
+         font-size:12px;color:var(--red);font-weight:700}
+
+/* ── ขั้นตอนเริ่มต้นตอนระบบยังว่าง ── */
+.steps{margin:6px 0 0;padding-left:20px}
+.steps li{font-size:13px;line-height:1.75;margin-bottom:7px;color:#444}
+.empty{text-align:center;padding:34px 20px;color:var(--muted);font-size:14px;font-weight:600}
+.empty span{display:inline-block;margin-top:7px;font-size:12.5px;font-weight:400;color:#999}
+
+/* ── แท็บในใบเคลม ── */
+.tabs{display:flex;gap:6px;margin-top:12px;border-bottom:2px solid var(--line);padding-bottom:0}
+.tabbtn{border:1px solid var(--line);border-bottom:none;background:#fafafb;cursor:pointer;
+        padding:9px 15px 8px;border-radius:9px 9px 0 0;text-align:left;margin-bottom:-2px;
+        font-family:inherit;transition:.12s}
+.tabbtn b{display:block;font-size:13px;font-weight:800;color:#666}
+.tabbtn span{display:block;font-size:11px;color:#a0a0a6;margin-top:1px}
+.tabbtn:hover{background:#fff}
+.tabbtn.on{background:#fff;border-color:var(--line);border-bottom:2px solid #fff}
+.tabbtn.on b{color:var(--red)}
+.tabbtn.on span{color:#888}
+.pane{margin-top:14px}
+
+/* ── แถบบอกสถานะการบันทึกอัตโนมัติ ── */
+.savebar{margin-left:auto;font-size:12px;font-weight:700;padding:4px 11px;border-radius:99px;
+         border:1px solid var(--line);color:var(--muted);background:#fafafb;white-space:nowrap}
+.savebar.ok{background:#eefaf1;border-color:#a9dcb8;color:#14612e}
+.savebar.wait{background:#fff7e8;border-color:#e8c89a;color:#8a5a00}
+.savebar.bad{background:#fdeeed;border-color:#e6a9a4;color:#8f130c}
+
+/* ── ติ๊กบอกว่าช่องไหนบันทึกแล้ว (ไม่วาดหน้าใหม่ จอไม่เด้ง) ── */
+.sv-wait{background:#fff9ef!important;border-color:#e8c89a!important}
+.sv-ok{background:#f2fbf5!important;border-color:#a9dcb8!important}
+.sv-bad{background:#fdeeed!important;border-color:#e6a9a4!important;box-shadow:0 0 0 2px rgba(226,35,26,.12)}
+
+/* ── ปุ่ม Acc / Un-Acc ── */
+.accrow{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.accbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 13px;
+        font-size:12.5px;font-weight:700;color:#666;cursor:pointer;font-family:inherit;transition:.12s}
+.accbtn:hover{background:#f6f6f8}
+.accbtn.ok.on{background:#1e9e4a;border-color:#1e9e4a;color:#fff}
+.accbtn.bad.on{background:var(--red);border-color:var(--red);color:#fff}
+.accnote{font-size:12px;color:var(--muted)}
+.accnote.ok{color:#14612e;font-weight:700}
+.accnote.bad{color:var(--red);font-weight:700}
+.accnote.wait{color:#8a5a00}
+
+/* ── การ์ดหัวข้อตรวจ ── */
+.itemcard.ins{border-left:4px solid var(--line)}
+.itemcard.ins.ok{border-left-color:#1e9e4a;background:#fbfefc}
+.itemcard.ins.un{border-left-color:var(--red);background:#fffbfb}
+.itemcard .ititle{flex:1;min-width:180px;font-size:14.5px;font-weight:700;border:1px solid transparent;
+                  background:transparent;padding:3px 7px;border-radius:6px;font-family:inherit}
+.itemcard .ititle:hover{border-color:var(--line);background:#fff}
+.itemcard .ititle:focus{border-color:var(--red);background:#fff;outline:none}
+.itemcard .icodein{width:120px;font-size:12px;color:var(--muted);border:1px solid transparent;
+                   background:transparent;padding:3px 7px;border-radius:6px;font-family:inherit}
+.itemcard .icodein:hover{border-color:var(--line);background:#fff}
+.unbox{background:#fff;border:1px dashed #e6c4c1;border-radius:9px;padding:9px 12px;margin:8px 0}
+.catline{font-size:12px;font-weight:800;color:var(--red);text-transform:uppercase;
+         letter-spacing:.5px;margin:16px 0 7px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.sentto{font-size:12px;color:#8f130c;background:#fdeeed;border-radius:7px;padding:5px 10px;margin:7px 0}
+
+/* ── แถวฟอร์มหลายช่องในบรรทัดเดียว ── */
+.frow2,.frow4{display:flex;align-items:center;gap:8px;padding:3px 0;flex-wrap:wrap}
+.frow2>label,.frow4>label{font-size:12.5px;color:#555;font-weight:600;white-space:nowrap}
+.frow2>input,.frow2>select{flex:0 1 150px;min-width:0;padding:5px 8px;border:1px solid var(--line);
+                           border-radius:7px;font-family:inherit;font-size:13px;height:30px}
+.frow4>input{flex:0 1 130px;min-width:0;padding:5px 8px;border:1px solid var(--line);
+             border-radius:7px;font-family:inherit;font-size:13px;height:30px}
+.frow>textarea{flex:1;min-width:0;padding:6px 9px;border:1px solid var(--line);border-radius:7px;
+               font-family:inherit;font-size:13px;min-height:34px;resize:vertical;line-height:1.5}
+.frow>textarea.tall{min-height:76px}
+.fgrid2{display:grid;grid-template-columns:repeat(2,1fr);gap:2px 22px}
+
+/* ── ตารางเงิน ── */
+.t.money th span{display:block;font-size:10px;font-weight:400;color:#999;margin-top:1px}
+.t.money input{width:100%;padding:4px 7px;border:1px solid var(--line);border-radius:6px;
+               font-family:inherit;font-size:13px;height:28px}
+.t td.b,.t th.r{font-weight:800}
+.ratelock{background:#fff7e8;border:1px solid #e8c89a;border-radius:8px;padding:8px 12px;
+          font-size:12.5px;color:#7a4e00;line-height:1.55}
+.retform{background:#fafafb;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+
+/* ── หน้ารายงาน ── */
+.repgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+@media(max-width:900px){.repgrid{grid-template-columns:1fr}}
+.repcard{border:1px solid var(--line);border-radius:11px;padding:15px 17px;cursor:pointer;
+         background:#fff;transition:.15s;display:flex;gap:13px;align-items:flex-start}
+.repcard:hover{border-color:var(--red);box-shadow:0 4px 14px rgba(0,0,0,.07);transform:translateY(-1px)}
+.repcard .ic{font-size:23px;line-height:1;flex:none}
+.repcard h4{margin:0 0 4px;font-size:14.5px;font-weight:800}
+.repcard p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.55}
+.mediadoc{border-top:1px dotted var(--line);padding:11px 0 4px}
+.mdhd{display:flex;gap:8px;align-items:center;margin-bottom:8px;font-size:12.5px}
+.mdhd a{color:var(--red);font-weight:700;cursor:pointer;text-decoration:none}
+.mdhd a:hover{text-decoration:underline}
+.phcell.sm{width:104px;height:78px}
+.phseq{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.65);color:#fff;
+       font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px}
+.doclink{color:var(--red);cursor:pointer;font-size:12px;font-weight:700;margin-right:7px;white-space:nowrap}
+.doclink:hover{text-decoration:underline}
+
+
+.phsoft{margin-top:6px;font-size:12px;color:#7a7a80;background:#fafafb;border:1px dashed #ddd;
+        border-radius:7px;padding:5px 10px;display:inline-block}
+.rethd{font-size:12.5px;font-weight:700;color:#555;margin:12px 0 7px}
 </style>

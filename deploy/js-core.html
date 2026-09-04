@@ -1,5 +1,5 @@
 <script>
-/* ═══ แกนกลาง: เข้าสู่ระบบ · เมนู · เรียก server ═══ */
+/* ═══ แกนกลาง: เข้าสู่ระบบ · เมนู · เรียก server · บันทึกอัตโนมัติ ═══ */
 var AUTH = null;        // {emp, pin} — อยู่ในหน่วยความจำหน้าเว็บเท่านั้น ไม่เก็บลงเครื่อง
 var ME   = null;
 var CURVIEW = 'home';
@@ -23,6 +23,105 @@ function srv(fn, args, ok, fail){
       var m = (e && e.message) ? e.message : String(e);
       if (fail) fail(m); else $('view').innerHTML = '<div class="msg bad">' + esc(m) + '</div>';
     })[fn].apply(null, args || []);
+}
+function hasRole(r){
+  if (!ME) return false;
+  var rs = (ME.roles && ME.roles.length) ? ME.roles : [ME.role];
+  return rs.indexOf('ADMIN') >= 0 || rs.indexOf(r) >= 0;
+}
+
+/* ═══════════ บันทึกอัตโนมัติ (เหมือน Google Sheets) ═══════════
+   เบียร์: "ในระบบ เมื่อพิมแล้ว ต้องบันทึกเองเลย เหมือนทำใน GGS · ห้ามเด้งขึ้นลงเอง"
+
+   กฎที่โค้ดนี้ต้องรักษาให้ได้ 3 ข้อ
+   1. พิมพ์เสร็จ (หยุดพิมพ์ 0.6 วิ) หรือคลิกออกจากช่อง → บันทึกเอง ไม่มีปุ่ม Save
+   2. บันทึกแล้ว **ห้ามวาดหน้าใหม่** — ไม่งั้นจอเด้ง เคอร์เซอร์หลุด ตรงที่พิมพ์อยู่หาย
+      → เซิร์ฟเวอร์ตอบกลับมาก็แค่ติ๊กเขียวข้างช่อง ไม่แตะ DOM ส่วนอื่น
+   3. บันทึกไม่ผ่าน ต้องเห็นชัดว่าช่องไหน + เพราะอะไร ไม่ใช่เงียบหาย                */
+var SAVET = {};      // ตัวจับเวลาแยกตามช่อง — พิมพ์รัว ๆ ส่งครั้งเดียว
+var SAVING = 0;
+
+function fieldMark(el, state, msg){
+  if (!el) return;
+  el.classList.remove('sv-wait','sv-ok','sv-bad');
+  if (state) el.classList.add('sv-' + state);
+  el.title = msg || (state === 'ok' ? 'บันทึกแล้ว' : state === 'bad' ? msg : '');
+  if (state === 'ok') setTimeout(function(){ el.classList.remove('sv-ok'); }, 1400);
+  var b = $('savebar');
+  if (b){
+    if (state === 'wait'){ SAVING++; b.className = 'savebar wait'; b.textContent = 'กำลังบันทึก…'; }
+    else {
+      SAVING = Math.max(0, SAVING - 1);
+      if (state === 'bad'){ b.className = 'savebar bad'; b.textContent = '⚠️ ' + (msg || 'บันทึกไม่สำเร็จ'); }
+      else if (!SAVING){ b.className = 'savebar ok'; b.textContent = '✓ บันทึกแล้วทุกช่อง'; }
+    }
+  }
+}
+
+/** ผูกช่องกรอก 1 ช่องเข้ากับฟังก์ชันบันทึกฝั่งเซิร์ฟเวอร์ */
+function bindSave(el, fn, argsFn, onDone){
+  if (!el) return;
+  var key = fn + ':' + (el.id || el.name || Math.random());
+  function fire(){
+    var args = argsFn();
+    fieldMark(el, 'wait');
+    google.script.run
+      .withSuccessHandler(function(r){ fieldMark(el, 'ok'); if (onDone) onDone(r); })
+      .withFailureHandler(function(e){ fieldMark(el, 'bad', (e && e.message) || 'บันทึกไม่สำเร็จ'); })
+      [fn].apply(null, args);
+  }
+  el.addEventListener('input', function(){
+    if (SAVET[key]) clearTimeout(SAVET[key]);
+    SAVET[key] = setTimeout(fire, 600);
+  });
+  el.addEventListener('change', function(){
+    if (SAVET[key]) clearTimeout(SAVET[key]);
+    fire();
+  });
+  el.addEventListener('blur', function(){
+    if (SAVET[key]){ clearTimeout(SAVET[key]); fire(); }
+  });
+}
+
+/** ผูกทุกช่องในกล่องที่มี data-save="ชื่อฟังก์ชัน" data-f="ชื่อช่อง" */
+function bindAll(scopeEl, docNo){
+  var els = (scopeEl || document).querySelectorAll('[data-save]');
+  for (var i = 0; i < els.length; i++){
+    (function(el){
+      var fn  = el.getAttribute('data-save');
+      var f   = el.getAttribute('data-f');
+      var seq = el.getAttribute('data-seq');
+      bindSave(el, fn, function(){
+        return seq == null ? [docNo, f, el.value, AUTH] : [docNo, seq, f, el.value, AUTH];
+      }, function(r){
+        // เซิร์ฟเวอร์คิดราคาให้ใหม่ → เติมเฉพาะช่องนั้นช่องเดียว ไม่วาดหน้าใหม่
+        if (r && r.price != null && r.price !== ''){
+          var p = document.querySelector('[data-price="' + seq + '"]');
+          if (p) p.value = r.price;
+        }
+        if (typeof refreshTotals === 'function') refreshTotals();
+      });
+    })(els[i]);
+  }
+}
+
+/* ─── ตัวช่วยสร้างช่องกรอก (ใช้ร่วมกันทุกหน้า) ─── */
+function fr(label, ctrl){ return '<div class="frow"><label>' + label + '</label>' + ctrl + '</div>'; }
+function fld(label, ctrl){ return '<div class="fld"><label>' + label + '</label><div><b>' + ctrl + '</b></div></div>'; }
+/** ช่องที่บันทึกเอง — bindAll() จะอ่าน data-save / data-f / data-seq แล้วผูก event ให้ */
+function ip(id, fn, field, val, ph, list){
+  return '<input id="' + id + '" data-save="' + fn + '" data-f="' + field + '" ' +
+         (list ? 'list="' + list + '" ' : '') +
+         (ph ? 'placeholder="' + esc(ph) + '" ' : '') +
+         'value="' + esc(val == null ? '' : val) + '">';
+}
+function sel(id, fn, field, val, opts){
+  var t = '<select id="' + id + '" data-save="' + fn + '" data-f="' + field + '">';
+  for (var i = 0; i < opts.length; i++){
+    t += '<option value="' + esc(opts[i][0]) + '"' + (String(val == null ? '' : val) === opts[i][0] ? ' selected' : '') + '>' +
+         esc(opts[i][1]) + '</option>';
+  }
+  return t + '</select>';
 }
 
 /* ─── หน้า login ─── */
@@ -64,45 +163,124 @@ function logout(){
   $('empInput').value = ''; $('pinInput').value = ''; $('loginErr').textContent = '';
   loginTab('login');
 }
-function refreshData(){ go(CURVIEW); }
+function refreshData(){ go(CURVIEW, CURARG); }
 
 /* ─── เปลี่ยนหน้า ─── */
+var CURARG = null;
 function go(v, arg){
-  CURVIEW = v;
-  if (v === 'home')     return loadHome();
-  if (v === 'list')     return loadList();
-  if (v === 'newclaim') return newClaimForm(arg);
-  if (v === 'claim')    return openClaim(arg);
+  CURVIEW = v; CURARG = arg;
+  window.scrollTo(0, 0);
+  if (v === 'home')       return loadHome();
+  /* ① Inspection */
+  if (v === 'inslist')    return loadInspList();
+  if (v === 'newins')     return newInspForm();
+  if (v === 'ins')        return openInspection(arg);
+  /* ② Claim */
+  if (v === 'list')       return loadList();
+  if (v === 'newclaim')   return newClaimForm(arg);
+  if (v === 'claim')      return openClaim(arg);
+  /* ③ All Data and Report */
+  if (v === 'reports')    return loadReportHome();
+  if (v === 'repmedia')   return loadRepMedia();
+  if (v === 'repjob')     return loadRepJob();
+  if (v === 'repdocs')    return loadRepDocs();
+  if (v === 'repcost')    return loadRepCost();
   $('view').innerHTML = '<div class="msg bad">ไม่รู้จักหน้า ' + esc(v) + '</div>';
 }
 
-/* ─── หน้าแรก ─── */
+/* ═══════════ หน้าแรก = 3 กล่อง (ตามที่เบียร์ออกแบบ) ═══════════ */
 function loadHome(){
   busy(true, 'กำลังโหลดหน้าแรก…');
-  srv('getHome', [AUTH], function(h){
+  srv('getHome2', [AUTH], function(h){
     $('verBadge').textContent = h.version;
     var rs = (h.roles && h.roles.length) ? h.roles.join(' · ') : h.role;
+
     var t = '';
-    t += '<div class="hero"><h1>สวัสดีคุณ ' + esc(h.name) + '</h1>' +
-         '<p>สิทธิ์งานเคลมของคุณ : <b>' + esc(rs) + '</b> · ปีเอกสารปัจจุบัน ' + h.year +
-         ' · เอกสารในระบบ ' + h.total + ' ใบ</p></div>';
-    t += '<div class="tiles">';
-    t += tile('newclaim','📝','เปิดใบแจ้งเคลม','แจ้งปัญหาให้ Supplier · ยังไม่มีเรื่องเงิน');
-    t += tile('list','📋','ทะเบียนเอกสาร','เอกสารทั้งหมด ' + h.total + ' ใบ · ร่าง ' + h.draft + ' ใบ');
-    t += soon('🧾','ใบเรียกเก็บค่าเคลม','ออกเมื่อ Supplier ตกลงให้ STT ทำเอง');
-    t += soon('🔍','ใบตรวจรับแท็งค์','Inspection · ติ๊ก Acc / Un-Acc พร้อมรูป');
-    t += soon('📷','รูป &amp; วิดีโอ','อัปขึ้น Drive · คัดลอกส่ง Supplier');
-    t += soon('📊','สรุปต้นทุนเคลม','ต้นทุน JMC + ค่าแรงคนจาก HR');
+    /* แถบ KPI เล็ก ๆ — เบียร์: "ทำเป็นกล่องเล็กๆ พอ และต้นทุนเคลมเอาออกไปเลย" */
+    t += '<div class="kpirow">' +
+      kpi('ใบตรวจรับ', h.ins.total) +
+      kpi('ตรวจยังไม่จบ', h.ins.open, h.ins.open ? 'warn' : '') +
+      kpi('ใบเคลม', h.clm.total) +
+      kpi('เคลมยังไม่ปิด', h.clm.open, h.clm.open ? 'warn' : '') +
+      kpi('ใบที่รูปยังไม่ครบ', h.clm.noPhoto + h.ins.noPhoto, (h.clm.noPhoto + h.ins.noPhoto) ? 'bad' : '') +
+      kpi('รูปในระบบ', h.rep.photos) +
+      '<span class="kpiwho">' + esc(h.name) + ' · ' + esc(rs) + ' · ปี ' + h.year + '</span>' +
+      '</div>';
+
+    t += '<div class="boxes">';
+
+    t += box('1', '🔍', 'Inspection', 'ตรวจรับสินค้า', [
+      'ตรวจทีละหัวข้อ ติ๊ก Acc / Un-Acc พร้อมถ่ายรูปทุกข้อ',
+      'ใช้ได้ทั้งงานต่างประเทศและงานในประเทศที่ต้องตรวจเฉพาะ',
+      'ข้อที่ Un-Acc กดส่งไปเปิดใบเคลมได้เลย รูปตามไปด้วย'
+    ], [
+      ['newins', '+ เปิดใบตรวจรับใหม่', 'primary'],
+      ['inslist', 'ใบตรวจทั้งหมด (' + h.ins.total + ')', 'ghost']
+    ], h.ins.open ? ('ตรวจค้างอยู่ ' + h.ins.open + ' ใบ') : '');
+
+    t += box('2', '📋', 'Claim', 'งานเคลม', [
+      'เอกสารใบเดียว 4 แท็บ : แจ้งเคลม → คำตอบ Supplier → เรียกเก็บเงิน → รับของกลับ',
+      'ใบแจ้งเคลมรอบแรกไม่มีเรื่องราคา · ราคาใส่ทีหลังตอนออกใบเรียกเก็บ',
+      'ทุกรายการต้องมีรูปหลักฐาน ไม่มีรูปส่งเคลมไม่ได้'
+    ], [
+      ['newclaim', '+ เปิดใบแจ้งเคลมใหม่', 'primary'],
+      ['list', 'ใบเคลมทั้งหมด (' + h.clm.total + ')', 'ghost']
+    ], h.clm.open ? ('เคลมค้างอยู่ ' + h.clm.open + ' ใบ') : '');
+
+    t += box('3', '📊', 'All Data and Report', 'ข้อมูลและรายงาน', [
+      '3.1 รูปและวิดีโอทั้งหมด · 3.2 สรุปงานเคลมตามจ๊อบงาน',
+      '3.3 ทะเบียนเอกสาร (ใบตรวจ + ใบเคลม รวมกัน)',
+      '3.4 สรุปต้นทุนการเคลม (เห็นเฉพาะผู้บริหารและจัดซื้อ)'
+    ], [
+      ['reports', 'เข้าดูรายงาน', 'primary']
+    ], h.rep.jobs ? ('มีข้อมูล ' + h.rep.jobs + ' จ๊อบ · รูป ' + h.rep.photos + ' รูป') : '');
+
     t += '</div>';
+
+    if (!h.ins.total && !h.clm.total){
+      t += '<div class="card"><h3>ระบบยังว่างอยู่ — เริ่มยังไงดี</h3>' +
+        '<ol class="steps">' +
+        '<li>งานที่ต้อง <b>ตรวจรับก่อน</b> (แท็งค์นำเข้า หรือสินค้าที่ต้องตรวจเฉพาะ) → กด <b>เปิดใบตรวจรับใหม่</b> ' +
+            'ระบบจะดึงหัวข้อตรวจจากแม่แบบมาให้ ตรวจแล้วติ๊ก Acc / Un-Acc ถ่ายรูปทุกข้อ ' +
+            'ข้อที่ Un-Acc กดส่งไปเปิดใบเคลมได้ทันที</li>' +
+        '<li>งานที่ <b>รู้อยู่แล้วว่าจะเคลมอะไร</b> (เจอปัญหาหลังส่งมอบ) → กด <b>เปิดใบแจ้งเคลมใหม่</b> ได้เลย ไม่ต้องผ่านใบตรวจ</li>' +
+        '<li>ทุกใบต้อง <b>แนบรูป</b> ก่อนถึงจะส่งเคลมได้ — รูปคือหลักฐาน</li>' +
+        '</ol></div>';
+    }
     $('view').innerHTML = t;
   });
 }
-function tile(v, ic, title, sub){
-  return '<div class="tile" onclick="go(\'' + v + '\')"><div class="ic">' + ic + '</div>' +
-         '<h3>' + title + '</h3><p>' + sub + '</p></div>';
+
+function kpi(label, n, cls){
+  return '<span class="kpi ' + (cls || '') + '"><b>' + n + '</b>' + esc(label) + '</span>';
 }
-function soon(ic, title, sub){
-  return '<div class="tile soon"><div class="ic" style="background:#c9ccd1;box-shadow:none">' + ic + '</div>' +
-         '<h3>' + title + '</h3><p>' + sub + '<br><b style="color:#aaa">— ยังไม่เปิดใช้ —</b></p></div>';
+function box(no, ic, title, sub, lines, btns, foot){
+  var t = '<div class="box"><div class="boxhd"><span class="boxno">' + no + '</span>' +
+          '<span class="boxic">' + ic + '</span>' +
+          '<div><h3>' + esc(title) + '</h3><p>' + esc(sub) + '</p></div></div><ul class="boxul">';
+  for (var i = 0; i < lines.length; i++) t += '<li>' + lines[i] + '</li>';
+  t += '</ul><div class="boxbtn">';
+  for (var k = 0; k < btns.length; k++){
+    t += '<button class="btn ' + btns[k][2] + '" onclick="go(\'' + btns[k][0] + '\')">' + btns[k][1] + '</button>';
+  }
+  t += '</div>' + (foot ? '<div class="boxfoot">' + esc(foot) + '</div>' : '') + '</div>';
+  return t;
 }
+
+/* ─── ตอนเปิดหน้าเว็บ ─── */
+document.addEventListener('DOMContentLoaded', function(){
+  google.script.run.withSuccessHandler(function(v){ $('loginVer').textContent = 'STT CLAIM HUB · ' + v; })
+                   .withFailureHandler(function(){ $('loginVer').textContent = 'STT CLAIM HUB'; })
+                   .getVersion();
+
+  $('loginErr').innerHTML = '<span class="spin"></span> กำลังตรวจบัญชี Google…';
+  google.script.run
+    .withSuccessHandler(function(r){
+      $('loginErr').textContent = '';
+      if (r && r.ok){ AUTH = null; enterApp(r, 'บัญชี Google'); return; }
+      $('empInput').focus();
+    })
+    .withFailureHandler(function(){ $('loginErr').textContent = ''; $('empInput').focus(); })
+    .loginByEmail();
+});
 </script>

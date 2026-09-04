@@ -1,7 +1,11 @@
 <script>
-/* ═══ ใบแจ้งเคลม: ฟอร์มเปิดใบ · ทะเบียนเอกสาร · เปิดดู ═══ */
+/* ═══ ② Claim — เอกสารใบเดียว 4 แท็บ ═══
+   แท็บ 1 ใบแจ้งเคลม (ไม่มีราคา)  แท็บ 2 คำตอบจาก Supplier
+   แท็บ 3 ใบเรียกเก็บค่าเคลม      แท็บ 4 รับของกลับ + QC Accept          */
+
 var VENDORS = null;
 var FORM = { docNo:'', items:[] };
+var CLAIM = null;          // ใบที่เปิดอยู่ (หัว + รายการ + ค่าแรง + ของกลับ)
 
 function blankItem(){
   return { code:'', name:'', th:'', en:'', qty:'', unit:'', po:'', supplier:'', recv:'', note:'' };
@@ -18,11 +22,11 @@ function newClaimForm(){
 function drawForm(title){
   var t = '';
   t += '<div class="card tight"><div class="cardhd"><h3>' + esc(title) + '</h3>' +
-       '<span class="sub">ใบแจ้งเคลมรอบแรก ไม่มีเรื่องราคา · ราคาจะใส่ทีหลังในใบเรียกเก็บค่าเคลม</span>' +
-       '<button class="btn" id="saveBtn" onclick="submitClaim()">💾 บันทึกใบแจ้งเคลม</button></div>';
+       '<span class="sub">ใบแจ้งเคลมรอบแรก ไม่มีเรื่องราคา · ราคาจะใส่ทีหลังในแท็บ “ใบเรียกเก็บค่าเคลม”</span>' +
+       '<button class="btn primary" id="saveBtn" onclick="submitClaim()">💾 เปิดใบแจ้งเคลม</button></div>';
   t += '<div id="fmsg"></div>';
-  t += '<div class="phnote">📷 <b>รูปคือหลักฐาน</b> — บันทึกใบแจ้งเคลมก่อน 1 ครั้ง ระบบจะเปิดหน้าใบเคลมให้แนบรูปทีละรายการ ' +
-       'ถ้ารายการไหนไม่มีรูป ระบบจะไม่ยอมให้ส่งเคลม</div>';
+  t += '<div class="phnote">📷 <b>รูปคือหลักฐาน</b> — เปิดใบก่อน 1 ครั้ง ระบบจะพาไปหน้าใบเคลมให้แนบรูปทีละรายการ ' +
+       'รายการไหนไม่มีรูป ระบบจะไม่ยอมให้ส่งเคลม</div>';
   t += '<div class="fgrid">';
   t += fr('ประเภทการเคลม', '<select id="f_claimType"><option value="after">หลังส่งมอบ (After-Sales)</option><option value="pre">ก่อนส่งมอบ (Pre-Delivery)</option></select>');
   t += fr('เลขที่ JOB', '<input id="f_jobNo" placeholder="JT-69/0009" onblur="jobLookup()">');
@@ -44,8 +48,7 @@ function drawForm(title){
 
   t += '<div class="card tight"><div class="cardhd"><h3>รายการที่เคลม</h3>' +
        '<span class="sub">จำนวนใส่มายังไงเก็บตามนั้น ไม่ปัดเอง · วันที่ DD/MM/YYYY</span>' +
-       '<button class="btn ghost" onclick="addRow()">+ เพิ่มแถว</button>' +
-       '<button class="btn ghost" onclick="translateAll()">🌐 แปลไทย → EN</button></div>';
+       '<button class="btn ghost" onclick="addRow()">+ เพิ่มแถว</button></div>';
   t += '<div style="overflow-x:auto"><table class="t" id="itab"><thead><tr>' +
        '<th style="width:30px">ที่</th><th style="width:104px">รหัสสินค้า</th><th style="width:160px">ชื่อสินค้า</th>' +
        '<th>รายละเอียดการเคลม (ไทย)</th><th>Claim description (EN)</th>' +
@@ -56,11 +59,7 @@ function drawForm(title){
   $('view').innerHTML = t;
   renderRows();
 }
-function fr(label, ctrl){ return '<div class="frow"><label>' + label + '</label>' + ctrl + '</div>'; }
-function fld(label, ctrl){ return '<div class="fld"><label>' + label + '</label>' + ctrl + '</div>'; }
-function areaChanged(){
-  $('f_fkwrap').style.display = ($('f_area').value === 'for') ? '' : 'none';
-}
+function areaChanged(){ $('f_fkwrap').style.display = ($('f_area').value === 'for') ? '' : 'none'; }
 
 function renderRows(){
   var tb = $('itab').getElementsByTagName('tbody')[0];
@@ -69,7 +68,7 @@ function renderRows(){
     var it = FORM.items[i];
     h += '<tr>' +
       '<td class="c">' + (i+1) + '</td>' +
-      '<td><input data-k="code" data-i="' + i + '" value="' + esc(it.code) + '" onblur="goodLookup(' + i + ')"></td>' +
+      '<td><input data-k="code" data-i="' + i + '" value="' + esc(it.code) + '"></td>' +
       '<td><input data-k="name" data-i="' + i + '" value="' + esc(it.name) + '"></td>' +
       '<td><textarea data-k="th" data-i="' + i + '">' + esc(it.th) + '</textarea></td>' +
       '<td><textarea data-k="en" data-i="' + i + '">' + esc(it.en) + '</textarea></td>' +
@@ -110,8 +109,7 @@ function addRow(){ collect(); FORM.items.push(blankItem()); renderRows(); }
 function delRow(i){ collect(); FORM.items.splice(i,1); if (!FORM.items.length) FORM.items.push(blankItem()); renderRows(); }
 
 function jobLookup(){
-  var j = $('f_jobNo').value.trim();
-  if (!j) return;
+  var j = $('f_jobNo').value.trim(); if (!j) return;
   srv('lookupJob', [j], function(r){
     if (!r || !r.found){ $('fmsg').innerHTML = '<div class="msg bad">ไม่พบเลขจ๊อบ ' + esc(j) + ' ในทะเบียนงาน — กรอกข้อมูลรถเองได้</div>'; return; }
     $('fmsg').innerHTML = '<div class="msg good">พบจ๊อบ ' + esc(r.jobNo) + ' แล้ว — เด้งข้อมูลให้อัตโนมัติ</div>';
@@ -120,8 +118,6 @@ function jobLookup(){
     if (r.loc && String(r.loc).indexOf('ต่าง') >= 0){ $('f_area').value = 'for'; areaChanged(); }
   }, function(m){ $('fmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; });
 }
-function goodLookup(i){ /* รอบถัดไป: ใส่รหัสแล้วเด้งชื่อ/หน่วยจาก Data Good Code */ }
-function translateAll(){ alert('ตัวแปลภาษาจะเปิดใช้ในรอบถัดไปครับ'); }
 
 function submitClaim(){
   collect();
@@ -146,29 +142,31 @@ function submitClaim(){
   };
   $('saveBtn').disabled = true; $('saveBtn').textContent = 'กำลังบันทึก…';
   srv('createClaim', [h, AUTH], function(r){
-    $('saveBtn').disabled = false; $('saveBtn').textContent = '💾 บันทึกใบแจ้งเคลม';
+    $('saveBtn').disabled = false; $('saveBtn').textContent = '💾 เปิดใบแจ้งเคลม';
     if (!r || !r.ok){ $('fmsg').innerHTML = '<div class="msg bad">บันทึกไม่สำเร็จ</div>'; return; }
     go('claim', r.docNo);
   }, function(m){
-    $('saveBtn').disabled = false; $('saveBtn').textContent = '💾 บันทึกใบแจ้งเคลม';
+    $('saveBtn').disabled = false; $('saveBtn').textContent = '💾 เปิดใบแจ้งเคลม';
     $('fmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>';
   });
 }
 
-/* ─────────── ทะเบียนเอกสาร ─────────── */
+/* ─────────── ทะเบียนใบเคลม ─────────── */
 function loadList(){
   busy(true, 'กำลังโหลดทะเบียนเอกสาร…');
   srv('listClaims', [{}, AUTH], function(rows){
-    var t = '<div class="card"><h3>ทะเบียนเอกสาร</h3>';
-    t += '<div style="margin-bottom:10px"><button class="btn primary" onclick="go(\'newclaim\')">+ เปิดใบแจ้งเคลมใหม่</button></div>';
+    var t = '<div class="card"><div class="cardhd"><h3>ใบเคลมทั้งหมด</h3>' +
+            '<button class="btn" onclick="go(\'home\')">← หน้าแรก</button>' +
+            '<button class="btn primary" onclick="go(\'newclaim\')">+ เปิดใบแจ้งเคลมใหม่</button></div>';
     if (!rows || !rows.length){
-      t += '<div class="hint">ยังไม่มีเอกสารในระบบ</div></div>';
+      t += '<div class="empty">ยังไม่มีใบเคลมในระบบ<br><span>กด “+ เปิดใบแจ้งเคลมใหม่” เพื่อเริ่มใบแรก ' +
+           'หรือเปิดจากใบตรวจรับโดยส่งข้อที่ไม่ผ่านมาเป็นใบเคลม</span></div></div>';
       $('view').innerHTML = t; return;
     }
-    t += '<table class="t"><thead><tr><th style="width:120px">เลขที่เอกสาร</th><th style="width:92px">วันที่</th>' +
-         '<th style="width:120px">ประเภท</th><th style="width:120px">เลขที่ JOB</th><th>ชื่อลูกค้า</th>' +
+    t += '<table class="t"><thead><tr><th style="width:116px">เลขที่เอกสาร</th><th style="width:88px">วันที่</th>' +
+         '<th style="width:150px">ประเภท</th><th style="width:112px">เลขที่ JOB</th><th>ชื่อลูกค้า</th>' +
          '<th style="width:104px">รูปหลักฐาน</th>' +
-         '<th style="width:96px">สถานะ</th><th style="width:120px">ผู้เปิด</th></tr></thead><tbody>';
+         '<th style="width:92px">สถานะ</th><th style="width:112px">ผู้เปิด</th></tr></thead><tbody>';
     for (var i = 0; i < rows.length; i++){
       var r = rows[i];
       t += '<tr style="cursor:pointer" onclick="go(\'claim\',\'' + r.docNo + '\')">' +
@@ -182,108 +180,413 @@ function loadList(){
     $('view').innerHTML = t;
   });
 }
-
-/* ─────────── เปิดดูใบเคลม (v0.2.0 · เห็นรูปทุกรายการ) ─────────── */
-function openClaim(docNo){
-  busy(true, 'กำลังเปิด ' + docNo + '…');
-  srv('getClaim', [docNo, AUTH], function(c){
-    if (!c){ $('view').innerHTML = '<div class="msg bad">ไม่พบเอกสาร ' + esc(docNo) + '</div>'; return; }
-    var h = c.head;
-    CURDOC = docNo;
-    CURJOB = h['เลขที่ JOB'] || '';
-    PHOTOS = c.photos || {};
-
-    /* นับว่ารายการไหนมีรูปแล้วบ้าง — รูปคือหลักฐาน ไม่มีรูป = เคลมไม่ได้ */
-    var nHave = 0, missing = [];
-    for (var i = 0; i < c.items.length; i++){
-      var sq = String(c.items[i].seq);
-      if (PHOTOS[sq] && PHOTOS[sq].length) nHave++; else missing.push(sq);
-    }
-
-    var t = '<div class="card noprint"><h3>' + esc(h['เลขที่เอกสาร']) + ' — ใบแจ้งเคลมสินค้า</h3>' +
-      '<div class="grid2"><div>' +
-      row('เลขที่ JOB', h['เลขที่ JOB']) + row('ชื่อลูกค้า', h['ชื่อลูกค้า']) +
-      row('MODEL', h['MODEL']) + row('CHASSIS NO. (STT)', h['CHASSIS NO. (STT)']) +
-      row('CHASSIS NO. (ผู้ผลิต)', h['CHASSIS NO. (ผู้ผลิต)']) +
-      '</div><div>' +
-      row('วันที่', h['วันที่']) +
-      row('ประเภทการเคลม', h['ประเภทการเคลม'] === 'pre' ? 'ก่อนส่งมอบ' : 'หลังส่งมอบ') +
-      row('พื้นที่', h['พื้นที่'] === 'for' ? 'ต่างประเทศ' : 'ในประเทศ') +
-      row('SERIAL NO.', h['SERIAL NO.']) + row('JMC ที่ผูก', h['JMC ที่ผูก'] || '— ยังไม่ผูก —') +
-      '</div></div>';
-
-    t += '<div class="phbar ' + (missing.length ? 'bad' : 'good') + '" id="phbar">' +
-         (missing.length
-            ? '📷 รูปหลักฐาน ' + nHave + ' / ' + c.items.length + ' รายการ — <b>ยังขาดรายการที่ ' + missing.join(', ') + '</b> · ยังส่งเคลมไม่ได้'
-            : '📷 รูปหลักฐานครบทุกรายการแล้ว (' + c.items.length + ' รายการ) · พร้อมส่งเคลม') +
-         '</div>';
-
-    t += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
-      '<button class="btn" onclick="go(\'list\')">← กลับทะเบียน</button>' +
-      '<button class="btn ghost" onclick="openMediaFolder()">📁 เปิดโฟลเดอร์รูปใน Drive</button>' +
-      '<button class="btn ghost" onclick="checkPhotos()">✅ ตรวจความครบของรูป</button>' +
-      '<button class="btn dark" onclick="window.print()">🖨️ ปริ้น / บันทึกเป็น PDF</button></div>' +
-      '<div class="hint" style="margin-top:6px">แบบฟอร์มปริ้นเต็มรูปแบบ (หัวกระดาษ SUTEE · แยกใบตาม Supplier · เลขหน้า x/y) จะต่อในรอบถัดไป</div>' +
-      '</div>';
-
-    t += '<div class="card"><h3>รายการที่เคลม (' + c.items.length + ' รายการ)</h3>' +
-         '<div class="hint" style="margin-bottom:10px">ทุกรายการต้องมีรูปถ่ายหลักฐาน กดที่รูปเพื่อดูใหญ่ · กด <b>+ เพิ่มรูป</b> เพื่อแนบรูปจากมือถือหรือเครื่อง</div>';
-    for (var i = 0; i < c.items.length; i++){
-      var it = c.items[i];
-      t += '<div class="itemcard">' +
-        '<div class="ihd"><span class="ino">' + esc(it.seq) + '</span>' +
-        '<span class="inm">' + esc(it.name || '—') + '</span>' +
-        '<span class="icode">' + (it.code ? 'รหัส ' + esc(it.code) : '') + '</span></div>' +
-        '<div class="imeta">จำนวน <b>' + esc(it.qty) + '</b> ' + esc(it.unit) +
-        ' · PO <b>' + esc(it.po || '—') + '</b> · Supplier <b>' + esc(it.supplier || '—') + '</b>' +
-        ' · วันรับสินค้า <b>' + esc(it.recv || '—') + '</b></div>' +
-        '<div class="idesc">' + esc(it.th || '—') +
-        (it.en ? '<div class="ien">' + esc(it.en) + '</div>' : '') + '</div>' +
-        '<div data-phbox="' + esc(it.seq) + '"></div>' +
-        '</div>';
-    }
-    t += '</div>';
-    $('view').innerHTML = t;
-    drawAllPhotos();
-  });
-}
-/** ป้ายบอกความครบของรูปในทะเบียนเอกสาร */
 function photoPill(r){
   var n = r.nPhoto || 0, miss = r.nNoPhoto || 0;
   if (!r.nItem) return '<span class="pill">—</span>';
   if (miss > 0) return '<span class="pill red">📷 ' + n + ' · ขาด ' + miss + '</span>';
   return '<span class="pill green">📷 ' + n + ' ครบ</span>';
 }
-function row(k, v){ return '<div class="fld"><label>' + esc(k) + '</label><div><b>' + esc(v || '—') + '</b></div></div>'; }
 
-/* ─── ตอนเปิดหน้าเว็บ ─── */
-document.addEventListener('DOMContentLoaded', function(){
-  // โชว์เวอร์ชันตั้งแต่หน้า login — ตรวจได้ว่า deploy เข้าจริงไหมโดยไม่ต้องล็อกอินก่อน
-  google.script.run.withSuccessHandler(function(v){ $('loginVer').textContent = 'STT CLAIM HUB · ' + v; })
-                   .withFailureHandler(function(){ $('loginVer').textContent = 'STT CLAIM HUB'; })
-                   .getVersion();
+/* ═══════════ เปิดใบเคลม — 4 แท็บในเอกสารเดียว ═══════════ */
+function openClaim(docNo){
+  busy(true, 'กำลังเปิด ' + docNo + '…');
+  srv('getClaim', [docNo, AUTH], function(c){
+    if (!c){ $('view').innerHTML = '<div class="msg bad">ไม่พบเอกสาร ' + esc(docNo) + '</div>'; return; }
+    CLAIM = c;
+    CURDOC = docNo;
+    CURJOB = c.head['เลขที่ JOB'] || '';
+    PHOTOS = c.photos || {};
+    srv('listLabour', [docNo, AUTH], function(lab){
+      CLAIM.labour = lab || [];
+      srv('listReturns', [docNo, AUTH], function(ret){
+        CLAIM.returns = ret || [];
+        drawClaim();
+      });
+    });
+  });
+}
 
-  // ลองเข้าด้วยบัญชี Google ของบริษัทก่อน (เบียร์/พี่แบล็ค ไม่ต้องใส่ PIN)
-  $('loginErr').innerHTML = '<span class="spin"></span> กำลังตรวจบัญชี Google…';
-  google.script.run
-    .withSuccessHandler(function(r){
-      $('loginErr').textContent = '';
-      if (r && r.ok){ AUTH = null; enterApp(r, 'บัญชี Google'); return; }
-      $('empInput').focus();
-    })
-    .withFailureHandler(function(){ $('loginErr').textContent = ''; $('empInput').focus(); })
-    .loginByEmail();
-});
+var CURTAB = 1;
+function drawClaim(){
+  var c = CLAIM, h = c.head, docNo = h['เลขที่เอกสาร'];
+
+  var t = '<div class="card noprint tight"><div class="cardhd">' +
+    '<h3>' + esc(docNo) + '</h3>' +
+    '<span class="sub">' + esc(h['เลขที่ JOB']) + ' · ' + esc(h['ชื่อลูกค้า']) + ' · ' +
+      (h['ประเภทการเคลม'] === 'pre' ? 'ก่อนส่งมอบ' : 'หลังส่งมอบ') + ' · ' +
+      (h['พื้นที่'] === 'for' ? 'ต่างประเทศ' : 'ในประเทศ') + '</span>' +
+    '<span class="savebar ok" id="savebar">✓ บันทึกอัตโนมัติ</span>' +
+    '<button class="btn" onclick="go(\'list\')">← ทะเบียน</button></div>';
+
+  /* แท็บ */
+  t += '<div class="tabs">' +
+    tab(1, '① ใบแจ้งเคลม', 'แจ้งปัญหา ไม่มีราคา') +
+    tab(2, '② คำตอบ Supplier', 'ตอบมาว่ายังไง') +
+    tab(3, '③ ใบเรียกเก็บค่าเคลม', 'ใส่เงินตรงนี้') +
+    tab(4, '④ รับของกลับ + QC', 'ของมาแล้วใช้ได้ไหม') +
+    '</div></div>';
+
+  t += '<div id="pane1" class="pane">' + paneClaim(c, docNo) + '</div>';
+  t += '<div id="pane2" class="pane" style="display:none">' + paneSupplier(c, docNo) + '</div>';
+  t += '<div id="pane3" class="pane" style="display:none">' + paneBill(c, docNo) + '</div>';
+  t += '<div id="pane4" class="pane" style="display:none">' + paneReturn(c, docNo) + '</div>';
+
+  $('view').innerHTML = t;
+  bindAll($('view'), docNo);
+  drawAllPhotos();
+  drawLabour();
+  showTab(CURTAB);
+}
+function tab(n, label, sub){
+  return '<button class="tabbtn' + (CURTAB === n ? ' on' : '') + '" id="tabbtn' + n + '" onclick="showTab(' + n + ')">' +
+         '<b>' + label + '</b><span>' + sub + '</span></button>';
+}
+function showTab(n){
+  CURTAB = n;
+  for (var i = 1; i <= 4; i++){
+    var p = $('pane' + i), b = $('tabbtn' + i);
+    if (p) p.style.display = (i === n) ? '' : 'none';
+    if (b) b.className = 'tabbtn' + (i === n ? ' on' : '');
+  }
+  if (n === 3) refreshTotals();
+}
+
+/* ─── แท็บ 1 · ใบแจ้งเคลม (หัวใบ + รายการ + รูป) ─── */
+function paneClaim(c, docNo){
+  var h = c.head;
+  var nHave = 0, missing = [];
+  for (var i = 0; i < c.items.length; i++){
+    var sq = String(c.items[i].seq);
+    if (PHOTOS[sq] && PHOTOS[sq].length) nHave++; else missing.push(sq);
+  }
+
+  var t = '<div class="card tight"><div class="cardhd"><h3>ข้อมูลใบแจ้งเคลม</h3>' +
+    '<span class="sub">พิมพ์แล้วบันทึกเอง ไม่ต้องกดปุ่ม</span></div><div class="fgrid">';
+  t += fr('เลขที่ JOB', ip('c_jobNo','saveClaimField','jobNo',h['เลขที่ JOB'])) +
+       fr('ชื่อลูกค้า', ip('c_jobName','saveClaimField','jobName',h['ชื่อลูกค้า'])) +
+       fr('วันที่', '<input value="' + esc(h['วันที่']) + '" disabled>');
+  t += fr('MODEL', ip('c_model','saveClaimField','model',h['MODEL'])) +
+       fr('SERIAL NO.', ip('c_serialNo','saveClaimField','serialNo',h['SERIAL NO.'])) +
+       fr('JMC ที่ผูก', ip('c_jmc','saveClaimField','jmc',h['JMC ที่ผูก'],'เว้นว่างได้ เติมทีหลัง'));
+  t += fr('CHASSIS <i>STT</i>', ip('c_chassisStt','saveClaimField','chassisStt',h['CHASSIS NO. (STT)'])) +
+       fr('CHASSIS <i>ผู้ผลิต</i>', ip('c_chassisMaker','saveClaimField','chassisMaker',h['CHASSIS NO. (ผู้ผลิต)'])) +
+       fr('เลขใบส่งมอบ', ip('c_deliveryNote','saveClaimField','deliveryNote',h['เลขใบส่งมอบ']));
+  t += fr('แผนกที่ขอเคลม', ip('c_dept','saveClaimField','dept',h['แผนก'])) +
+       fr('วันที่ต้องการของ', ip('c_wantDate','saveClaimField','wantDate',h['วันที่ต้องการของ'],'DD/MM/YYYY')) +
+       fr('สถานะ', sel('c_status','saveClaimField','status',h['สถานะ'],
+            [['DRAFT','ร่าง'],['SENT','ส่ง Supplier แล้ว'],['REPLIED','Supplier ตอบแล้ว'],
+             ['BILLED','ออกใบเรียกเก็บแล้ว'],['CLOSED','ปิดงานแล้ว']]));
+  t += '</div>';
+
+  t += '<div class="phbar ' + (missing.length ? 'bad' : 'good') + '" id="phbar">' +
+       (missing.length
+          ? '📷 รูปหลักฐาน ' + nHave + ' / ' + c.items.length + ' รายการ — <b>ยังขาดรายการที่ ' + missing.join(', ') + '</b> · ยังส่งเคลมไม่ได้'
+          : '📷 รูปหลักฐานครบทุกรายการแล้ว (' + c.items.length + ' รายการ) · พร้อมส่งเคลม') + '</div>';
+
+  t += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
+    '<button class="btn ghost" onclick="addClaimRow()">+ เพิ่มรายการ</button>' +
+    '<button class="btn ghost" onclick="openMediaFolder()">📁 โฟลเดอร์รูปใน Drive</button>' +
+    '<button class="btn dark" onclick="window.print()">🖨️ ปริ้น / บันทึกเป็น PDF</button></div>' +
+    '<div class="hint" style="margin-top:6px">แบบฟอร์มปริ้นเต็มรูปแบบ (หัวกระดาษ SUTEE · FM-WH-03 · แยกใบตาม Supplier · เลขหน้า x/y) จะต่อในรอบถัดไป</div>' +
+    '</div>';
+
+  t += '<div class="card"><div class="cardhd"><h3>รายการที่เคลม (' + c.items.length + ' รายการ)</h3>' +
+       '<span class="sub">ทุกรายการต้องมีรูป · กดที่รูปเพื่อดูใหญ่</span></div>';
+  for (var k = 0; k < c.items.length; k++) t += claimItemCard(c.items[k]);
+  if (!c.items.length) t += '<div class="empty">ใบนี้ยังไม่มีรายการ<br><span>กด “+ เพิ่มรายการ” ด้านบน</span></div>';
+  t += '</div>';
+  return t;
+}
+
+function claimItemCard(it){
+  var s = String(it.seq);
+  var t = '<div class="itemcard"><div class="ihd"><span class="ino">' + esc(s) + '</span>' +
+    '<input class="ititle" data-save="saveItemField" data-seq="' + s + '" data-f="name" value="' + esc(it.name) + '" placeholder="ชื่อสินค้า">' +
+    '<input class="icodein" data-save="saveItemField" data-seq="' + s + '" data-f="code" value="' + esc(it.code) + '" placeholder="รหัสสินค้า">' +
+    '<button class="rowbtn" style="margin-left:auto" title="ลบรายการนี้" onclick="delClaimRow(\'' + s + '\')">&#10005;</button></div>';
+
+  t += '<div class="frow"><label>รายละเอียด (ไทย)</label>' +
+    '<textarea data-save="saveItemField" data-seq="' + s + '" data-f="th" placeholder="บรรยายปัญหาให้ละเอียด">' + esc(it.th) + '</textarea></div>';
+  t += '<div class="frow"><label>Description (EN)</label>' +
+    '<textarea data-save="saveItemField" data-seq="' + s + '" data-f="en" placeholder="ส่งให้ Supplier ต่างประเทศอ่าน">' + esc(it.en) + '</textarea></div>';
+
+  t += '<div class="frow4">' +
+    '<label>จำนวน</label><input class="r" data-save="saveItemField" data-seq="' + s + '" data-f="qty" value="' + esc(it.qty) + '">' +
+    '<label>หน่วย</label><input data-save="saveItemField" data-seq="' + s + '" data-f="unit" value="' + esc(it.unit) + '">' +
+    '<label>PO</label><input data-save="saveItemField" data-seq="' + s + '" data-f="po" value="' + esc(it.po) + '">' +
+    '<label>วันรับ</label><input data-save="saveItemField" data-seq="' + s + '" data-f="recv" value="' + esc(it.recv) + '" placeholder="DD/MM/YYYY">' +
+    '</div>';
+  t += '<div class="frow"><label>Supplier</label>' +
+    '<input list="vlist" data-save="saveItemField" data-seq="' + s + '" data-f="supplier" value="' + esc(it.supplier) + '"></div>';
+
+  t += '<div data-phbox="' + esc(s) + '"></div></div>';
+  return t;
+}
+
+function addClaimRow(){ srv('addClaimItem', [CURDOC, AUTH], function(){ go('claim', CURDOC); }); }
+function delClaimRow(seq){
+  if (!confirm('ลบรายการที่ ' + seq + ' ออกจากใบเคลม?')) return;
+  srv('delClaimItem', [CURDOC, seq, AUTH], function(){ go('claim', CURDOC); });
+}
+
+/* ─── แท็บ 2 · คำตอบจาก Supplier ─── */
+function paneSupplier(c, docNo){
+  var h = c.head;
+  var t = '<div class="card"><div class="cardhd"><h3>คำตอบจาก Supplier</h3>' +
+    '<span class="sub">กรอกเมื่อ Supplier ตอบกลับมา · พิมพ์แล้วบันทึกเอง</span></div>';
+  t += '<div class="hint" style="margin-bottom:12px">ผลการเคลมจะเป็นตัวตัดสินว่าต้องออก <b>ใบเรียกเก็บค่าเคลม (แท็บ ③)</b> หรือไม่ — ' +
+       'ออกใบเรียกเก็บเฉพาะกรณีที่ <b>STT ต้องซื้อหรือซ่อมเอง</b> แล้วเรียกเงินคืนจาก Supplier</div>';
+  t += '<div class="fgrid2">';
+  t += '<div class="frow"><label>ผลการเคลม</label>' +
+    sel('c_result','saveClaimField','result',h['ผลการเคลม'],
+      [['','— ยังไม่ตอบ —'],
+       ['SEND_NEW','Supplier ส่งของใหม่มาให้'],
+       ['SEND_PART','Supplier ส่งอะไหล่มาให้ซ่อม'],
+       ['STT_FIX','ให้ STT ซ่อม/ซื้อเอง แล้วเรียกเก็บเงินคืน'],
+       ['REJECT','Supplier ปฏิเสธการเคลม'],
+       ['OTHER','อื่น ๆ']]) + '</div>';
+  t += '<div class="frow"><label>วันที่ตอบกลับ</label>' + ip('c_rateDateX','saveClaimField','rateDate',h['เรท ณ วันที่'],'DD/MM/YYYY') + '</div>';
+  t += '</div>';
+  t += '<div class="frow"><label>รายละเอียดผลการเคลม</label>' +
+    '<textarea class="tall" data-save="saveClaimField" data-f="resultDetail" placeholder="สรุปว่าตกลงกันได้ยังไง">' + esc(h['รายละเอียดผลการเคลม']) + '</textarea></div>';
+  t += '<div class="frow"><label>หมายเหตุ / ข้อความจาก Supplier</label>' +
+    '<textarea class="tall" data-save="saveClaimField" data-f="supplierNote" placeholder="ก๊อปข้อความ/อีเมลที่ Supplier ตอบมาไว้ตรงนี้ได้">' + esc(h['หมายเหตุจาก Supplier']) + '</textarea></div>';
+  t += '</div>';
+  return t;
+}
+
+/* ─── แท็บ 3 · ใบเรียกเก็บค่าเคลม (เงิน) ─── */
+function paneBill(c, docNo){
+  var h = c.head;
+  var locked = !!h['อัตราแลกเปลี่ยน'];
+
+  var t = '<div class="card"><div class="cardhd"><h3>ใบเรียกเก็บค่าเคลม</h3>' +
+    '<span class="sub">ใช้เลขที่เดียวกับใบแจ้งเคลม · ไม่มี VAT</span></div>';
+  t += '<div class="hint" style="margin-bottom:12px">ออกใบนี้เฉพาะตอนที่ <b>STT ต้องซื้อหรือซ่อมเอง</b> แล้วเรียกเงินคืนจาก Supplier · ' +
+       'ถ้า Supplier ส่งของใหม่มาให้ ไม่ต้องออกใบนี้ ข้ามไปแท็บ ④ ได้เลย</div>';
+
+  t += '<div class="fgrid">';
+  t += '<div class="frow"><label>สกุลเงิน</label>' +
+    sel('c_currency','saveClaimField','currency',h['สกุลเงิน'],
+      [['','— เลือก —'],['USD','USD'],['CNY','CNY'],['EUR','EUR'],['GBP','GBP']]) + '</div>';
+  t += '<div class="frow"><label>อัตราแลกเปลี่ยน</label>' +
+    '<input id="c_rate" class="r" data-save="saveClaimField" data-f="rate" value="' + esc(h['อัตราแลกเปลี่ยน']) + '" ' +
+    'placeholder="บาทต่อ 1 หน่วย"' + (locked ? ' readonly title="เรทล็อกแล้ว แก้ไม่ได้"' : '') + '></div>';
+  t += '<div class="frow"><label>ล็อกเรทเมื่อ</label><input value="' + esc(h['เรท ณ วันที่']) + '" disabled></div>';
+  t += '</div>';
+  t += '<div class="' + (locked ? 'ratelock' : 'hint') + '" style="margin-top:8px">' +
+    (locked
+      ? '🔒 เรทของใบนี้ล็อกไว้ที่ <b>' + esc(h['อัตราแลกเปลี่ยน']) + '</b> บาท ตั้งแต่ ' + esc(h['เรท ณ วันที่']) +
+        ' — แก้ไม่ได้แล้ว เพื่อให้ตัวเลขในเอกสารที่ส่งออกไปตรงกันตลอด (ถ้าเรทผิดจริง ต้องให้ผู้บริหารแก้)'
+      : '⚠️ ใส่เรทได้<b>ครั้งเดียว</b> ใส่แล้วล็อกติดใบนี้ถาวร ตรวจให้ดีก่อนพิมพ์') + '</div>';
+
+  /* ตารางเงิน */
+  t += '<div style="overflow-x:auto;margin-top:14px"><table class="t money"><thead><tr>' +
+    '<th style="width:30px">ที่</th><th>ชื่อสินค้า</th>' +
+    '<th style="width:58px">จำนวน</th><th style="width:56px">หน่วย</th>' +
+    '<th style="width:104px">ต้นทุน/หน่วย<br><span>(บาท)</span></th>' +
+    '<th style="width:92px">กำไร<br><span>15% หรือ 500</span></th>' +
+    '<th style="width:110px">ราคาเรียกเก็บ<br><span>/หน่วย (บาท)</span></th>' +
+    '<th style="width:110px">รวม (บาท)</th>' +
+    '<th style="width:110px">รวม (<span id="curlbl">' + esc(h['สกุลเงิน'] || '—') + '</span>)</th>' +
+    '</tr></thead><tbody>';
+  for (var i = 0; i < c.items.length; i++){
+    var it = c.items[i], s = String(it.seq);
+    t += '<tr>' +
+      '<td class="c">' + esc(s) + '</td>' +
+      '<td>' + esc(it.name) + '<div class="hint">' + esc(it.supplier || '(ยังไม่ระบุ Supplier)') + '</div></td>' +
+      '<td class="r">' + esc(it.qty) + '</td><td class="c">' + esc(it.unit) + '</td>' +
+      '<td><input class="r" data-save="saveItemField" data-seq="' + s + '" data-f="cost" value="' + esc(it.cost) + '"></td>' +
+      '<td><input class="r" data-save="saveItemField" data-seq="' + s + '" data-f="margin" value="' + esc(it.margin) + '" placeholder="15%"></td>' +
+      '<td><input class="r" data-price="' + s + '" data-save="saveItemField" data-seq="' + s + '" data-f="price" value="' + esc(it.price) + '"></td>' +
+      '<td class="r b" data-tot="' + s + '">—</td><td class="r" data-fx="' + s + '">—</td></tr>';
+  }
+  t += '</tbody></table></div>';
+  t += '<div class="hint" style="margin-top:6px">กำไรใส่ได้ 2 แบบ: <b>15%</b> = บวก 15% จากต้นทุน · <b>500</b> = บวก 500 บาทตรง ๆ · ' +
+       'หรือพิมพ์ราคาเรียกเก็บลงไปตรง ๆ เลยก็ได้</div>';
+  t += '</div>';
+
+  /* ค่าแรง */
+  t += '<div class="card"><div class="cardhd"><h3>ค่าแรง</h3>' +
+    '<span class="sub">ลงเป็นก้อนได้ แต่ต้องบอกว่าครอบคลุมรายการข้อไหนบ้าง</span>' +
+    '<button class="btn ghost" onclick="addLabour()">+ เพิ่มค่าแรง</button></div>';
+  t += '<div style="overflow-x:auto"><table class="t" id="labtab"><thead><tr>' +
+    '<th style="width:30px">ที่</th><th>รายละเอียดงาน (ไทย)</th><th>Description (EN)</th>' +
+    '<th style="width:110px">ครอบคลุมข้อ</th><th style="width:160px">Supplier</th>' +
+    '<th style="width:110px">จำนวนเงิน (บาท)</th><th style="width:28px"></th></tr></thead><tbody></tbody></table></div>';
+  t += '<div style="margin-top:8px"><button class="btn" onclick="saveLabourRows()">💾 บันทึกค่าแรง</button> ' +
+       '<span id="labmsg" class="hint"></span></div></div>';
+
+  /* ยอดรวมแยกตาม Supplier */
+  t += '<div class="card"><div class="cardhd"><h3>ยอดรวม</h3>' +
+    '<span class="sub">1 ใบเคลมมีได้หลาย Supplier — ตอนพิมพ์ระบบจะแยกใบให้เอง</span></div>' +
+    '<div id="totbox"><span class="spin"></span> กำลังคิดยอด…</div></div>';
+  return t;
+}
+
+function refreshTotals(){
+  if (!CLAIM || CURTAB !== 3) return;
+  var h = CLAIM.head;
+  var rate = Number(String($('c_rate') ? $('c_rate').value : h['อัตราแลกเปลี่ยน']).replace(/,/g,'')) || 0;
+  var cur = $('c_currency') ? $('c_currency').value : h['สกุลเงิน'];
+  var lbl = $('curlbl'); if (lbl) lbl.textContent = cur || '—';
+
+  for (var i = 0; i < CLAIM.items.length; i++){
+    var it = CLAIM.items[i], s = String(it.seq);
+    var pe = document.querySelector('[data-price="' + s + '"]');
+    var price = pe ? Number(String(pe.value).replace(/,/g,'')) || 0 : 0;
+    var qty = Number(String(it.qty).replace(/,/g,'')) || 0;
+    var tot = Math.round(price * qty * 100) / 100;
+    var te = document.querySelector('[data-tot="' + s + '"]');
+    var fe = document.querySelector('[data-fx="' + s + '"]');
+    if (te) te.textContent = tot ? money(tot) : '—';
+    if (fe) fe.textContent = (tot && rate > 0) ? money(tot / rate) : '—';
+  }
+  srv('claimTotals', [CURDOC, AUTH], function(r){
+    var b = $('totbox'); if (!b || !r) return;
+    var t = '<table class="t"><thead><tr><th>Supplier</th><th style="width:130px">ค่าของ (บาท)</th>' +
+      '<th style="width:130px">ค่าแรง (บาท)</th><th style="width:140px">รวม (บาท)</th>' +
+      '<th style="width:140px">รวม (' + esc(r.currency || '—') + ')</th></tr></thead><tbody>';
+    if (!r.bySupplier.length){
+      t += '<tr><td colspan="5" class="c hint">ยังไม่ได้ใส่ราคา — ใส่ต้นทุนในตารางด้านบนแล้วยอดจะขึ้นเอง</td></tr>';
+    }
+    for (var i = 0; i < r.bySupplier.length; i++){
+      var x = r.bySupplier[i];
+      t += '<tr><td><b>' + esc(x.supplier) + '</b></td><td class="r">' + money(x.items) + '</td>' +
+        '<td class="r">' + money(x.labour) + '</td><td class="r b">' + money(x.thb) + '</td>' +
+        '<td class="r b">' + (x.foreign === '' ? '—' : money(x.foreign)) + '</td></tr>';
+    }
+    t += '</tbody><tfoot><tr><th>รวมทั้งใบ</th><th></th><th></th>' +
+      '<th class="r">' + money(r.thb) + '</th><th class="r">' + (r.foreign === '' ? '—' : money(r.foreign)) + '</th></tr></tfoot></table>';
+    if (!r.rate) t += '<div class="hint" style="margin-top:6px">ยังไม่ได้ใส่เรท — ช่องสกุลเงินต่างประเทศจะขึ้นให้เมื่อใส่เรทแล้ว</div>';
+    b.innerHTML = t;
+  }, function(){});
+}
+
+/* ค่าแรง — แก้ในตารางแล้วกดบันทึกทีเดียว (มีไม่กี่บรรทัด) */
+function labRows(){
+  var tb = $('labtab').getElementsByTagName('tbody')[0], out = [];
+  var trs = tb.getElementsByTagName('tr');
+  for (var i = 0; i < trs.length; i++){
+    var q = function(k){ var e = trs[i].querySelector('[data-l="' + k + '"]'); return e ? e.value : ''; };
+    out.push({ th:q('th'), en:q('en'), covers:q('covers'), supplier:q('supplier'), amount:q('amount') });
+  }
+  return out;
+}
+function drawLabour(){
+  var tb = $('labtab'); if (!tb) return;
+  tb = tb.getElementsByTagName('tbody')[0];
+  var rows = CLAIM.labour || [], h = '';
+  for (var i = 0; i < rows.length; i++){
+    var x = rows[i];
+    h += '<tr><td class="c">' + (i+1) + '</td>' +
+      '<td><input data-l="th" value="' + esc(x.th) + '"></td>' +
+      '<td><input data-l="en" value="' + esc(x.en) + '"></td>' +
+      '<td><input data-l="covers" value="' + esc(x.covers) + '" placeholder="1, 3, 4"></td>' +
+      '<td><input data-l="supplier" list="vlist" value="' + esc(x.supplier) + '"></td>' +
+      '<td><input data-l="amount" class="r" value="' + esc(x.amount) + '"></td>' +
+      '<td class="c"><button class="rowbtn" onclick="delLabour(' + i + ')">&#10005;</button></td></tr>';
+  }
+  if (!rows.length) h = '<tr><td colspan="7" class="c hint">ยังไม่มีค่าแรง — กด “+ เพิ่มค่าแรง” ถ้ามีค่าแรงที่ต้องเรียกเก็บ</td></tr>';
+  tb.innerHTML = h;
+}
+function addLabour(){
+  CLAIM.labour = labRowsSafe();
+  CLAIM.labour.push({ th:'', en:'', covers:'', supplier:'', amount:'' });
+  drawLabour();
+}
+function labRowsSafe(){
+  var tb = $('labtab'); if (!tb) return CLAIM.labour || [];
+  if (!tb.querySelector('[data-l]')) return [];
+  return labRows();
+}
+function delLabour(i){
+  CLAIM.labour = labRowsSafe();
+  CLAIM.labour.splice(i, 1);
+  drawLabour();
+}
+function saveLabourRows(){
+  var rows = labRowsSafe();
+  $('labmsg').textContent = 'กำลังบันทึก…';
+  srv('saveLabour', [CURDOC, rows, AUTH], function(){
+    $('labmsg').textContent = '✓ บันทึกค่าแรงแล้ว';
+    setTimeout(function(){ $('labmsg').textContent = ''; }, 1600);
+    CLAIM.labour = rows;
+    refreshTotals();
+  }, function(m){ $('labmsg').textContent = m; });
+}
+
+/* ─── แท็บ 4 · รับของกลับ + QC Accept ─── */
+function paneReturn(c, docNo){
+  var t = '<div class="card"><div class="cardhd"><h3>รับของกลับจาก Supplier</h3>' +
+    '<span class="sub">ถ่ายรูปของที่ได้กลับมา แล้วให้ Production / QC กดรับ</span></div>';
+  t += '<div class="hint" style="margin-bottom:12px">ของกลับมาแล้ว <b>ต้องถ่ายรูปลงระบบ</b> และให้ Production หรือ QC กด ' +
+       '<b>Accept</b> หรือ <b>ไม่ Accept</b> — ถ้าไม่ Accept ระบบจะเปิดใบเคลมรอบใหม่ให้ (วนกลับ) นี่คือขั้นตอนภายใน ไม่ได้ส่งให้ Supplier</div>';
+
+  t += '<div class="retform"><div class="frow2">' +
+    '<label>รายการที่</label><select id="r_item">';
+  for (var i = 0; i < c.items.length; i++){
+    t += '<option value="' + esc(c.items[i].seq) + '">' + esc(c.items[i].seq) + ' · ' + esc(c.items[i].name) + '</option>';
+  }
+  t += '</select><label>วันที่รับกลับ</label><input id="r_date" placeholder="DD/MM/YYYY">' +
+    '<label>จำนวนที่รับ</label><input id="r_qty" class="r"></div>';
+  t += '<div class="frow"><label>หมายเหตุ</label><input id="r_note" placeholder="สภาพของที่ได้กลับมาเป็นยังไง"></div>';
+  t += '<div class="rethd">📷 รูปของที่ได้กลับมา (ถ่ายก่อนกด Accept)</div>' +
+       '<div data-phbox="R" data-phreq="soft"></div>';
+  t += '<div class="accrow" style="margin-top:8px">' +
+    '<button class="accbtn ok" onclick="addReturn(\'ACC\')">✓ Accept — ใช้ได้ ปิดจบ</button>' +
+    '<button class="accbtn bad" onclick="addReturn(\'UNACC\')">✕ ไม่ Accept — ยังใช้ไม่ได้</button>' +
+    '<span class="accnote" id="retnote"></span></div></div>';
+
+  var rets = c.returns || [];
+  t += '<table class="t" style="margin-top:14px"><thead><tr><th style="width:30px">ที่</th>' +
+    '<th style="width:88px">รายการที่</th><th style="width:100px">วันที่รับกลับ</th>' +
+    '<th style="width:80px">จำนวน</th><th style="width:140px">ผลตรวจ</th>' +
+    '<th>หมายเหตุ</th><th style="width:130px">ผู้ตรวจ</th></tr></thead><tbody>';
+  var anyBad = false;
+  for (var k = 0; k < rets.length; k++){
+    var r = rets[k];
+    if (r.acc === 'UNACC') anyBad = true;
+    t += '<tr><td class="c">' + esc(r.seq) + '</td><td class="c">' + esc(r.itemSeq) + '</td>' +
+      '<td class="c">' + esc(r.date) + '</td><td class="r">' + esc(r.qty) + '</td>' +
+      '<td class="c">' + (r.acc === 'ACC' ? '<span class="pill green">✓ Accept</span>'
+                        : r.acc === 'UNACC' ? '<span class="pill red">✕ ไม่ Accept</span>' : '—') + '</td>' +
+      '<td>' + esc(r.note) + '</td><td>' + esc(r.by) + '</td></tr>';
+  }
+  if (!rets.length) t += '<tr><td colspan="7" class="c hint">ยังไม่มีการรับของกลับ</td></tr>';
+  t += '</tbody></table>';
+
+  if (anyBad){
+    t += '<div class="phbar bad" style="margin-top:12px">มีของที่ QC ไม่ Accept — ต้องเคลมรอบใหม่</div>' +
+      '<div style="margin-top:8px"><button class="btn primary" onclick="doReclaim()">➜ เปิดใบเคลมรอบใหม่จากของที่ไม่ Accept</button></div>';
+  }
+  t += '<div id="retmsg"></div></div>';
+  return t;
+}
+function addReturn(acc){
+  var rec = { itemSeq:$('r_item') ? $('r_item').value : '', date:$('r_date').value,
+              qty:$('r_qty').value, acc:acc, note:$('r_note').value };
+  $('retnote').textContent = 'กำลังบันทึก…'; $('retnote').className = 'accnote wait';
+  srv('saveReturn', [CURDOC, rec, AUTH], function(){ go('claim', CURDOC); },
+      function(m){ $('retnote').textContent = m; $('retnote').className = 'accnote bad'; });
+}
+function doReclaim(){
+  if (!confirm('เปิดใบเคลมรอบใหม่จากรายการที่ QC ไม่ Accept?')) return;
+  srv('reclaimFromReturn', [CURDOC, AUTH], function(r){
+    alert('เปิดใบเคลม ' + r.claimNo + ' แล้ว (' + r.n + ' รายการ)');
+    go('claim', r.claimNo);
+  }, function(m){ $('retmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; });
+}
 </script>
-<script>
-/* ═══════════ v0.2.0 · ระบบรูปถ่าย ═══════════
-   รูป = หลักฐาน · ทุกรายการที่เคลมต้องมีรูป
-   ย่อรูปในเครื่องก่อนส่ง (กว้างสุด 1600px) → ไฟล์เล็กลง 5-10 เท่า อัปเร็ว ไม่ติดลิมิต */
 
-var PHOTOS = {};        // { '1':[{id,thumb,view,name}], '2':[...] }
+<script>
+/* ═══════════ ระบบรูปถ่าย (ใช้ร่วมกันทั้งใบเคลมและใบตรวจรับ) ═══════════
+   รูป = หลักฐาน · ไม่มีรูป เคลมไม่ได้
+   ย่อรูปในเครื่องก่อนส่ง (กว้างสุด 1600px) → เล็กลง 5-10 เท่า อัปเร็ว ไม่ติดลิมิต */
+
+var PHOTOS = {};
 var CURDOC = '', CURJOB = '';
 
-/** ย่อรูปด้วย canvas ก่อนอัป — กล้องมือถือ 4-8 MB จะเหลือ ~300-600 KB */
 function shrinkImage(file, maxW, quality){
   return new Promise(function(res, rej){
     var fr = new FileReader();
@@ -305,7 +608,7 @@ function shrinkImage(file, maxW, quality){
 }
 
 function pickPhotos(seq){
-  if (!CURDOC){ alert('บันทึกใบเคลมก่อน แล้วค่อยแนบรูปครับ'); return; }
+  if (!CURDOC){ alert('เปิดเอกสารก่อน แล้วค่อยแนบรูปครับ'); return; }
   var inp = document.createElement('input');
   inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
   inp.onchange = function(){ uploadList(seq, Array.prototype.slice.call(inp.files)); };
@@ -314,12 +617,10 @@ function pickPhotos(seq){
 
 function uploadList(seq, files){
   if (!files.length) return;
-  var box = $('ph_' + seq);
   var done = 0, fail = 0;
   function step(i){
     if (i >= files.length){
-      var m = 'อัปโหลดเสร็จ ' + done + ' รูป' + (fail ? (' · ไม่สำเร็จ ' + fail) : '');
-      setPhotoMsg(seq, m, fail ? 'bad' : 'good');
+      setPhotoMsg(seq, 'อัปโหลดเสร็จ ' + done + ' รูป' + (fail ? (' · ไม่สำเร็จ ' + fail) : ''), fail ? 'bad' : 'good');
       loadPhotos();
       return;
     }
@@ -339,37 +640,64 @@ function setPhotoMsg(seq, msg, cls){
   el.innerHTML = (cls === 'wait' ? '<span class="spin"></span> ' : '') + esc(msg);
 }
 
+/** โหลดรูปใหม่แล้ววาดเฉพาะแถบรูป — ไม่แตะส่วนอื่นของหน้า จอจึงไม่เด้ง */
 function loadPhotos(){
   if (!CURDOC) return;
   srv('listPhotos', [CURDOC, AUTH], function(p){
     PHOTOS = p || {};
     drawAllPhotos();
+    if (typeof updateInsBar === 'function' && $('insbar')) updateInsBar();
+    updatePhBar();
   });
 }
 function drawAllPhotos(){
   var boxes = document.querySelectorAll('[data-phbox]');
   for (var i = 0; i < boxes.length; i++){
-    var seq = boxes[i].getAttribute('data-phbox');
-    boxes[i].innerHTML = photoStrip(seq);
+    drawPhotoBox(boxes[i]);
   }
 }
-function photoStrip(seq){
+/** วาดแถบรูปกล่องเดียว — ใช้ตอนติ๊ก Acc/Un-Acc จะได้ไม่ต้องวาดทั้งหน้า */
+function drawPhotoBox(box){
+  if (typeof box === 'string') box = document.querySelector('[data-phbox="' + box + '"]');
+  if (!box) return;
+  box.innerHTML = photoStrip(box.getAttribute('data-phbox'),
+                             box.getAttribute('data-phreq') || 'hard');
+}
+/** req = 'hard' ต้องมีรูปจริง ๆ · 'soft' มีก็ดี ไม่มีก็ยังไม่ผิด */
+function photoStrip(seq, req){
   var list = PHOTOS[String(seq)] || [];
   var h = '<div class="phwrap">';
   list.forEach(function(p, k){
     h += '<div class="phcell"><img src="' + p.thumb + '" alt="รูป ' + (k+1) + '" ' +
          'onclick="zoomPhoto(\'' + p.view + '\',\'' + p.thumb + '\')" ' +
          'onerror="this.parentNode.classList.add(\'bad\')">' +
-         '<button class="phdel" title="เอารูปนี้ออก" onclick="delPhoto(' + seq + ',\'' + p.id + '\')">&#10005;</button></div>';
+         '<button class="phdel" title="เอารูปนี้ออก" onclick="delPhoto(\'' + seq + '\',\'' + p.id + '\')">&#10005;</button></div>';
   });
-  h += '<div class="phadd" onclick="pickPhotos(' + seq + ')"><b>+</b><span>เพิ่มรูป</span></div>';
+  h += '<div class="phadd" onclick="pickPhotos(\'' + seq + '\')"><b>+</b><span>เพิ่มรูป</span></div>';
   h += '</div>';
-  if (!list.length) h += '<div class="phwarn">⚠️ ยังไม่มีรูปหลักฐาน — รายการนี้เคลมไม่ได้</div>';
+  if (!list.length){
+    h += (req === 'soft')
+      ? '<div class="phsoft">📷 ยังไม่มีรูปข้อนี้ — ถ่ายไว้ด้วยจะดี เป็นหลักฐานว่าตรวจแล้วจริง</div>'
+      : '<div class="phwarn">⚠️ ยังไม่มีรูปหลักฐาน — รายการนี้เคลมไม่ได้</div>';
+  }
   h += '<div class="phmsg" id="phmsg_' + seq + '"></div>';
   return h;
 }
+/** อัปเดตแถบสรุปรูปของใบเคลมจากสิ่งที่อยู่บนจอ — ไม่ต้องวาดหน้าใหม่ */
+function updatePhBar(){
+  var bar = $('phbar'); if (!bar || !CLAIM) return;
+  var have = 0, missing = [];
+  for (var i = 0; i < CLAIM.items.length; i++){
+    var s = String(CLAIM.items[i].seq);
+    if (PHOTOS[s] && PHOTOS[s].length) have++; else missing.push(s);
+  }
+  bar.className = 'phbar ' + (missing.length ? 'bad' : 'good');
+  bar.innerHTML = missing.length
+    ? '📷 รูปหลักฐาน ' + have + ' / ' + CLAIM.items.length + ' รายการ — <b>ยังขาดรายการที่ ' + missing.join(', ') + '</b> · ยังส่งเคลมไม่ได้'
+    : '📷 รูปหลักฐานครบทุกรายการแล้ว (' + CLAIM.items.length + ' รายการ) · พร้อมส่งเคลม';
+}
 function delPhoto(seq, id){
-  if (!confirm('เอารูปนี้ออกจากใบเคลม?\n(ไฟล์ยังอยู่ใน Drive ไม่ได้ลบทิ้ง)')) return;
+  if (!confirm('เอารูปนี้ออกจากเอกสาร?\n(ไฟล์ยังอยู่ใน Drive ไม่ได้ลบทิ้ง)')) return;
   srv('removePhoto', [CURDOC, id, AUTH], function(){ loadPhotos(); });
 }
 function zoomPhoto(view, thumb){
@@ -383,10 +711,5 @@ function zoomPhoto(view, thumb){
 }
 function openMediaFolder(){
   srv('getMediaFolderLink', [CURDOC, CURJOB, AUTH], function(u){ window.open(u, '_blank'); });
-}
-function checkPhotos(){
-  srv('photoCheck', [CURDOC, AUTH], function(r){
-    alert(r.ok ? '✅ ' + r.msg : '⚠️ ' + r.msg);
-  });
 }
 </script>

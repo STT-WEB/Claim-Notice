@@ -1,0 +1,311 @@
+<script>
+/* ═══ ① Inspection — ใบตรวจรับสินค้า ═══
+   ตรวจทีละหัวข้อ · ติ๊ก Acc / Un-Acc · ถ่ายรูปทุกข้อ
+   ข้อที่ Un-Acc กดส่งไปเปิดใบเคลมได้เลย รูปตามไปด้วย                  */
+
+var INSTPL = null;
+
+/* ─────────── เปิดใบตรวจใหม่ ─────────── */
+function newInspForm(){
+  busy(true, 'กำลังเตรียมแม่แบบเช็คลิสต์…');
+  srv('listInspTemplates', [], function(tpl){
+    INSTPL = tpl || [];
+    var opts = '';
+    for (var i = 0; i < INSTPL.length; i++){
+      opts += '<option value="' + esc(INSTPL[i].key) + '"' + (INSTPL[i].key === 'tanker' ? ' selected' : '') + '>' +
+              esc(INSTPL[i].name) + ' (' + INSTPL[i].n + ' หัวข้อ)</option>';
+    }
+    var t = '<div class="card tight"><div class="cardhd"><h3>เปิดใบตรวจรับสินค้า (ใบใหม่)</h3>' +
+      '<span class="sub">เลขที่ INS-YY/NNNN · คนละชุดกับใบเคลม</span>' +
+      '<button class="btn primary" id="insSave" onclick="submitInsp()">💾 เปิดใบตรวจ</button></div>';
+    t += '<div id="imsg"></div>';
+    t += '<div class="phnote">📷 ตรวจแล้วต้อง<b>ถ่ายรูปทุกข้อที่ไม่ผ่าน</b> ระบบถึงจะยอมให้ส่งไปเปิดใบเคลม</div>';
+    t += '<div class="fgrid">';
+    t += fr('พื้นที่', '<select id="i_area" onchange="inspAreaChanged()"><option value="for">ต่างประเทศ</option><option value="dom">ในประเทศ</option></select>');
+    t += fr('เลขที่ JOB', '<input id="i_jobNo" placeholder="JT-69/0009" onblur="inspJobLookup()">');
+    t += fr('ชื่อลูกค้า', '<input id="i_jobName">');
+
+    t += fr('แม่แบบเช็คลิสต์', '<select id="i_template" onchange="inspTplNote()">' + opts + '</select>');
+    t += fr('MODEL', '<input id="i_model">');
+    t += fr('SERIAL NO.', '<input id="i_serialNo">');
+
+    t += fr('CHASSIS <i>STT</i>', '<input id="i_chassisStt">');
+    t += fr('CHASSIS <i>ผู้ผลิต</i>', '<input id="i_chassisMaker">');
+    t += fr('PO', '<input id="i_po">');
+
+    t += fr('Supplier', '<input id="i_supplier" list="vlist">');
+    t += fr('วันรับสินค้า', '<input id="i_recv" placeholder="DD/MM/YYYY">');
+    t += fr('ชนิดงาน', '<select id="i_kind"><option value="tanker">Tankers (ไม่ผ่านสโตร์)</option><option value="equip">อุปกรณ์ (ผ่านสโตร์)</option></select>');
+    t += '</div>';
+    t += '<div class="hint" id="i_tplnote" style="margin-top:8px"></div></div>';
+    $('view').innerHTML = t;
+    inspTplNote();
+    if (!VENDORS) srv('listVendors', [], function(v){ VENDORS = v || []; fillVendorList(); });
+    else fillVendorList();
+  });
+}
+function inspAreaChanged(){
+  // งานในประเทศส่วนใหญ่เป็นสินค้า/อุปกรณ์ ไม่ใช่แท็งค์ทั้งคัน — เดาให้ก่อน แก้เองได้
+  if ($('i_area').value === 'dom'){
+    $('i_kind').value = 'equip';
+    if ($('i_template').value === 'tanker') $('i_template').value = 'domestic';
+  } else {
+    $('i_kind').value = 'tanker';
+    if ($('i_template').value === 'domestic') $('i_template').value = 'tanker';
+  }
+  inspTplNote();
+}
+function inspTplNote(){
+  if (!INSTPL) return;
+  var k = $('i_template').value, n = '';
+  for (var i = 0; i < INSTPL.length; i++) if (INSTPL[i].key === k) n = INSTPL[i].note;
+  $('i_tplnote').innerHTML = '💡 ' + esc(n) + ' — เปิดใบแล้ว <b>เพิ่ม / ลบ / แก้หัวข้อได้ทุกข้อ</b> แม่แบบเป็นแค่ตัวตั้งต้น';
+}
+function inspJobLookup(){
+  var j = $('i_jobNo').value.trim(); if (!j) return;
+  srv('lookupJob', [j], function(r){
+    if (!r || !r.found){ $('imsg').innerHTML = '<div class="msg bad">ไม่พบเลขจ๊อบ ' + esc(j) + ' — กรอกข้อมูลเองได้</div>'; return; }
+    $('imsg').innerHTML = '<div class="msg good">พบจ๊อบ ' + esc(r.jobNo) + ' — เด้งข้อมูลให้อัตโนมัติ</div>';
+    if (r.jobName) $('i_jobName').value = r.jobName;
+    if (r.model)   $('i_model').value   = r.model;
+  }, function(m){ $('imsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; });
+}
+function submitInsp(){
+  var jobNo = $('i_jobNo').value.trim();
+  if (!jobNo){ $('imsg').innerHTML = '<div class="msg bad">ต้องระบุเลขที่ JOB ก่อน</div>'; return; }
+  var h = { area:$('i_area').value, kind:$('i_kind').value, template:$('i_template').value,
+    jobNo:jobNo, jobName:$('i_jobName').value, model:$('i_model').value,
+    chassisStt:$('i_chassisStt').value, chassisMaker:$('i_chassisMaker').value,
+    serialNo:$('i_serialNo').value, po:$('i_po').value, supplier:$('i_supplier').value,
+    recv:$('i_recv').value };
+  $('insSave').disabled = true; $('insSave').textContent = 'กำลังเปิดใบ…';
+  srv('createInspection', [h, AUTH], function(r){
+    if (!r || !r.ok){ $('insSave').disabled = false; $('insSave').textContent = '💾 เปิดใบตรวจ'; return; }
+    go('ins', r.docNo);
+  }, function(m){
+    $('insSave').disabled = false; $('insSave').textContent = '💾 เปิดใบตรวจ';
+    $('imsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>';
+  });
+}
+
+/* ─────────── ทะเบียนใบตรวจ ─────────── */
+function loadInspList(){
+  busy(true, 'กำลังโหลดใบตรวจรับ…');
+  srv('listInspections', [{}, AUTH], function(rows){
+    var t = '<div class="card"><div class="cardhd"><h3>ใบตรวจรับสินค้าทั้งหมด</h3>' +
+            '<button class="btn" onclick="go(\'home\')">← หน้าแรก</button>' +
+            '<button class="btn primary" onclick="go(\'newins\')">+ เปิดใบตรวจรับใหม่</button></div>';
+    if (!rows || !rows.length){
+      t += '<div class="empty">ยังไม่มีใบตรวจรับในระบบ<br><span>กด “+ เปิดใบตรวจรับใหม่” เพื่อเริ่มใบแรก</span></div></div>';
+      $('view').innerHTML = t; return;
+    }
+    t += '<table class="t"><thead><tr><th style="width:116px">เลขที่</th><th style="width:88px">วันที่</th>' +
+      '<th style="width:112px">เลขที่ JOB</th><th>ชื่อลูกค้า / Supplier</th>' +
+      '<th style="width:172px">ผลตรวจ</th><th style="width:96px">รูป</th>' +
+      '<th style="width:120px">สถานะ</th></tr></thead><tbody>';
+    for (var i = 0; i < rows.length; i++){
+      var r = rows[i];
+      t += '<tr style="cursor:pointer" onclick="go(\'ins\',\'' + r.docNo + '\')">' +
+        '<td><b>' + esc(r.docNo) + '</b></td><td class="c">' + esc(r.date) + '</td>' +
+        '<td>' + esc(r.jobNo) + '</td>' +
+        '<td>' + esc(r.jobName) + (r.supplier ? '<div class="hint">' + esc(r.supplier) + '</div>' : '') + '</td>' +
+        '<td class="c">' + accBar(r) + '</td>' +
+        '<td class="c">' + (r.nPhoto ? '<span class="pill green">📷 ' + r.nPhoto + '</span>' : '<span class="pill">—</span>') + '</td>' +
+        '<td class="c">' + (r.claimNo ? '<span class="pill red">→ ' + esc(r.claimNo) + '</span>' : esc(r.status)) + '</td></tr>';
+    }
+    t += '</tbody></table></div>';
+    $('view').innerHTML = t;
+  });
+}
+function accBar(r){
+  if (!r.n) return '<span class="pill">ไม่มีหัวข้อ</span>';
+  var h = '<span class="pill green">ผ่าน ' + r.acc + '</span> ';
+  if (r.un)   h += '<span class="pill red">ไม่ผ่าน ' + r.un + '</span> ';
+  if (r.todo) h += '<span class="pill">ยังไม่ตรวจ ' + r.todo + '</span>';
+  return h;
+}
+
+/* ─────────── เปิดใบตรวจ (หน้าตรวจจริง) ─────────── */
+function openInspection(docNo){
+  busy(true, 'กำลังเปิด ' + docNo + '…');
+  srv('getInspection', [docNo, AUTH], function(c){
+    if (!c){ $('view').innerHTML = '<div class="msg bad">ไม่พบใบตรวจ ' + esc(docNo) + '</div>'; return; }
+    var h = c.head;
+    CURDOC = docNo; CURJOB = h['เลขที่ JOB'] || '';
+    PHOTOS = c.photos || {};
+
+    var acc = 0, un = 0, todo = 0, unNoPhoto = [];
+    for (var i = 0; i < c.items.length; i++){
+      var a = c.items[i].acc;
+      if (a === 'ACC') acc++;
+      else if (a === 'UNACC'){
+        un++;
+        if (!PHOTOS[String(c.items[i].seq)] || !PHOTOS[String(c.items[i].seq)].length) unNoPhoto.push(c.items[i].seq);
+      } else todo++;
+    }
+
+    var t = '<div class="card noprint"><div class="cardhd">' +
+      '<h3>' + esc(h['เลขที่เอกสาร']) + ' — ใบตรวจรับสินค้า</h3>' +
+      '<span class="sub">' + esc(h['แม่แบบเช็คลิสต์']) + '</span>' +
+      '<span class="savebar ok" id="savebar">✓ บันทึกอัตโนมัติ</span></div>';
+
+    t += '<div class="fgrid">';
+    t += fr('เลขที่ JOB', ip('i2_jobNo','saveInspHeadField','jobNo',h['เลขที่ JOB'])) +
+         fr('ชื่อลูกค้า', ip('i2_jobName','saveInspHeadField','jobName',h['ชื่อลูกค้า'])) +
+         fr('วันที่', '<input value="' + esc(h['วันที่']) + '" disabled>');
+    t += fr('MODEL', ip('i2_model','saveInspHeadField','model',h['MODEL'])) +
+         fr('SERIAL NO.', ip('i2_serialNo','saveInspHeadField','serialNo',h['SERIAL NO.'])) +
+         fr('ผู้ตรวจ', ip('i2_inspector','saveInspHeadField','inspector',h['ผู้ตรวจ']));
+    t += fr('CHASSIS <i>STT</i>', ip('i2_chassisStt','saveInspHeadField','chassisStt',h['CHASSIS NO. (STT)'])) +
+         fr('CHASSIS <i>ผู้ผลิต</i>', ip('i2_chassisMaker','saveInspHeadField','chassisMaker',h['CHASSIS NO. (ผู้ผลิต)'])) +
+         fr('วันรับสินค้า', ip('i2_recv','saveInspHeadField','recv',h['วันรับสินค้า'],'DD/MM/YYYY'));
+    t += fr('PO', ip('i2_po','saveInspHeadField','po',h['PO'])) +
+         fr('Supplier', ip('i2_supplier','saveInspHeadField','supplier',h['Supplier'],'','vlist')) +
+         fr('หมายเหตุ', ip('i2_note','saveInspHeadField','note',h['หมายเหตุ']));
+    t += '</div>';
+
+    t += '<div class="phbar ' + (un && !unNoPhoto.length ? 'good' : (unNoPhoto.length ? 'bad' : '')) + '" id="insbar">' +
+         insBarText(c.items.length, acc, un, todo, unNoPhoto) + '</div>';
+
+    t += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="btn" onclick="go(\'inslist\')">← ใบตรวจทั้งหมด</button>' +
+      '<button class="btn ghost" onclick="addInspRow()">+ เพิ่มหัวข้อตรวจ</button>' +
+      '<button class="btn ghost" onclick="openMediaFolder()">📁 โฟลเดอร์รูปใน Drive</button>';
+    if (h['ใบเคลมที่ออกจากใบนี้']){
+      t += '<button class="btn dark" onclick="go(\'claim\',\'' + esc(h['ใบเคลมที่ออกจากใบนี้']) + '\')">' +
+           '📋 เปิดใบเคลม ' + esc(h['ใบเคลมที่ออกจากใบนี้']) + '</button>';
+    } else {
+      t += '<button class="btn primary" id="sendBtn" onclick="sendToClaim()">➜ ส่งข้อที่ไม่ผ่านไปเปิดใบเคลม</button>';
+    }
+    t += '</div><div id="insmsg"></div></div>';
+
+    /* หัวข้อตรวจ — ติ๊กแล้วบันทึกทันที ไม่มีปุ่ม Save */
+    t += '<div class="card"><div class="cardhd"><h3>หัวข้อตรวจ (' + c.items.length + ' ข้อ)</h3>' +
+         '<span class="sub">ติ๊กผลตรวจแล้วบันทึกเอง · ข้อที่ไม่ผ่านต้องมีรูป</span></div>';
+    var lastCat = null;
+    for (var k = 0; k < c.items.length; k++){
+      var it = c.items[k];
+      if (it.cat && it.cat !== lastCat){ t += '<div class="catline">' + esc(it.cat) + '</div>'; lastCat = it.cat; }
+      t += inspCard(it, docNo);
+    }
+    if (!c.items.length){
+      t += '<div class="empty">ใบนี้ยังไม่มีหัวข้อตรวจ<br><span>กด “+ เพิ่มหัวข้อตรวจ” ด้านบน</span></div>';
+    }
+    t += '</div>';
+
+    $('view').innerHTML = t;
+    bindAll($('view'), docNo);
+    drawAllPhotos();
+  });
+}
+
+function insBarText(n, acc, un, todo, noPhoto){
+  if (!n) return 'ใบนี้ยังไม่มีหัวข้อตรวจ';
+  var s = '📋 ตรวจแล้ว ' + (acc + un) + ' / ' + n + ' ข้อ · <b>ผ่าน ' + acc + '</b> · <b>ไม่ผ่าน ' + un + '</b>';
+  if (todo) s += ' · ยังไม่ตรวจ ' + todo + ' ข้อ';
+  if (noPhoto.length) s += ' — <b>ข้อที่ไม่ผ่านยังไม่มีรูป: ข้อ ' + noPhoto.join(', ') + ' · ส่งเคลมไม่ได้</b>';
+  else if (un) s += ' — 📷 รูปครบ พร้อมส่งเคลม';
+  return s;
+}
+
+function inspCard(it, docNo){
+  var s = String(it.seq);
+  var t = '<div class="itemcard ins ' + (it.acc === 'UNACC' ? 'un' : it.acc === 'ACC' ? 'ok' : '') + '" id="inscard_' + s + '">' +
+    '<div class="ihd"><span class="ino">' + esc(s) + '</span>' +
+    '<input class="ititle" data-save="saveInspItemField" data-seq="' + s + '" data-f="title" value="' + esc(it.title) + '" placeholder="หัวข้อที่ตรวจ">' +
+    '</div>';
+
+  t += '<div class="accrow">' +
+    '<button class="accbtn ok'   + (it.acc === 'ACC'   ? ' on' : '') + '" onclick="setAcc(\'' + s + '\',\'ACC\')">✓ ผ่าน (Acc)</button>' +
+    '<button class="accbtn bad'  + (it.acc === 'UNACC' ? ' on' : '') + '" onclick="setAcc(\'' + s + '\',\'UNACC\')">✕ ไม่ผ่าน (Un-Acc)</button>' +
+    '<button class="accbtn"      onclick="setAcc(\'' + s + '\',\'\')">ล้าง</button>' +
+    '<span class="accnote" id="accnote_' + s + '"></span>' +
+    '<button class="rowbtn" style="margin-left:auto" title="ลบหัวข้อนี้" onclick="delInspRow(\'' + s + '\')">&#10005;</button>' +
+    '</div>';
+
+  /* ช่องบรรยายสิ่งที่พบ — โผล่เมื่อไม่ผ่าน (ข้อมูลนี้จะไหลไปเป็นรายละเอียดในใบเคลม) */
+  t += '<div class="unbox" id="unbox_' + s + '" style="display:' + (it.acc === 'UNACC' ? '' : 'none') + '">' +
+    '<div class="frow"><label>สิ่งที่พบ (ไทย)</label>' +
+      '<textarea data-save="saveInspItemField" data-seq="' + s + '" data-f="found" placeholder="บรรยายให้ละเอียด ข้อความนี้จะไปอยู่ในใบเคลม">' + esc(it.found) + '</textarea></div>' +
+    '<div class="frow"><label>Finding (EN)</label>' +
+      '<textarea data-save="saveInspItemField" data-seq="' + s + '" data-f="foundEn" placeholder="ส่งให้ Supplier ต่างประเทศอ่าน">' + esc(it.foundEn) + '</textarea></div>' +
+    '<div class="frow2"><label>จำนวน</label>' +
+      '<input class="r" data-save="saveInspItemField" data-seq="' + s + '" data-f="qty" value="' + esc(it.qty) + '">' +
+      '<label>หน่วย</label>' +
+      '<input data-save="saveInspItemField" data-seq="' + s + '" data-f="unit" value="' + esc(it.unit) + '"></div>' +
+    '</div>';
+
+  if (it.sentTo) t += '<div class="sentto">➜ ส่งไปใบเคลม <b>' + esc(it.sentTo) + '</b> แล้ว</div>';
+  /* ข้อที่ไม่ผ่านต้องมีรูปแน่นอน · ข้อที่ผ่านถ่ายไว้ก็ดี แต่ไม่บังคับ */
+  t += '<div data-phbox="' + esc(s) + '" data-phreq="' + (it.acc === 'UNACC' ? 'hard' : 'soft') + '"></div></div>';
+  return t;
+}
+
+/** ติ๊กผลตรวจ — บันทึกทันที และเปิด/ปิดช่องบรรยายโดยไม่วาดหน้าใหม่ (จอไม่เด้ง) */
+function setAcc(seq, val){
+  var card = $('inscard_' + seq), box = $('unbox_' + seq), note = $('accnote_' + seq);
+  var btns = card.querySelectorAll('.accbtn');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove('on');
+  if (val === 'ACC')   { btns[0].classList.add('on'); card.className = 'itemcard ins ok'; }
+  if (val === 'UNACC') { btns[1].classList.add('on'); card.className = 'itemcard ins un'; }
+  if (!val)            { card.className = 'itemcard ins'; }
+  box.style.display = (val === 'UNACC') ? '' : 'none';
+
+  /* ติ๊กไม่ผ่าน → รูปกลายเป็นของบังคับ · วาดใหม่แค่แถบรูปของข้อนี้ ไม่แตะหน้าอื่น */
+  var pb = document.querySelector('[data-phbox="' + seq + '"]');
+  if (pb){ pb.setAttribute('data-phreq', val === 'UNACC' ? 'hard' : 'soft'); drawPhotoBox(pb); }
+
+  note.textContent = 'กำลังบันทึก…'; note.className = 'accnote wait';
+  google.script.run
+    .withSuccessHandler(function(){
+      note.textContent = '✓ บันทึกแล้ว'; note.className = 'accnote ok';
+      setTimeout(function(){ note.textContent = ''; }, 1400);
+      updateInsBar();
+    })
+    .withFailureHandler(function(e){ note.textContent = (e && e.message) || 'บันทึกไม่สำเร็จ'; note.className = 'accnote bad'; })
+    .saveInspItemField(CURDOC, seq, 'acc', val, AUTH);
+}
+
+/** อัปเดตแถบสรุปด้านบนจากสิ่งที่เห็นบนจอ — ไม่ต้องยิงเซิร์ฟเวอร์ ไม่ต้องวาดใหม่ */
+function updateInsBar(){
+  var cards = document.querySelectorAll('.itemcard.ins');
+  var n = cards.length, acc = 0, un = 0, todo = 0, noPhoto = [];
+  for (var i = 0; i < cards.length; i++){
+    var seq = cards[i].id.replace('inscard_','');
+    if (cards[i].classList.contains('ok')) acc++;
+    else if (cards[i].classList.contains('un')){
+      un++;
+      if (!PHOTOS[seq] || !PHOTOS[seq].length) noPhoto.push(seq);
+    } else todo++;
+  }
+  var bar = $('insbar'); if (!bar) return;
+  bar.className = 'phbar ' + (un && !noPhoto.length ? 'good' : (noPhoto.length ? 'bad' : ''));
+  bar.innerHTML = insBarText(n, acc, un, todo, noPhoto);
+}
+
+function addInspRow(){
+  srv('addInspItem', [CURDOC, AUTH], function(){ go('ins', CURDOC); });
+}
+function delInspRow(seq){
+  if (!confirm('ลบหัวข้อที่ ' + seq + ' ออกจากใบตรวจ?')) return;
+  srv('delInspItem', [CURDOC, seq, AUTH], function(){ go('ins', CURDOC); },
+      function(m){ $('insmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; });
+}
+
+/** ส่งข้อที่ Un-Acc ไปเปิดใบเคลม — รูปตามไปด้วย ไม่ต้องถ่ายซ้ำ */
+function sendToClaim(){
+  var b = $('sendBtn');
+  srv('inspCheck', [CURDOC, AUTH], function(chk){
+    if (!chk.ok){ $('insmsg').innerHTML = '<div class="msg bad">' + esc(chk.msg) + '</div>'; return; }
+    if (!confirm('เปิดใบเคลมจากข้อที่ไม่ผ่าน ' + chk.un + ' ข้อ?\nรูปของแต่ละข้อจะถูกส่งไปด้วย')) return;
+    b.disabled = true; b.textContent = 'กำลังเปิดใบเคลม…';
+    srv('sendUnAccToClaim', [CURDOC, AUTH], function(r){
+      alert('เปิดใบเคลม ' + r.claimNo + ' แล้ว (' + r.n + ' รายการ)');
+      go('claim', r.claimNo);
+    }, function(m){
+      b.disabled = false; b.textContent = '➜ ส่งข้อที่ไม่ผ่านไปเปิดใบเคลม';
+      $('insmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>';
+    });
+  });
+}
+</script>

@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v0.2.0';
+var VERSION = 'v0.3.0';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -729,37 +729,5 @@ function photoCheck(docNo, auth){
   };
 }
 
-/** v0.2.0 — สรุปว่าแต่ละใบมีกี่รายการ กี่รูป และเหลืออีกกี่รายการที่ยังไม่มีรูป
- *  อ่านทีเดียวทั้งชีต แล้วนับในหน่วยความจำ — ไม่วนอ่านทีละใบ (ช้าและกิน quota) */
-function photoCoverage_(){
-  var res = { item:{}, photo:{}, noPhoto:{} };
-  var seen = {};                                   // docNo -> { seq: true }  (รายการที่มีรูปแล้ว)
-  var d = db_();
+/* photoCoverage_ ย้ายไปอยู่ CLAIM-More.js แล้ว (v0.3.0) */
 
-  var lrI = d.items.getLastRow();
-  if (lrI >= 2){
-    var vi = d.items.getRange(2,1,lrI-1,2).getDisplayValues();   // A=เลขที่เอกสาร B=ลำดับ
-    for (var i = 0; i < vi.length; i++){
-      var dn = norm_(vi[i][0]); if (!dn) continue;
-      res.item[dn] = (res.item[dn] || 0) + 1;
-    }
-  }
-
-  var pt = photoTab_(), lrP = pt.getLastRow();
-  if (lrP >= 2){
-    var vp = pt.getRange(2,1,lrP-1,HDR_PHOTO.length).getDisplayValues();
-    for (var k = 0; k < vp.length; k++){
-      if (norm_(vp[k][7]).toUpperCase() === 'N') continue;        // ถูกเอาออกแล้ว
-      var dn2 = norm_(vp[k][0]); if (!dn2) continue;
-      res.photo[dn2] = (res.photo[dn2] || 0) + 1;
-      if (!seen[dn2]) seen[dn2] = {};
-      seen[dn2][norm_(vp[k][1])] = true;
-    }
-  }
-
-  for (var dk in res.item){
-    var have = seen[dk] ? Object.keys(seen[dk]).length : 0;
-    res.noPhoto[dk] = Math.max(0, res.item[dk] - have);
-  }
-  return res;
-}
