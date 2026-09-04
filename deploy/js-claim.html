@@ -388,7 +388,7 @@ function paneClaim(c, docNo){
   t += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
     '<button class="btn ghost" onclick="addClaimRow()">+ เพิ่มรายการ</button>' +
     '<button class="btn ghost" onclick="openMediaFolder()">📁 โฟลเดอร์รูปใน Drive</button>' +
-    '<button class="btn dark" onclick="window.print()">🖨️ ปริ้น / บันทึกเป็น PDF</button></div></div>';
+    '<button class="btn dark" onclick="go(\'print\',CURDOC)">🖨️ ปริ้นเอกสาร</button></div></div>';
 
   t += '<div class="card tight"><div class="cardhd"><h3>รายการที่เคลม (' + c.items.length + ' รายการ)</h3>' +
        '<span class="sub">แก้ในตารางได้เลย บันทึกเอง · ก๊อปจาก Sheets มาวางได้</span>' +

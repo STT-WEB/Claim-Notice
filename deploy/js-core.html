@@ -179,6 +179,13 @@ function go(v, arg){
   if (v === 'list')       return loadList();
   if (v === 'newclaim')   return newClaimForm(arg);
   if (v === 'claim')      return openClaim(arg);
+  if (v === 'print')      return (CLAIM && CLAIM.head['เลขที่เอกสาร'] === arg)
+                                  ? openPrint()
+                                  : srv('getClaimFull', [arg, AUTH], function(c){
+                                      CLAIM = c; FLOW = c.flow || null; CURDOC = arg;
+                                      CURJOB = c.head['เลขที่ JOB'] || ''; PHOTOS = c.photos || {};
+                                      openPrint();
+                                    });
   /* ③ All Data and Report */
   if (v === 'reports')    return loadReportHome();
   if (v === 'repmedia')   return loadRepMedia();
