@@ -78,12 +78,14 @@ function listInspTemplates(){
 }
 
 function inspDb_(){
-  var ss = SpreadsheetApp.openById(dbId_()), be = yearBE_();
-  return {
+  if (_IDB) return _IDB;                    // v0.4.0 — เปิดไฟล์ครั้งเดียวต่อคำสั่ง
+  var ss = ss_(), be = yearBE_();
+  _IDB = {
     ss    : ss,
     head  : ensureTab_(ss, 'INSP_'    + be, HDR_INSP),
     items : ensureTab_(ss, 'INSPIT_'  + be, HDR_INSPIT)
   };
+  return _IDB;
 }
 
 /** เลขที่ INS-YY/NNNN — นับจากชีต INSP ของตัวเอง ไม่ปนกับ CLM */

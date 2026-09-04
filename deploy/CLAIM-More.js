@@ -18,9 +18,10 @@ var HDR_RET = ['เลขที่เอกสาร','ลำดับ','รา�
 
 var CURRENCIES = ['USD','CNY','EUR','GBP'];
 
+var _RT = null;
 function retTab_(){
-  var ss = SpreadsheetApp.openById(dbId_());
-  return ensureTab_(ss, 'RETURN_' + yearBE_(), HDR_RET);
+  if (!_RT) _RT = ensureTab_(ss_(), 'RETURN_' + yearBE_(), HDR_RET);
+  return _RT;
 }
 
 /* ═══════════ บันทึกทีละช่อง (หัวใบเคลม) ═══════════ */
@@ -418,39 +419,252 @@ function reportMedia(auth){
   return out;
 }
 
-/** หน้าแรก 3 กล่อง — นับงานค้างของแต่ละกล่อง (ไม่มีตัวเลขเงิน ทุกคนเห็นหน้านี้) */
+/** หน้าแรก 3 กล่อง — v0.4.0 อ่านทีเดียวจบ
+ *  เดิมเรียก listInspections + listClaims + photoCountByDoc_ ซึ่งแต่ละตัวเปิดไฟล์ใหม่หมด
+ *  ตอนนี้เปิดไฟล์ครั้งเดียว อ่านเฉพาะคอลัมน์ที่ต้องใช้ แล้วนับในหน่วยความจำ */
 function getHome2(auth){
   var me = requireLogin_(auth);
-  var ins = [], clm = [];
-  try { ins = listInspections({}, auth); } catch(e){}
-  try { clm = listClaims({}, auth); } catch(e){}
 
-  var insOpen = 0, insNoPhoto = 0;
-  for (var i = 0; i < ins.length; i++){
-    if (ins[i].todo > 0) insOpen++;
-    if (ins[i].un > 0 && ins[i].nPhoto === 0) insNoPhoto++;
+  var cache = CacheService.getScriptCache();
+  var hit = cache.get('CLAIM_HOME');
+  if (hit){
+    try { var o = JSON.parse(hit); o.name = me.name; o.role = me.role; o.roles = me.roles || []; return o; }
+    catch(e){}
   }
-  var clmOpen = 0, clmNoPhoto = 0;
-  for (var k = 0; k < clm.length; k++){
-    if (clm[k].status !== 'CLOSED') clmOpen++;
-    if (clm[k].nNoPhoto > 0) clmNoPhoto++;
-  }
-  var photos = 0, pc = photoCountByDoc_();
-  for (var d2 in pc) photos += pc[d2];
 
-  return {
+  var d = db_(), di = inspDb_();
+  var out = {
     version:VERSION, name:me.name, role:me.role, roles:me.roles || [], year:yearBE_(),
-    ins:{ total:ins.length, open:insOpen, noPhoto:insNoPhoto },
-    clm:{ total:clm.length, open:clmOpen, noPhoto:clmNoPhoto },
-    rep:{ photos:photos, jobs:reportJobCount_(ins, clm) }
+    ins:{ total:0, open:0, noPhoto:0 },
+    clm:{ total:0, open:0, noPhoto:0 },
+    rep:{ photos:0, jobs:0 }
   };
+  var jobs = {};
+
+  /* ── ใบเคลม: อ่านคอลัมน์ A(เลขที่) G(จ๊อบ) V(สถานะ) พอ ── */
+  var lrC = d.claims.getLastRow();
+  var claimSeq = {};                                   // เลขที่ใบ -> ชุดลำดับรายการ
+  if (lrC > 1){
+    var vc = d.claims.getRange(2,1,lrC-1,22).getDisplayValues();
+    for (var i = 0; i < vc.length; i++){
+      var dn = norm_(vc[i][0]); if (!dn) continue;
+      out.clm.total++;
+      if (norm_(vc[i][21]) !== 'CLOSED') out.clm.open++;
+      var j = norm_(vc[i][6]); if (j) jobs[j] = 1;
+      claimSeq[dn] = {};
+    }
+  }
+  var lrI = d.items.getLastRow();
+  if (lrI > 1){
+    var vi = d.items.getRange(2,1,lrI-1,2).getDisplayValues();
+    for (var k = 0; k < vi.length; k++){
+      var dk = norm_(vi[k][0]);
+      if (claimSeq[dk]) claimSeq[dk][norm_(vi[k][1])] = false;   // false = ยังไม่มีรูป
+    }
+  }
+
+  /* ── ใบตรวจรับ ── */
+  var lrH = di.head.getLastRow();
+  var insDocs = {};
+  if (lrH > 1){
+    var vh = di.head.getRange(2,1,lrH-1,7).getDisplayValues();
+    for (var h = 0; h < vh.length; h++){
+      var dh = norm_(vh[h][0]); if (!dh) continue;
+      out.ins.total++;
+      var jh = norm_(vh[h][5]); if (jh) jobs[jh] = 1;
+      insDocs[dh] = { todo:0, un:0, photo:0 };
+    }
+  }
+  var lrIt = di.items.getLastRow();
+  if (lrIt > 1){
+    var vit = di.items.getRange(2,1,lrIt-1,6).getDisplayValues();
+    for (var t = 0; t < vit.length; t++){
+      var dt = norm_(vit[t][0]); if (!insDocs[dt]) continue;
+      var a = norm_(vit[t][5]).toUpperCase();
+      if (a === 'UNACC') insDocs[dt].un++;
+      else if (a !== 'ACC') insDocs[dt].todo++;
+    }
+  }
+
+  /* ── รูป: อ่านครั้งเดียว ใช้ตอบทั้ง 3 กล่อง ── */
+  var pt = photoTab_(), lrP = pt.getLastRow();
+  if (lrP > 1){
+    var vp = pt.getRange(2,1,lrP-1,8).getDisplayValues();
+    for (var p = 0; p < vp.length; p++){
+      if (norm_(vp[p][7]).toUpperCase() === 'N') continue;
+      var pd = norm_(vp[p][0]); if (!pd) continue;
+      out.rep.photos++;
+      if (claimSeq[pd] && claimSeq[pd][norm_(vp[p][1])] === false) claimSeq[pd][norm_(vp[p][1])] = true;
+      if (insDocs[pd]) insDocs[pd].photo++;
+    }
+  }
+
+  for (var c in claimSeq){
+    var seqs = claimSeq[c], miss = 0;
+    for (var sq in seqs) if (!seqs[sq]) miss++;
+    if (miss) out.clm.noPhoto++;
+  }
+  for (var n in insDocs){
+    if (insDocs[n].todo > 0) out.ins.open++;
+    if (insDocs[n].un > 0 && insDocs[n].photo === 0) out.ins.noPhoto++;
+  }
+  out.rep.jobs = Object.keys(jobs).length;
+
+  cache.put('CLAIM_HOME', JSON.stringify(out), 20);   // 20 วิพอ — กดรีเฟรชแล้วเห็นของใหม่ทันที
+  return out;
 }
-function reportJobCount_(ins, clm){
-  var s = {};
-  for (var i = 0; i < ins.length; i++) if (ins[i].jobNo) s[ins[i].jobNo] = 1;
-  for (var k = 0; k < clm.length; k++) if (clm[k].jobNo) s[clm[k].jobNo] = 1;
-  return Object.keys(s).length;
+
+/** เปิดใบเคลม 1 ใบ — ส่งทุกอย่างกลับในคำสั่งเดียว
+ *  เดิมยิง 3 คำสั่งเรียงกัน (getClaim → listLabour → listReturns) = รอ 3 รอบ
+ *  ทุกรอบของ google.script.run กิน 0.5-1.5 วิ ต่อให้เซิร์ฟเวอร์เร็วแค่ไหนก็ช้าอยู่ดี */
+function getClaimFull(docNo, auth){
+  requireLogin_(auth);
+  var c = getClaim(docNo, auth);
+  if (!c) return null;
+  c.labour  = listLabour(docNo, auth);
+  c.returns = listReturns(docNo, auth);
+  c.vendors = listVendors();
+  return c;
 }
+
+/** เปิดใบตรวจ 1 ใบ — คำสั่งเดียวเหมือนกัน */
+function getInspFull(docNo, auth){
+  requireLogin_(auth);
+  var c = getInspection(docNo, auth);
+  if (!c) return null;
+  c.vendors = listVendors();
+  return c;
+}
+
+/* ═══════════ เติมข้อมูลให้อัตโนมัติในตาราง (v0.4.0) ═══════════
+ * เบียร์: "ถ้าใส่รหัสสินค้า ให้มีหน่วยขึ้นมาเองเลย · ถ้าใส่ PO ให้มีวันที่รับสินค้ามาเลย"
+ * ทำเป็น "ถามทีเดียวทั้งตาราง" ไม่ใช่ถามทีละช่อง — วางทับ 20 แถวก็ยิงคำสั่งเดียว */
+
+/** ทะเบียนสินค้าจาก MASTER แท็บ Data Good Code */
+function goodsMap_(){
+  var cache = CacheService.getScriptCache();
+  var hit = cache.get('CLAIM_GOODS');
+  if (hit){ try { return JSON.parse(hit); } catch(e){} }
+
+  var rows = readTab_(CFG.MASTER, 'Data Good Code') || [];
+  var map = {};
+  if (rows.length){
+    var hr  = findHeaderRow_(rows, ['goodcode','good code','รหัสสินค้า'], 8);
+    var hdr = rows[hr];
+    var iC = colIdx_(hdr, ['goodcode','good code','รหัสสินค้า']);
+    var iN = colIdx_(hdr, ['goodname','good name','ชื่อสินค้า']);
+    var iU = colIdx_(hdr, ['unit','หน่วย']);
+    for (var r = hr + 1; r < rows.length; r++){
+      var code = norm_(iC >= 0 ? rows[r][iC] : ''); if (!code) continue;
+      if (map[code.toUpperCase()]) continue;
+      map[code.toUpperCase()] = { name:norm_(iN >= 0 ? rows[r][iN] : ''),
+                                  unit:norm_(iU >= 0 ? rows[r][iU] : '') };
+    }
+  }
+  try { cache.put('CLAIM_GOODS', JSON.stringify(map), 1800); } catch(e){}   // ใหญ่เกิน cache ก็ไม่เป็นไร
+  return map;
+}
+
+/** ใส่รหัสสินค้ามาเป็นชุด → คืนชื่อ + หน่วย */
+function lookupGoods(codes, auth){
+  requireLogin_(auth);
+  var map = goodsMap_(), out = {};
+  codes = codes || [];
+  for (var i = 0; i < codes.length; i++){
+    var c = norm_(codes[i]).toUpperCase(); if (!c) continue;
+    if (map[c]) out[norm_(codes[i])] = map[c];
+  }
+  return out;
+}
+
+/** ใส่เลข PO มาเป็นชุด → คืนวันรับสินค้า (จาก PO Report ของปีนั้น)
+ *  หาไม่เจอก็ไม่เป็นไร เบียร์พิมพ์วันที่เองได้ ช่องไม่ได้ล็อก */
+function lookupPoDates(pos, auth){
+  requireLogin_(auth);
+  pos = pos || [];
+  var want = {}, years = {};
+  for (var i = 0; i < pos.length; i++){
+    var po = norm_(pos[i]); if (!po) continue;
+    want[po.toUpperCase()] = po;
+    var m = po.match(/(\d\d)\s*\/|-(\d\d)\//);      // POR-69/0123 หรือ 69/0123
+    var yy = m ? (m[1] || m[2]) : '';
+    if (yy) years[2500 + parseInt(yy, 10)] = 1;
+  }
+  if (!Object.keys(want).length) return {};
+  if (!Object.keys(years).length) years[yearBE_()] = 1;
+
+  var out = {};
+  for (var y in years){
+    var fid = POREPORT[y]; if (!fid) continue;
+    var rows;
+    try { rows = readTab_(fid, 'PO Report') || readTab_(fid, 'Sheet1') || []; } catch(e){ continue; }
+    if (!rows.length) continue;
+    var hr  = findHeaderRow_(rows, ['po no','pono','เลขที่ po','por'], 8);
+    var hdr = rows[hr];
+    var iP = colIdx_(hdr, ['po no','pono','เลขที่ po','por']);
+    var iD = colIdx_(hdr, ['วันที่รับ','receive','recv','rr date','วันรับ']);
+    if (iP < 0 || iD < 0) continue;
+    for (var r = hr + 1; r < rows.length; r++){
+      var key = norm_(rows[r][iP]).toUpperCase();
+      if (!want[key] || out[want[key]]) continue;
+      var dt = fmtDMY_(rows[r][iD]);
+      if (dt) out[want[key]] = dt;
+    }
+  }
+  return out;
+}
+
+/* ═══════════ รูปแนบก่อนบันทึก (v0.4.0) ═══════════
+ * เบียร์: "มันควรจะต้องมีให้ใส่รูปเลยไหม" — ต้องแนบรูปได้ตั้งแต่ยังไม่กดบันทึก
+ * ปัญหา: ตอนนั้นยังไม่มีเลขที่เอกสาร แล้วจะผูกรูปกับอะไร
+ * ทางที่เลือก: เก็บชั่วคราวใต้คีย์ DRAFT-xxxx แล้วตอนกดบันทึกค่อยย้ายมาเป็นเลขจริง
+ *   → ไม่ต้องจองเลขเอกสารไว้ล่วงหน้า = เลขที่เอกสารไม่ขาดช่วงถ้าเปิดฟอร์มทิ้งไว้แล้วไม่บันทึก
+ *     (กฎเลขเรียงของเบียร์ยังอยู่ครบ) */
+function newDraftId(){
+  return 'DRAFT-' + Utilities.getUuid().slice(0, 8).toUpperCase();
+}
+
+/** ย้ายรูปที่แนบไว้ตอนร่าง มาเป็นของเอกสารจริง + ย้ายโฟลเดอร์ใน Drive ตามไปด้วย
+ *  seqMap = { รหัสแถวตอนร่าง : ลำดับรายการจริง } — แถวที่เว้นว่างไว้ถูกตัดออกตอนบันทึก
+ *  ลำดับจึงเลื่อน ต้องแปลงให้ตรง ไม่งั้นรูปไปติดผิดรายการ */
+function claimDraftPhotos_(draftId, docNo, jobNo, seqMap, byName){
+  draftId = norm_(draftId); if (!draftId) return 0;
+  seqMap = seqMap || {};
+  var pt = photoTab_(), lr = pt.getLastRow();
+  if (lr < 2) return 0;
+  var v = pt.getRange(2,1,lr-1,HDR_PHOTO.length).getDisplayValues();
+  var n = 0;
+  for (var i = 0; i < v.length; i++){
+    if (norm_(v[i][0]) !== draftId) continue;
+    var newSeq = seqMap[norm_(v[i][1])];
+    if (newSeq == null) continue;                     // แถวนั้นไม่ได้ถูกบันทึก = รูปไม่ต้องย้าย
+    pt.getRange(i + 2, 1).setValue(docNo);
+    pt.getRange(i + 2, 2).setValue(newSeq);
+    n++;
+    try {                                        // ย้ายไฟล์ไปโฟลเดอร์ของเลขจริง
+      var f = DriveApp.getFileById(norm_(v[i][4]));
+      var dest = mediaFolder_(jobNo, docNo);
+      dest.addFile(f);
+      var ps = f.getParents();
+      while (ps.hasNext()){ var pf = ps.next(); if (pf.getId() !== dest.getId()) pf.removeFile(f); }
+    } catch(e){}
+  }
+  if (n) log_('claimDraftPhotos', docNo, draftId + ' → ' + n + ' รูป');
+  return n;
+}
+
+/** เปิดใบแจ้งเคลม พร้อมรูปที่แนบไว้ตั้งแต่ยังไม่บันทึก — จบในคำสั่งเดียว */
+function createClaimWithPhotos(h, draftId, seqMap, auth){
+  var res = createClaim(h, auth);
+  if (res && res.ok && norm_(draftId)){
+    var me = whoAmI_(auth);
+    claimDraftPhotos_(draftId, res.docNo, norm_(h.jobNo).toUpperCase(), seqMap, me.name);
+  }
+  try { CacheService.getScriptCache().remove('CLAIM_HOME'); } catch(e){}
+  return res;
+}
+
+
 
 /** v0.3.0 — แทนที่ตัวเดิม: นับเฉพาะรูปที่ผูกกับ "รายการจริง" ในใบเคลม
  *  ถ้านับรูปของกล่องอื่น (เช่นรูปของที่รับกลับ ซึ่งใช้คีย์ "R") ปนเข้ามา

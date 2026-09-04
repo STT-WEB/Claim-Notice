@@ -128,7 +128,7 @@ function accBar(r){
 /* ─────────── เปิดใบตรวจ (หน้าตรวจจริง) ─────────── */
 function openInspection(docNo){
   busy(true, 'กำลังเปิด ' + docNo + '…');
-  srv('getInspection', [docNo, AUTH], function(c){
+  srv('getInspFull', [docNo, AUTH], function(c){
     if (!c){ $('view').innerHTML = '<div class="msg bad">ไม่พบใบตรวจ ' + esc(docNo) + '</div>'; return; }
     var h = c.head;
     CURDOC = docNo; CURJOB = h['เลขที่ JOB'] || '';
@@ -143,6 +143,8 @@ function openInspection(docNo){
         if (!PHOTOS[String(c.items[i].seq)] || !PHOTOS[String(c.items[i].seq)].length) unNoPhoto.push(c.items[i].seq);
       } else todo++;
     }
+
+    if (c.vendors && c.vendors.length) VENDORS = c.vendors;
 
     var t = '<div class="card noprint"><div class="cardhd">' +
       '<h3>' + esc(h['เลขที่เอกสาร']) + ' — ใบตรวจรับสินค้า</h3>' +
@@ -194,6 +196,7 @@ function openInspection(docNo){
     t += '</div>';
 
     $('view').innerHTML = t;
+    fillVendorList();
     bindAll($('view'), docNo);
     drawAllPhotos();
   });

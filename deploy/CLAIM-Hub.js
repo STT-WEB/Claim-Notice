@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v0.3.0';
+var VERSION = 'v0.4.0';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -344,12 +344,24 @@ var HDR_ACK  = ['เลขที่เอกสาร','ขั้น','บทบ
 
 var HDR_LOG  = ['วันเวลา','ผู้ใช้','การกระทำ','อ้างอิง','รายละเอียด'];
 
+/* ═══ ความเร็ว (v0.4.0) ═══
+ * ปัญหาเดิม: เปิดหน้าแรก 1 ครั้ง ระบบสั่ง SpreadsheetApp.openById() ถึง 6-7 รอบ
+ *   (dbId_ เปิดทิ้งเพื่อเช็คว่าไฟล์มีจริง 1 · db_ 2 ครั้ง · photoTab_ 3 ครั้ง · inspDb_ 1)
+ *   openById แต่ละครั้งกิน 0.5-1.5 วินาที → ยังไม่มีข้อมูลเลยก็ช้าแล้ว
+ * แก้: จำไว้ในตัวแปรกลาง ภายใน 1 คำสั่งเปิดไฟล์ครั้งเดียวพอ
+ *   (ตัวแปรกลางของ Apps Script อยู่แค่ในคำสั่งนั้น คำสั่งถัดไปเริ่มใหม่ = ไม่มีข้อมูลค้าง) */
+var _DBID = null, _SS = null, _DB = null, _IDB = null, _PT = null;
+
+function ss_(){
+  if (!_SS) _SS = SpreadsheetApp.openById(dbId_());
+  return _SS;
+}
+
 function dbId_(){
+  if (_DBID) return _DBID;
   var pr = PropertiesService.getScriptProperties();
   var id = norm_(pr.getProperty(CFG.DB_PROP));
-  if (id){
-    try { SpreadsheetApp.openById(id); return id; } catch(e){ id = ''; }   // ไฟล์ถูกลบ/ย้าย → สร้างใหม่
-  }
+  if (id){ _DBID = id; return id; }        // เชื่อค่าที่เก็บไว้ · ถ้าไฟล์หายจริง openById จะ error ให้เห็นเอง
   var ss = SpreadsheetApp.create(CFG.DB_NAME);
   id = ss.getId();
   try {
@@ -358,6 +370,7 @@ function dbId_(){
     DriveApp.getRootFolder().removeFile(f);
   } catch(e){}
   pr.setProperty(CFG.DB_PROP, id);
+  _DBID = id;
   return id;
 }
 
@@ -376,7 +389,8 @@ function ensureTab_(ss, name, header){
 }
 
 function db_(){
-  var ss = SpreadsheetApp.openById(dbId_());
+  if (_DB) return _DB;
+  var ss = ss_();
   var be = yearBE_();
   var o = {
     ss     : ss,
@@ -386,8 +400,7 @@ function db_(){
     ack    : ensureTab_(ss, 'ACK_'    + be, HDR_ACK),
     log    : ensureTab_(ss, 'LOG',          HDR_LOG)
   };
-  var junk = ss.getSheetByName('Sheet1') || ss.getSheetByName('ชีต1');
-  if (junk && ss.getSheets().length > 1 && junk.getLastRow() === 0){ try { ss.deleteSheet(junk); } catch(e){} }
+  _DB = o;
   return o;
 }
 
@@ -623,9 +636,9 @@ function getDbLink(auth){
 
 var HDR_PHOTO = ['เลขที่เอกสาร','รายการที่','ลำดับรูป','ชื่อไฟล์','file id','ลิงก์รูป','ลิงก์เปิดเต็ม','ใช้งาน','โดย','เมื่อ'];
 
-function photoTab_(){ 
-  var ss = SpreadsheetApp.openById(dbId_());
-  return ensureTab_(ss, 'PHOTOS_' + yearBE_(), HDR_PHOTO);
+function photoTab_(){
+  if (!_PT) _PT = ensureTab_(ss_(), 'PHOTOS_' + yearBE_(), HDR_PHOTO);
+  return _PT;
 }
 
 /** โฟลเดอร์ Drive: รูป-วิดีโอ / <เลขจ๊อบ> / <เลขที่เอกสาร>  (ชื่อโฟลเดอร์ใช้ / ได้ ไม่ต้องแปลง) */

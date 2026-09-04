@@ -227,13 +227,16 @@ function loadHome(){
       ['list', 'ใบเคลมทั้งหมด (' + h.clm.total + ')', 'ghost']
     ], h.clm.open ? ('เคลมค้างอยู่ ' + h.clm.open + ' ใบ') : '');
 
-    t += box('3', '📊', 'All Data and Report', 'ข้อมูลและรายงาน', [
-      '3.1 รูปและวิดีโอทั้งหมด · 3.2 สรุปงานเคลมตามจ๊อบงาน',
-      '3.3 ทะเบียนเอกสาร (ใบตรวจ + ใบเคลม รวมกัน)',
-      '3.4 สรุปต้นทุนการเคลม (เห็นเฉพาะผู้บริหารและจัดซื้อ)'
-    ], [
-      ['reports', 'เข้าดูรายงาน', 'primary']
-    ], h.rep.jobs ? ('มีข้อมูล ' + h.rep.jobs + ' จ๊อบ · รูป ' + h.rep.photos + ' รูป') : '');
+    /* เบียร์: "ไม่ต้องกดเข้าดู มันมี Tab ของมันเลย กดได้จากหน้านี้เลย ดีกว่า"
+       → เอา 4 รายงานมาไว้บนกล่องเลย กดทีเดียวถึงหน้าที่ต้องการ ไม่ต้องผ่านหน้ากลาง */
+    t += '<div class="box"><div class="boxhd"><span class="boxno">3</span><span class="boxic">📊</span>' +
+      '<div><h3>All Data and Report</h3><p>ข้อมูลและรายงาน</p></div></div>' +
+      '<div class="replist">' +
+      replink('repmedia', '3.1', '📷', 'รูปและวิดีโอทั้งหมด', h.rep.photos ? (h.rep.photos + ' รูป') : '') +
+      replink('repjob',   '3.2', '🚛', 'สรุปงานเคลมตามจ๊อบงาน', h.rep.jobs ? (h.rep.jobs + ' จ๊อบ') : '') +
+      replink('repdocs',  '3.3', '🗂️', 'ทะเบียนเอกสาร', (h.ins.total + h.clm.total) ? ((h.ins.total + h.clm.total) + ' ฉบับ') : '') +
+      replink('repcost',  '3.4', '💰', 'สรุปต้นทุนการเคลม', 'ผู้บริหาร / จัดซื้อ') +
+      '</div></div>';
 
     t += '</div>';
 
@@ -251,6 +254,12 @@ function loadHome(){
   });
 }
 
+function replink(v, no, ic, label, right){
+  return '<a class="replink" onclick="go(\'' + v + '\')">' +
+         '<span class="rno">' + no + '</span><span class="ric">' + ic + '</span>' +
+         '<span class="rlb">' + esc(label) + '</span>' +
+         (right ? '<span class="rrt">' + esc(right) + '</span>' : '') + '</a>';
+}
 function kpi(label, n, cls){
   return '<span class="kpi ' + (cls || '') + '"><b>' + n + '</b>' + esc(label) + '</span>';
 }
