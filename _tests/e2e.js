@@ -149,6 +149,27 @@ T('เดินครบวงกลับมาถึงจัดซื้อ A
   call('receiveClaim',[DOC,BUY]);
   return 'ตอนนี้ขั้น '+call('advanceClaim',[DOC,BUY]).stage; });
 
+T('ลายเซ็นขึ้นเองตามคนที่กด', ()=>{
+  const f=call('claimFlow',[DOC,AUTH]);
+  const by={}; f.signs.forEach(s=>by[s.role]=s.text);
+  if(!by['ผู้เปิดใบ']) throw new Error('ไม่มีลายเซ็นผู้เปิดใบ');
+  if(!by['ผู้อนุมัติ']) throw new Error('ไม่มีลายเซ็นผู้อนุมัติ');
+  if(!by['สโตร์'])     throw new Error('ไม่มีลายเซ็นสโตร์');
+  if(by['ผู้เปิดใบ'].split(' · ').length < 2) throw new Error('ลายเซ็นไม่มีแผนก/เวลา');
+  return 'ผู้เปิดใบ: '+by['ผู้เปิดใบ'].slice(0,32)+'… · ครบ '+f.signs.filter(s=>s.text).length+' ช่อง'; });
+T('เมนู 5 แท็บ นับใบค้างถูกช่อง', ()=>{
+  const w=call('workQueues',[AUTH]);
+  const keys=['open','approve','store','buy','close'];
+  for(const k of keys) if(!w.tabs[k]) throw new Error('ไม่มีแท็บ '+k);
+  const sum=keys.reduce((a,k)=>a+w.tabs[k].n,0);
+  if(!sum) throw new Error('ทุกแท็บว่างหมด ทั้งที่มีใบอยู่');
+  return keys.map(k=>k+'='+w.tabs[k].n).join(' · '); });
+T('แท็บบอกได้ว่าอันไหนเป็นงานของคนที่ล็อกอิน', ()=>{
+  const w=call('workQueues',[STORE]);
+  if(!w.tabs.store.mine) throw new Error('สโตร์ควรเห็นว่าแท็บงานสโตร์เป็นของตัวเอง');
+  if(w.tabs.approve.mine) throw new Error('สโตร์ไม่ควรเป็นเจ้าของแท็บอนุมัติ');
+  return 'สโตร์: งานสโตร์=ของฉัน · อนุมัติ=ไม่ใช่'; });
+
 console.log('\n④ เงิน · คำตอบ Supplier · รับของกลับ');
 T('ใส่สกุลเงิน + เรท (ล็อกครั้งเดียว)', ()=>{ call('saveClaimField',[DOC,'currency','USD',BUY]);
   call('saveClaimField',[DOC,'rate','34.85',BUY]); return 'USD 34.85'; });
@@ -240,6 +261,17 @@ T('แผงตรวจคำแปล คืนคำแปลกลับม�
   const r=call('translateCheck',[[{seq:1,th:'วาล์วรั่ว',en:'valve leaking'}],AUTH]);
   if(!r.length || !r[0].back) throw new Error('ไม่มีคำแปลกลับ');
   return 'เทียบได้ '+r.length+' แถว'; });
+
+T('ปิดงาน — QC กดปิดเองไม่ได้ ต้องผู้บริหาร', ()=>{
+  call('advanceClaim',[DOC,BUY]);                       // SUPPLIER -> RETURN
+  try { call('advanceClaim',[DOC,QC]); } catch(e){ return 'กันไว้ถูกแล้ว: '+e.message.slice(0,44)+'…'; }
+  throw new Error('QC ปิดงานเองได้ ทั้งที่ต้องเป็นผู้บริหาร'); });
+T('ผู้บริหารกดปิดงานได้ + มีลายเซ็นผู้ปิดงาน', ()=>{
+  const r=call('advanceClaim',[DOC,AUTH]);
+  const f=call('claimFlow',[DOC,AUTH]);
+  const close=f.signs.filter(s=>s.role==='ผู้ปิดงาน')[0];
+  if(!close || !close.text) throw new Error('ปิดงานแล้วแต่ไม่มีลายเซ็นผู้ปิดงาน');
+  return r.stage+' · '+close.text.slice(0,30)+'…'; });
 
 T('ยกเลิกใบเคลม — คนอื่นกดไม่ได้', ()=>{
   try { call('cancelClaim',[DOC,'ลองยกเลิก',STORE]); } catch(e){ return 'กันไว้ถูกแล้ว'; }

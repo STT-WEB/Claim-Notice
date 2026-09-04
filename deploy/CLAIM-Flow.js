@@ -56,8 +56,10 @@ var STAGES = [
   { key:'RETURN', no:6, name:'รับของกลับ + QC',
     who:'QC / Production',
     roles:['QC','PRODUCTION'],
-    todo:'ถ่ายรูปของที่ได้กลับมา แล้วกด Accept / ไม่ Accept',
-    next:'CLOSED', nextLabel:'✓ ปิดงานเคลม', lineKey:'' },
+    todo:'ถ่ายรูปของที่ได้กลับมา แล้วกด Accept / ไม่ Accept · แล้วให้ผู้บริหารกดปิดงาน',
+    next:'CLOSED', nextLabel:'✓ อนุมัติปิดงาน (ผู้บริหารเท่านั้น)',
+    nextRoles:['ADMIN','APPROVER'],       // เบียร์: ขั้นปิดจบ ผู้บริหารเป็นคนกด
+    lineKey:'' },
 
   { key:'CLOSED', no:7, name:'ปิดงานแล้ว',
     who:'—', roles:[], todo:'งานนี้จบแล้ว', next:'', nextLabel:'', lineKey:'' },
@@ -160,7 +162,37 @@ function canEditField_(curStage, field, map, me, received){
  * ต่อท้ายของเดิม แล้วเติมหัวตารางให้ชีตเก่าอัตโนมัติ (ensureCols_)
  * ⚠️ ห้ามใช้ HDR_CLAIM.length เป็น "คอลัมน์แก้ไขล่าสุด" อีกต่อไป
  *    เพราะพอเพิ่มคอลัมน์ ตัวเลขนั้นจะเลื่อนไปทับคอลัมน์ใหม่ — ใช้ colOf_() แทน */
-var HDR_FLOW = ['ขั้นตอน','รอใครทำ','เหตุผลที่ตีกลับ','ตีกลับโดย','ตีกลับเมื่อ','ประวัติขั้นตอน','ปริ้นส่งออกแล้วเมื่อ','ปริ้นโดย','รับเรื่องเมื่อ','รับเรื่องโดย','เหตุผลยกเลิก'];
+var HDR_FLOW = ['ขั้นตอน','รอใครทำ','เหตุผลที่ตีกลับ','ตีกลับโดย','ตีกลับเมื่อ','ประวัติขั้นตอน',
+  'ปริ้นส่งออกแล้วเมื่อ','ปริ้นโดย','รับเรื่องเมื่อ','รับเรื่องโดย','เหตุผลยกเลิก',
+  /* ลายเซ็น — เบียร์: "ลายเซ็นตั้งแต่ผู้เปิดใบ ผู้อนุมัติ ก็จะขึ้นมาเลย
+     พอถึงสโตร์กด ก็จะมีลายเซ็นสโตร์คนนั้นได้เลย"
+     เก็บเป็นข้อความ "ชื่อ · แผนก · วันเวลา" ช่องละคน ไม่ต้องเซ็นมือ */
+  'ลายเซ็น ผู้เปิดใบ','ลายเซ็น ผู้อนุมัติ','ลายเซ็น สโตร์','ลายเซ็น จัดซื้อ','ลายเซ็น ผู้ปิดงาน'];
+
+var SIGN_SLOT = { REQUEST:'ลายเซ็น ผู้เปิดใบ', APPROVAL:'ลายเซ็น ผู้อนุมัติ',
+                  STORE:'ลายเซ็น สโตร์', PURCHASE:'ลายเซ็น จัดซื้อ', RETURN:'ลายเซ็น ผู้ปิดงาน' };
+
+/** เซ็นชื่อลงช่องของขั้นนั้น — ชื่อ · แผนก · วันเวลา · เซ็นแล้วไม่ทับซ้ำ */
+function signStage_(sh, row, stageKey, me){
+  var col = SIGN_SLOT[norm_(stageKey)];
+  if (!col) return '';
+  var c = colOf_(col);
+  var cur = norm_(sh.getRange(row, c).getDisplayValue());
+  if (cur) return cur;
+  var txt = me.name + (me.dept ? ' · ' + me.dept : '') + ' · ' + nowStamp_();
+  sh.getRange(row, c).setValue(txt);
+  return txt;
+}
+
+/** ลายเซ็นทั้งใบ สำหรับหน้าเว็บและหน้าปริ้น */
+function signsOf_(sh, row){
+  var out = [], keys = ['ลายเซ็น ผู้เปิดใบ','ลายเซ็น ผู้อนุมัติ','ลายเซ็น สโตร์','ลายเซ็น จัดซื้อ','ลายเซ็น ผู้ปิดงาน'];
+  var lab = ['ผู้เปิดใบ','ผู้อนุมัติ','สโตร์','จัดซื้อ','ผู้ปิดงาน'];
+  for (var i = 0; i < keys.length; i++){
+    out.push({ role:lab[i], text:norm_(sh.getRange(row, colOf_(keys[i])).getDisplayValue()) });
+  }
+  return out;
+}
 
 function claimHdr_(){ return HDR_CLAIM.concat(HDR_FLOW); }
 
@@ -243,6 +275,7 @@ function claimFlow(docNo, auth){
     rejectBy:   norm_(d.claims.getRange(r, colOf_('ตีกลับโดย')).getDisplayValue()),
     rejectAt:   norm_(d.claims.getRange(r, colOf_('ตีกลับเมื่อ')).getDisplayValue()),
     history:    norm_(d.claims.getRange(r, colOf_('ประวัติขั้นตอน')).getDisplayValue()),
+    signs: signsOf_(d.claims, r),
     printedAt:  norm_(d.claims.getRange(r, colOf_('ปริ้นส่งออกแล้วเมื่อ')).getDisplayValue()),
     printedBy:  norm_(d.claims.getRange(r, colOf_('ปริ้นโดย')).getDisplayValue()),
     stages: STAGES.filter(function(s){ return !s.hidden; })
@@ -290,6 +323,7 @@ function receiveClaim(docNo, auth){
 
   d.claims.getRange(r, colOf_('รับเรื่องเมื่อ')).setValue(nowStamp_());
   d.claims.getRange(r, colOf_('รับเรื่องโดย')).setValue(me.name);
+  signStage_(d.claims, r, key, me);          // กดรับ = เซ็นชื่อทันที เบียร์สั่งไว้
   var hist = norm_(d.claims.getRange(r, colOf_('ประวัติขั้นตอน')).getDisplayValue());
   d.claims.getRange(r, colOf_('ประวัติขั้นตอน'))
    .setValue((hist ? hist + '\n' : '') + nowStamp_() + ' · ' + st.name + ' · ' + me.name + ' · รับเรื่องแล้ว');
@@ -332,11 +366,12 @@ function advanceClaim(docNo, auth){
   if (!st.next) throw new Error('เอกสารนี้ปิดงานแล้ว');
 
   var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
-  if (mine.indexOf('ADMIN') < 0){
-    var ok = false;
-    for (var i = 0; i < mine.length; i++) if (st.roles.indexOf(mine[i]) >= 0) ok = true;
-    if (!ok) throw new Error('ขั้นนี้เป็นหน้าที่ของ ' + st.who + ' — สิทธิ์ของคุณคือ ' + mine.join(', '));
-  }
+  var allow = st.nextRoles || st.roles;          // บางขั้น คนกดส่งต่อไม่ใช่คนเดียวกับคนกรอก
+  var ok = (!st.nextRoles) && mine.indexOf('ADMIN') >= 0;
+  for (var i = 0; i < mine.length; i++) if (allow.indexOf(mine[i]) >= 0) ok = true;
+  if (!ok) throw new Error(st.nextRoles
+      ? 'ขั้นนี้ต้องให้ผู้บริหารเป็นคนกด — สิทธิ์ของคุณคือ ' + mine.join(', ')
+      : 'ขั้นนี้เป็นหน้าที่ของ ' + st.who + ' — สิทธิ์ของคุณคือ ' + mine.join(', '));
 
   if (st.needReceive && !norm_(d.claims.getRange(r, colOf_('รับเรื่องเมื่อ')).getDisplayValue()))
     throw new Error('ยังไม่ได้กด "' + st.receiveLabel + '" — ต้องกดรับก่อนถึงจะส่งต่อได้');
@@ -344,6 +379,7 @@ function advanceClaim(docNo, auth){
   var miss = claimMissing_(d, docNo, key);
   if (miss.length) throw new Error('ยังส่งต่อไม่ได้ — ' + miss.join(' · '));
 
+  signStage_(d.claims, r, key, me);          // เซ็นชื่อขั้นที่เพิ่งทำเสร็จ
   setStage_(d.claims, r, st.next, me, '');
   d.claims.getRange(r, colOf_('เหตุผลที่ตีกลับ')).setValue('');    // ส่งต่อได้ = เคลียร์เหตุผลเดิม
 

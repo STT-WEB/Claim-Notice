@@ -267,18 +267,25 @@ function blkReplyBox(){
 
 function blkSign(h){
   var f = CLAIM.flow;
-  var cells = [
-    ['ผู้ขอเคลม', h['ผู้ขอเคลม'], h['แผนก']],
-    ['สโตร์', '', ''],
-    ['จัดซื้อ', '', ''],
-    ['ผู้อนุมัติ', '', '']
-  ];
+  /* เบียร์: "ลายเซ็นตั้งแต่ผู้เปิดใบ ผู้อนุมัติ ก็จะขึ้นมาเลย พอถึงสโตร์กด ก็จะมีลายเซ็นสโตร์คนนั้น"
+     → ใครกดรับ/อนุมัติ/ส่งต่อไปแล้ว ชื่อ-แผนก-วันเวลาขึ้นบนเอกสารเอง
+       คนที่ยังไม่ถึงคิว เว้นเส้นให้เซ็นมือไว้เหมือนเดิม */
+  var signs = (f && f.signs) ? f.signs : [];
+  var cells = [];
+  for (var k = 0; k < signs.length; k++){
+    var parts = String(signs[k].text || '').split(' · ');
+    cells.push([signs[k].role, parts[0] || '', parts.length > 2 ? parts[1] : '', parts[parts.length - 1] || '']);
+  }
+  if (!cells.length){
+    cells = [['ผู้ขอเคลม', h['ผู้ขอเคลม'], h['แผนก'], ''], ['ผู้อนุมัติ','','',''],
+             ['สโตร์','','',''], ['จัดซื้อ','','',''], ['ผู้ปิดงาน','','','']];
+  }
   var t = '<div class="blk"><div class="sg manual">';
   for (var i = 0; i < cells.length; i++){
-    t += '<div><div class="role">' + cells[i][0] + '</div>' +
+    t += '<div><div class="role">' + esc(cells[i][0]) + '</div>' +
          (cells[i][1] ? '<div class="nm">' + esc(cells[i][1]) + '</div><div class="ps">' + esc(cells[i][2]) + '</div>'
                       : '<div class="ln">ลงชื่อ</div>') +
-         '<div class="dt">วันที่ ______________</div></div>';
+         '<div class="dt">' + (cells[i][3] ? esc(cells[i][3]) : 'วันที่ ______________') + '</div></div>';
   }
   t += '</div></div>';
   if (f && f.history && isInternal()){

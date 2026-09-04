@@ -631,4 +631,30 @@ input.locked,textarea.locked,select.locked{
          color:#8b929a; margin-right:6px; }
 .trsl.back{ color:#8f130c; }
 @media (max-width:820px){ .trside{ width:100%; max-width:100%; } }
+
+/* ═══ เมนู 5 แท็บหน้าแรก (v1.0.0) — เบียร์: "ทำเหมือน NOVA เลย" ═══ */
+.wtabs{ display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 12px; }
+.wtab{ flex:1 1 180px; display:flex; align-items:center; gap:8px; cursor:pointer;
+       background:#fff; border:1px solid var(--line); border-radius:11px; padding:11px 13px;
+       text-align:left; font-family:inherit; }
+.wtab:hover{ border-color:#b9c0c8; }
+.wtab.on{ border-color:var(--red); box-shadow:0 0 0 2px rgba(226,35,26,.10); }
+.wtab .wno{ font-size:17px; color:#9aa3ad; }
+.wtab.on .wno{ color:var(--red); }
+.wtab .wnm{ font-size:13px; font-weight:700; color:#374151; flex:1; }
+.wtab.on .wnm{ color:#111; }
+.wtab.mine .wnm:after{ content:' ✋'; }
+.wtab .wct{ min-width:24px; text-align:center; font-size:12px; font-weight:700; color:#9aa3ad;
+            background:#f2f4f6; border-radius:20px; padding:2px 7px; }
+.wtab .wct.has{ background:var(--red); color:#fff; }
+.wnote{ font-size:12px; color:#374151; background:#f6fbff; border:1px solid #cfe4f5;
+        border-radius:8px; padding:8px 11px; margin-bottom:10px; line-height:1.6; }
+.wnote.notmine{ background:#fafbfc; border-color:var(--line); color:#6b7280; }
+/* ลายเซ็นบนใบ */
+.signrow{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+.signbox{ flex:1 1 170px; border:1px solid var(--line); border-radius:9px; padding:9px 11px; }
+.signbox i{ display:block; font-style:normal; font-size:10.5px; color:#8b929a; margin-bottom:3px; }
+.signbox b{ display:block; font-size:12px; color:#111; font-weight:600; line-height:1.5; }
+.signbox.wait b{ color:#b9bec5; font-weight:400; }
+@media (max-width:820px){ .wtab{ flex:1 1 100%; } }
 </style>

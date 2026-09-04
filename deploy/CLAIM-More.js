@@ -701,14 +701,59 @@ function claimDraftPhotos_(draftId, docNo, jobNo, seqMap, byName){
 }
 
 /** เปิดใบแจ้งเคลม พร้อมรูปที่แนบไว้ตั้งแต่ยังไม่บันทึก — จบในคำสั่งเดียว */
-function createClaimWithPhotos(h, draftId, seqMap, auth){
+/** submit = true → บันทึกแล้วส่งขออนุมัติต่อเลยในคำสั่งเดียว
+ *  เบียร์: "มีปุ่มบันทึกร่าง และปุ่มส่งอนุมัติได้เลย" */
+function createClaimWithPhotos(h, draftId, seqMap, auth, submit){
   var res = createClaim(h, auth);
   if (res && res.ok && norm_(draftId)){
     var me = whoAmI_(auth);
     claimDraftPhotos_(draftId, res.docNo, norm_(h.jobNo).toUpperCase(), seqMap, me.name);
   }
+  if (res && res.ok && submit){
+    try { advanceClaim(res.docNo, auth); res.submitted = true; }
+    catch(e){ res.submitted = false; res.submitMsg = e.message; }   // บันทึกแล้ว แต่ยังส่งไม่ได้ บอกเหตุผล
+  }
   try { CacheService.getScriptCache().remove('CLAIM_HOME'); } catch(e){}
   return res;
+}
+
+/* ═══ เมนู 5 แท็บแบบ NOVA (v1.0.0) ═══════════════════════════
+ * เบียร์: "มี Tab เปิดใบขอเคลม · Tab อนุมัติ · Tab งานสโตร์ · Tab งานจัดซื้อ · Tab อนุมัติปิดจบ"
+ * แต่ละแท็บ = ใบที่ค้างอยู่ที่ขั้นนั้น · ตัวเลขบนแท็บ = จำนวนใบที่รอคุณทำ                */
+var TAB_STAGES = {
+  open   : ['REQUEST'],
+  approve: ['APPROVAL'],
+  store  : ['STORE'],
+  buy    : ['PURCHASE','SUPPLIER'],
+  close  : ['RETURN','CLOSED']
+};
+var TAB_ROLES = {
+  open   : ['PRODUCTION','SALES','QC','DESIGN'],
+  approve: ['APPROVER'],
+  store  : ['STORE','PURCHASE'],
+  buy    : ['PURCHASE','STORE'],
+  close  : ['ADMIN','APPROVER','QC','PRODUCTION']
+};
+
+/** ใบที่ค้างอยู่ในแต่ละแท็บ — คำสั่งเดียวได้ครบทั้ง 5 แท็บ ไม่ต้องยิงทีละแท็บ */
+function workQueues(auth){
+  var me = requireLogin_(auth);
+  var rows = listClaims({}, auth);            // listClaims ซ่อนใบร่างของคนอื่นให้แล้ว
+  var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
+  var isAdmin = mine.indexOf('ADMIN') >= 0;
+
+  var out = { me:me.name, dept:me.dept || '', roles:mine, tabs:{} };
+  for (var t in TAB_STAGES){
+    var list = [];
+    for (var i = 0; i < rows.length; i++){
+      if (TAB_STAGES[t].indexOf(rows[i].stage) < 0) continue;
+      list.push(rows[i]);
+    }
+    var can = isAdmin;
+    for (var k = 0; k < mine.length; k++) if (TAB_ROLES[t].indexOf(mine[k]) >= 0) can = true;
+    out.tabs[t] = { n:list.length, mine:can, rows:list.slice(0, 200) };
+  }
+  return out;
 }
 
 

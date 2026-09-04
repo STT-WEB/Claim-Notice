@@ -11,7 +11,7 @@
    วิธีแก้: ฝังเลขเวอร์ชันไว้ในไฟล์หน้าเว็บเองด้วย (CLIENT_VER ข้างล่างนี้)
    ถ้า 2 ค่าไม่ตรงกัน = จอที่เห็นเป็นของเก่าแน่นอน ระบบจะขึ้นแถบแดงบอกให้กด Ctrl+Shift+R
    ⚠️ แก้ไฟล์หน้าเว็บทุกครั้ง ต้องเลื่อน CLIENT_VER ให้ตรงกับ VERSION ใน CLAIM-Hub.js */
-var CLIENT_VER = 'v0.9.2';
+var CLIENT_VER = 'v1.0.0';
 
 var AUTH = null;        // {emp, pin} — อยู่ในหน่วยความจำหน้าเว็บเท่านั้น ไม่เก็บลงเครื่อง
 var ME   = null;
@@ -257,80 +257,91 @@ function go(v, arg){
 var HOME_LAST = null;
 var STAGES_C = null;      // รายชื่อขั้นตอนใบเคลม จากเซิร์ฟเวอร์ — ห้ามเขียนซ้ำในหน้าเว็บ
 var STAGES_I = null;      // รายชื่อขั้นตอนใบตรวจรับ จากเซิร์ฟเวอร์
+var KPI_LAST = null;
 function loadHome(){
-  if (HOME_LAST){ drawHome(HOME_LAST, true); }        // มีของเก่า = ขึ้นทันที ไม่ต้องรอ
+  if (HOME_LAST) drawWork(HOME_LAST, true);
   else busy(true, 'กำลังเปิดหน้าแรก…');
+  srv('workQueues', [AUTH], function(w){
+    HOME_LAST = w;
+    if (CURVIEW === 'home') drawWork(w, false);
+  });
+  /* ดึงรายชื่อขั้นตอน + ตัวเลขรวมมาเก็บไว้เงียบ ๆ ใช้ในหน้าอื่น */
   srv('getHome2', [AUTH], function(h){
-    HOME_LAST = h;
+    KPI_LAST = h;
     if (h.stages && h.stages.length) STAGES_C = h.stages;
     if (h.insStages && h.insStages.length) STAGES_I = h.insStages;
-    if (CURVIEW === 'home') drawHome(h, false);
+    if (CURVIEW === 'home' && HOME_LAST) drawWork(HOME_LAST, false);
   });
 }
-function drawHome(h, stale){
-  (function(h){
-    $('verBadge').textContent = CLIENT_VER;   // เวอร์ชันของหน้าจอ ไม่ใช่ของเซิร์ฟเวอร์
-    if (h.version && h.version !== CLIENT_VER) checkVer(h.version);
-    var rs = (h.roles && h.roles.length) ? h.roles.join(' · ') : h.role;
 
-    var t = '';
-    /* แถบ KPI เล็ก ๆ — เบียร์: "ทำเป็นกล่องเล็กๆ พอ และต้นทุนเคลมเอาออกไปเลย" */
-    t += '<div class="kpirow">' +
-      kpi('ใบตรวจรับ', h.ins.total) +
-      kpi('ตรวจยังไม่จบ', h.ins.open, h.ins.open ? 'warn' : '') +
-      kpi('ใบเคลม', h.clm.total) +
-      kpi('เคลมยังไม่ปิด', h.clm.open, h.clm.open ? 'warn' : '') +
-      kpi('ใบที่รูปยังไม่ครบ', h.clm.noPhoto + h.ins.noPhoto, (h.clm.noPhoto + h.ins.noPhoto) ? 'bad' : '') +
-      kpi('รูปในระบบ', h.rep.photos) +
-      '<span class="kpiwho">' + esc(h.name) + ' · ' + esc(rs) + ' · ปี ' + h.year + '</span>' +
-      '</div>';
+/* ═══ หน้าแรก = เมนู 5 แท็บ ตามที่เบียร์สั่ง (ทำเหมือน NOVA) ═══ */
+var WTAB = 'open';
+var WTABS = [
+  ['open',    '①', 'เปิดใบขอเคลม',  'ทีมงานกรอก · บันทึกร่าง แล้วส่งอนุมัติ'],
+  ['approve', '②', 'อนุมัติใบเคลม',  'ผู้บังคับบัญชา รับเอกสาร → ส่งให้สโตร์'],
+  ['store',   '③', 'งานสโตร์',       'รับเรื่อง → เลขใบส่งมอบ · PO · Supplier'],
+  ['buy',     '④', 'งานจัดซื้อ',     'รับเอกสาร → ตรวจ → ส่ง Supplier'],
+  ['close',   '⑤', 'อนุมัติ ปิดจบ',  'รับของกลับ + QC → ผู้บริหารกดปิดงาน']
+];
+function goTab(k){ WTAB = k; if (HOME_LAST) drawWork(HOME_LAST, false); }
 
-    t += '<div class="boxes">';
+function drawWork(w, stale){
+  var t = '<div class="card tight"><div class="cardhd"><h3>งานเคลม</h3>' +
+    '<span class="sub">' + esc(w.me || '') + (w.dept ? ' · ' + esc(w.dept) : '') + '</span>' +
+    '<button class="btn ghost" onclick="go(\'inslist\')">🔍 ใบตรวจรับสินค้า</button>' +
+    '<button class="btn ghost" onclick="go(\'reports\')">📊 รายงาน</button>' +
+    '<button class="btn primary" onclick="go(\'newclaim\')">+ เปิดใบขอเคลมใหม่</button></div>';
 
-    t += box('1', '🔍', 'Inspection', 'ตรวจรับสินค้า', [
-      'ตรวจทีละหัวข้อ ติ๊ก Acc / Un-Acc พร้อมถ่ายรูปทุกข้อ',
-      'ใช้ได้ทั้งงานต่างประเทศและงานในประเทศที่ต้องตรวจเฉพาะ',
-      'ข้อที่ Un-Acc กดส่งไปเปิดใบเคลมได้เลย รูปตามไปด้วย'
-    ], [
-      ['newins', '+ เปิดใบตรวจรับใหม่', 'primary'],
-      ['inslist', 'ใบตรวจทั้งหมด (' + h.ins.total + ')', 'ghost']
-    ], h.ins.open ? ('ตรวจค้างอยู่ ' + h.ins.open + ' ใบ') : '');
+  t += '<div class="wtabs">';
+  for (var i = 0; i < WTABS.length; i++){
+    var k = WTABS[i][0], q = (w.tabs && w.tabs[k]) || { n:0, mine:false };
+    t += '<button class="wtab' + (WTAB === k ? ' on' : '') + (q.mine ? ' mine' : '') + '" onclick="goTab(\'' + k + '\')">' +
+      '<span class="wno">' + WTABS[i][1] + '</span>' +
+      '<span class="wnm">' + esc(WTABS[i][2]) + '</span>' +
+      '<span class="wct' + (q.n ? ' has' : '') + '">' + q.n + '</span></button>';
+  }
+  t += '</div>';
 
-    t += box('2', '📋', 'Claim', 'งานเคลม', [
-      'เอกสารใบเดียว 4 แท็บ : แจ้งเคลม → คำตอบ Supplier → เรียกเก็บเงิน → รับของกลับ',
-      'ใบแจ้งเคลมรอบแรกไม่มีเรื่องราคา · ราคาใส่ทีหลังตอนออกใบเรียกเก็บ',
-      'ทุกรายการต้องมีรูปหลักฐาน ไม่มีรูปส่งเคลมไม่ได้'
-    ], [
-      ['newclaim', '+ เปิดใบแจ้งเคลมใหม่', 'primary'],
-      ['list', 'ใบเคลมทั้งหมด (' + h.clm.total + ')', 'ghost']
-    ], h.clm.open ? ('เคลมค้างอยู่ ' + h.clm.open + ' ใบ') : '');
+  var cur = (w.tabs && w.tabs[WTAB]) || { n:0, rows:[], mine:false };
+  var meta = null;
+  for (var m = 0; m < WTABS.length; m++) if (WTABS[m][0] === WTAB) meta = WTABS[m];
+  t += '<div class="wnote' + (cur.mine ? '' : ' notmine') + '">' +
+       (cur.mine ? '✋ <b>แท็บนี้เป็นงานของคุณ</b> — ' : '👁 <b>แท็บนี้ไม่ใช่หน้าที่คุณ</b> ดูได้อย่างเดียว — ') +
+       esc(meta[3]) + '</div>';
 
-    /* เบียร์: "ไม่ต้องกดเข้าดู มันมี Tab ของมันเลย กดได้จากหน้านี้เลย ดีกว่า"
-       → เอา 4 รายงานมาไว้บนกล่องเลย กดทีเดียวถึงหน้าที่ต้องการ ไม่ต้องผ่านหน้ากลาง */
-    t += '<div class="box"><div class="boxhd"><span class="boxno">3</span><span class="boxic">📊</span>' +
-      '<div><h3>All Data and Report</h3><p>ข้อมูลและรายงาน</p></div></div>' +
-      '<div class="replist">' +
-      replink('repmedia', '3.1', '📷', 'รูปและวิดีโอทั้งหมด', h.rep.photos ? (h.rep.photos + ' รูป') : '') +
-      replink('repjob',   '3.2', '🚛', 'สรุปงานเคลมตามจ๊อบงาน', h.rep.jobs ? (h.rep.jobs + ' จ๊อบ') : '') +
-      replink('repdocs',  '3.3', '🗂️', 'ทะเบียนเอกสาร', (h.ins.total + h.clm.total) ? ((h.ins.total + h.clm.total) + ' ฉบับ') : '') +
-      replink('repcost',  '3.4', '💰', 'สรุปต้นทุนการเคลม', 'ผู้บริหาร / จัดซื้อ') +
-      '</div></div>';
-
-    t += '</div>';
-
-    if (!h.ins.total && !h.clm.total){
-      t += '<div class="card"><h3>ระบบยังว่างอยู่ — เริ่มยังไงดี</h3>' +
-        '<ol class="steps">' +
-        '<li>งานที่ต้อง <b>ตรวจรับก่อน</b> (แท็งค์นำเข้า หรือสินค้าที่ต้องตรวจเฉพาะ) → กด <b>เปิดใบตรวจรับใหม่</b> ' +
-            'ระบบจะดึงหัวข้อตรวจจากแม่แบบมาให้ ตรวจแล้วติ๊ก Acc / Un-Acc ถ่ายรูปทุกข้อ ' +
-            'ข้อที่ Un-Acc กดส่งไปเปิดใบเคลมได้ทันที</li>' +
-        '<li>งานที่ <b>รู้อยู่แล้วว่าจะเคลมอะไร</b> (เจอปัญหาหลังส่งมอบ) → กด <b>เปิดใบแจ้งเคลมใหม่</b> ได้เลย ไม่ต้องผ่านใบตรวจ</li>' +
-        '<li>ทุกใบต้อง <b>แนบรูป</b> ก่อนถึงจะส่งเคลมได้ — รูปคือหลักฐาน</li>' +
-        '</ol></div>';
+  if (!cur.rows.length){
+    t += '<div class="empty">ยังไม่มีใบค้างในขั้นนี้' +
+         (WTAB === 'open' ? '<br><span>กด “+ เปิดใบขอเคลมใหม่” เพื่อเริ่มใบแรก</span>' : '') + '</div>';
+  } else {
+    t += '<table class="t"><thead><tr><th style="width:120px">เลขที่</th><th style="width:84px">วันที่</th>' +
+      '<th style="width:112px">เลขที่ JOB</th><th>ชื่อลูกค้า</th>' +
+      '<th style="width:170px">ขั้นตอนตอนนี้</th><th style="width:150px">รอใครทำ</th>' +
+      '<th style="width:74px">รูป</th><th style="width:120px">ผู้เปิดใบ</th></tr></thead><tbody>';
+    for (var r = 0; r < cur.rows.length; r++){
+      var x = cur.rows[r];
+      t += '<tr style="cursor:pointer" onclick="go(\'claim\',\'' + esc(x.docNo) + '\')">' +
+        '<td><b>' + esc(x.docNo) + '</b></td><td class="c">' + esc(x.date) + '</td>' +
+        '<td>' + esc(x.jobNo) + '</td><td>' + esc(x.jobName) + '</td>' +
+        '<td><span class="pill">' + x.stageNo + ' · ' + esc(x.stageName) + '</span></td>' +
+        '<td class="hint">' + esc(x.waitWho || '') + '</td>' +
+        '<td class="c">' + (x.nNoPhoto ? '<span class="pill red">ขาด ' + x.nNoPhoto + '</span>'
+                                       : '<span class="pill green">ครบ</span>') + '</td>' +
+        '<td>' + esc(x.by) + '</td></tr>';
     }
-    if (stale) t += '<div class="hint" style="margin-top:8px"><span class="spin"></span> กำลังอัปเดตตัวเลขล่าสุด…</div>';
-    $('view').innerHTML = t;
-  })(h);
+    t += '</tbody></table>';
+  }
+  t += '</div>';
+
+  var h = KPI_LAST;
+  if (h){
+    t += '<div class="kpirow">' +
+      kpi('ใบตรวจรับ', h.ins.total) + kpi('ตรวจยังไม่จบ', h.ins.open, h.ins.open ? 'warn' : '') +
+      kpi('ใบเคลม', h.clm.total) + kpi('เคลมยังไม่ปิด', h.clm.open, h.clm.open ? 'warn' : '') +
+      kpi('ใบที่รูปยังไม่ครบ', h.clm.noPhoto + h.ins.noPhoto, (h.clm.noPhoto + h.ins.noPhoto) ? 'bad' : '') +
+      kpi('รูปในระบบ', h.rep.photos) + '</div>';
+  }
+  if (stale) t += '<div class="hint"><span class="spin"></span> กำลังอัปเดตตัวเลขล่าสุด…</div>';
+  $('view').innerHTML = t;
 }
 
 function replink(v, no, ic, label, right){

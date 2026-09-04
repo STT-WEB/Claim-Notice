@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v0.9.2';
+var VERSION = 'v1.0.0';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -568,6 +568,10 @@ function createClaim(h, auth){
     '', me.name, nowStamp_(), nowStamp_()
   ];
   d.claims.appendRow(row);
+  ensureCols_(d.claims, claimHdr_());
+  var nr = findClaimRow_(d.claims, docNo);
+  setStage_(d.claims, nr, 'REQUEST', me, 'เปิดใบ');
+  signStage_(d.claims, nr, 'REQUEST', me);      // ลายเซ็นผู้เปิดใบ ขึ้นตั้งแต่วินาทีแรก
   saveItems_(d, docNo, h.items || []);
   log_('createClaim', docNo, norm_(h.jobNo));
   return { ok:true, docNo:docNo };

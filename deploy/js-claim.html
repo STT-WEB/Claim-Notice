@@ -49,7 +49,8 @@ function newClaimForm(){
   var t = '';
   t += '<div class="card tight"><div class="cardhd"><h3>เปิดใบแจ้งเคลม (ใบใหม่)</h3>' +
        '<span class="sub">กรอกของตัวเองให้ครบ + แนบรูป · ช่องของสโตร์ยังไม่ต้องกรอก · บันทึกเป็นร่างไว้ก่อนได้</span>' +
-       '<button class="btn primary" id="saveBtn" onclick="submitClaim()">💾 บันทึกเป็นร่าง</button></div>';
+       '<button class="btn ghost" id="draftBtn" onclick="submitClaim(0)">💾 บันทึกร่าง</button>' +
+       '<button class="btn primary" id="saveBtn" onclick="submitClaim(1)">📤 บันทึก + ส่งอนุมัติ</button></div>';
   t += flowBarNew();
   t += '<div id="fmsg"></div>';
   t += '<div class="whokey">' +
@@ -154,6 +155,17 @@ function jobTypeOf(jobNo){
   return m ? m[1] : '';
 }
 /** สถานะเป็นผลของขั้นตอน ไม่ใช่ของที่ใครมาเลือกเอง (เบียร์ถามว่าใครเป็นคนเปลี่ยน) */
+/** ลายเซ็นตามขั้นตอน — ขึ้นเองเมื่อแต่ละคนกดรับ/อนุมัติ/ส่งต่อ ไม่ต้องเซ็นมือ */
+function signRow(signs){
+  if (!signs || !signs.length) return '';
+  var t = '<div class="signrow">';
+  for (var i = 0; i < signs.length; i++){
+    t += '<div class="signbox' + (signs[i].text ? '' : ' wait') + '">' +
+         '<i>' + esc(signs[i].role) + '</i><b>' + esc(signs[i].text || '— ยังไม่ถึงขั้นนี้ —') + '</b></div>';
+  }
+  return t + '</div>';
+}
+
 function statusText(v){
   var m = { DRAFT:'ร่าง / กำลังเตรียมข้อมูล', SENT:'ส่ง Supplier แล้ว รอคำตอบ',
             REPLIED:'Supplier ตอบแล้ว · ของกลับมา', BILLED:'ออกใบเรียกเก็บแล้ว', CLOSED:'ปิดงานแล้ว' };
@@ -304,9 +316,16 @@ function jobLookup(){
   }, function(m){ $('fmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; });
 }
 
-function submitClaim(){
-  /* ช่องบังคับกรอกก่อนเป็นอันดับแรก — บอกให้ครบทีเดียวพร้อมกรอบแดง
-     ไม่ใช่ให้เบียร์กดแล้วรู้ทีละช่อง กดใหม่แล้วรู้อีกช่อง */
+/** submit = 0 บันทึกร่าง (ข้อมูลไม่ครบก็เก็บไว้ได้) · 1 บันทึกแล้วส่งขออนุมัติเลย
+ *  เบียร์: "ข้อมูลไม่ครบ ... พอกรอกเสร็จ คือมีปุ่มบันทึกร่าง และปุ่มส่งอนุมัติได้เลย" */
+function submitClaim(submit){
+  if (!submit){                                  // ── บันทึกร่าง: ขอแค่เลขจ๊อบ ──
+    var j = $('f_jobNo').value.trim();
+    if (!j){ $('fmsg').innerHTML = '<div class="msg bad">อย่างน้อยต้องใส่ <b>เลขที่ JOB</b> ก่อน ระบบถึงจะออกเลขเอกสารให้ได้</div>';
+             window.scrollTo(0,0); return; }
+    return sendClaim(0);
+  }
+  /* ── ส่งอนุมัติ: ต้องครบทุกอย่าง บอกทีเดียวพร้อมกรอบแดง ── */
   var need = missingFields();
   if (need.length){
     $('fmsg').innerHTML = '<div class="msg bad">ยังไม่ได้กรอก: <b>' + esc(need.join(' · ')) + '</b>' +
@@ -315,10 +334,8 @@ function submitClaim(){
     window.scrollTo(0, 0);
     return;
   }
-  var jobNo = $('f_jobNo').value.trim();
-
-  var rows = gridFilledRows(GNEW.id);
-  if (!rows.length){ $('fmsg').innerHTML = '<div class="msg bad">ต้องมีรายการที่เคลมอย่างน้อย 1 รายการ</div>'; return; }
+  var rows0 = gridFilledRows(GNEW.id);
+  if (!rows0.length){ $('fmsg').innerHTML = '<div class="msg bad">ต้องมีรายการที่เคลมอย่างน้อย 1 รายการ</div>'; return; }
 
   /* รูปคือหลักฐาน — เช็คตรงนี้ก่อนส่ง จะได้ไม่ต้องไปแก้ทีหลัง */
   var miss = gridPhotoMissing(GNEW.id);
@@ -327,7 +344,12 @@ function submitClaim(){
     window.scrollTo(0, 0);
     return;
   }
+  sendClaim(1);
+}
 
+/** ส่งขึ้นเซิร์ฟเวอร์จริง — ใช้ร่วมกันทั้งปุ่มบันทึกร่างและปุ่มส่งอนุมัติ */
+function sendClaim(submit){
+  var rows = gridFilledRows(GNEW.id);
   /* แถวที่เว้นว่างถูกตัดออก ลำดับจึงเลื่อน — ส่งตารางแปลงลำดับไปด้วย ไม่งั้นรูปไปติดผิดรายการ */
   var seqMap = {};
   for (var i = 0; i < rows.length; i++) seqMap[rows[i]._rid] = i + 1;
@@ -336,21 +358,28 @@ function submitClaim(){
     claimType : $('f_claimType').value,
     area      : $('f_area').value,
     foreignKind : ($('f_area').value === 'for') ? $('f_foreignKind').value : '',
-    jobNo:jobNo, jobName:$('f_jobName').value, model:$('f_model').value,
+    jobNo: $('f_jobNo').value.trim(), jobName:$('f_jobName').value, model:$('f_model').value,
     chassisStt:$('f_chassisStt').value, chassisMaker:$('f_chassisMaker').value,
     serialNo:$('f_serialNo').value, jmc:$('f_jmc').value,
     deliveryNote:$('f_deliveryNote').value, dept:$('f_dept').value,
     wantDate:$('f_wantDate').value,
     items: rows
   };
-  $('saveBtn').disabled = true; $('saveBtn').textContent = 'กำลังบันทึกร่าง…';
-  srv('createClaimWithPhotos', [h, DRAFTID, seqMap, AUTH], function(r){
-    $('saveBtn').disabled = false; $('saveBtn').textContent = '💾 บันทึกเป็นร่าง';
+  var btn = submit ? $('saveBtn') : $('draftBtn');
+  var label = btn.textContent;
+  $('saveBtn').disabled = true; $('draftBtn').disabled = true;
+  btn.textContent = submit ? 'กำลังส่งอนุมัติ…' : 'กำลังบันทึก…';
+
+  srv('createClaimWithPhotos', [h, DRAFTID, seqMap, AUTH, submit ? 1 : 0], function(r){
+    $('saveBtn').disabled = false; $('draftBtn').disabled = false; btn.textContent = label;
     if (!r || !r.ok){ $('fmsg').innerHTML = '<div class="msg bad">บันทึกไม่สำเร็จ</div>'; return; }
     DRAFTID = '';
+    if (submit && r.submitted === false){
+      alert('บันทึกใบ ' + r.docNo + ' แล้ว แต่ยังส่งอนุมัติไม่ได้:\n\n' + (r.submitMsg || ''));
+    }
     go('claim', r.docNo);
   }, function(m){
-    $('saveBtn').disabled = false; $('saveBtn').textContent = '💾 บันทึกเป็นร่าง';
+    $('saveBtn').disabled = false; $('draftBtn').disabled = false; btn.textContent = label;
     $('fmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>';
   });
 }
@@ -532,6 +561,7 @@ function paneClaim(c, docNo){
        fr('สถานะ', '<input value="' + esc(statusText(h['สถานะ'])) + '" disabled>',
             'อัตโนมัติ|สถานะขึ้นเองตามขั้นตอน ไม่มีใครเปลี่ยนเอง — กดปุ่มส่งต่อขั้นถัดไปแทน');
   t += '</div>';
+  t += signRow(c.flow && c.flow.signs);
   t += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
     '<button class="btn ghost" onclick="addClaimRow()">+ เพิ่มรายการ</button>' +
     '<button class="btn ghost" onclick="openMediaFolder()">📁 โฟลเดอร์รูปใน Drive</button>' +
