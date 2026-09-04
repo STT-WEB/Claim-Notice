@@ -54,9 +54,10 @@ function newClaimForm(){
   t += '<div id="fmsg"></div>';
   t += '<div class="whokey">' +
        '<span><b class="req">*</b> ต้องกรอกก่อนบันทึก</span>' +
-       '<span><b class="who s1">ขั้น 1</b> ผลิต / ขาย / QC / ออกแบบ กรอก</span>' +
-       '<span><b class="who s2">ขั้น 2</b> สโตร์กรอก (จัดซื้อช่วยได้)</span>' +
-       '<span><b class="who au">อัตโนมัติ</b> ระบบเติมให้เอง</span></div>';
+       '<span><i class="c1"></i><b class="k1">หัวข้อสีฟ้า</b> ผลิต / ขาย / QC / ออกแบบ กรอก</span>' +
+       '<span><i class="c2"></i><b class="k2">สีเหลือง</b> สโตร์กรอก (จัดซื้อช่วยได้)</span>' +
+       '<span><i class="c3"></i><b class="k3">สีเขียว</b> จัดซื้อกรอก</span>' +
+       '<span><i class="ca"></i><b class="ka">สีเทา</b> ระบบเติมให้เอง</span></div>';
 
   var W1 = 'ขั้น 1|ขั้น 1 · ผลิต / ขาย / QC / ออกแบบ เป็นคนกรอก';
   var W2 = 'ขั้น 2|ขั้น 2 · สโตร์เป็นคนกรอก (จัดซื้อช่วยได้)';
@@ -66,6 +67,9 @@ function newClaimForm(){
   t += fr('ประเภทการเคลม', '<select id="f_claimType"><option value="after">หลังส่งมอบ (After-Sales)</option><option value="pre">ก่อนส่งมอบ (Pre-Delivery)</option></select>', W1, true);
   t += fr('เลขที่ JOB', '<input id="f_jobNo" placeholder="JT-69/0009" onblur="jobLookup()">', W1, true);
   t += fr('ชื่อลูกค้า', '<input id="f_jobName" placeholder="ขึ้นเองจากเลขจ๊อบ">', 'อัตโนมัติ|ขึ้นเองจากเลขที่ JOB');
+  /* เบียร์: "ประเภทงานคือ JT JM นั่นแหละ ตัวหนังสือที่มาก่อน - ใน Jobcode"
+     → ไม่ต้องให้เลือก ระบบตัดจากเลขจ๊อบให้เอง */
+  t += fr('ประเภทงาน', '<input id="f_jobType" disabled placeholder="JT / JM — ขึ้นเองจากเลขจ๊อบ">', 'อัตโนมัติ|ตัวอักษรหน้าเครื่องหมาย - ในเลขจ๊อบ');
 
   t += fr('สถานที่ผลิต', '<select id="f_area" onchange="areaChanged()"><option value="dom">ในประเทศ</option><option value="for">ต่างประเทศ</option></select>', W1, true);
   t += fr('MODEL', '<input id="f_model">', W1, true);
@@ -80,7 +84,8 @@ function newClaimForm(){
        (canStore ? 'กรอกได้เลย' : 'สโตร์เป็นคนกรอกในขั้นที่ 2') + '"' +
        (canStore ? '' : ' disabled') + '>', W2);
   t += fr('ผู้ขอเคลม', '<input id="f_by" disabled>', 'อัตโนมัติ|ขึ้นเองจากคนที่เข้าสู่ระบบ');
-  t += fr('แผนกที่ขอเคลม', '<input id="f_dept">', 'อัตโนมัติ|ขึ้นเองจากคนที่เข้าสู่ระบบ · พิมพ์ทับได้', true);
+  t += fr('แผนกที่ขอเคลม', '<select id="f_dept">' + deptOpts('') + '</select>',
+          'อัตโนมัติ|ขึ้นเองตามสิทธิ์ของคนที่เข้าสู่ระบบ · เปลี่ยนได้', true);
   t += fr('วันที่ต้องการของ', '<input id="f_wantDate" placeholder="DD/MM/YYYY">', W1, true);
   t += '</div></div>';
 
@@ -95,7 +100,7 @@ function newClaimForm(){
 
   /* เบียร์: "ชื่อผู้ขอเคลมและแผนกขึ้นเองอัตโนมัติ จาก user" */
   $('f_by').value   = (ME && ME.name) || '';
-  $('f_dept').value = (ME && ME.dept) || '';
+  $('f_dept').value = myDept();
 
   GNEW = makeGrid('gridBox', claimCols(), null, gridOptsNew());
   drawTrBtns('GNEW');
@@ -118,6 +123,36 @@ function drawTrBtns(which){
    กฎของเบียร์: ทุกใบต้องมี ประเภทการเคลม · เลขที่ JOB · สถานที่ผลิต ·
    MODEL · แผนก · วันที่ต้องการของ
    ถ้าเลือก "ต่างประเทศ" เพิ่ม CHASSIS STT และ CHASSIS ผู้ผลิต */
+var DEPTS = ['ผลิต','ขาย','QC','ออกแบบ','สโตร์','จัดซื้อ','คลังสินค้า','บุคคล','ผู้บริหาร'];
+/** แผนกของคนที่เข้าสู่ระบบ — มาจาก role ไม่ใช่ให้พิมพ์เอง */
+function myDept(){
+  if (ME && ME.dept) return ME.dept;
+  var m = { ADMIN:'ผู้บริหาร', APPROVER:'ผู้บริหาร', PRODUCTION:'ผลิต', SALES:'ขาย', QC:'QC',
+            DESIGN:'ออกแบบ', STORE:'สโตร์', PURCHASE:'จัดซื้อ', HR:'บุคคล', PICKER:'คลังสินค้า' };
+  var rs = (ME && ME.roles && ME.roles.length) ? ME.roles : [(ME && ME.role) || ''];
+  for (var i = 0; i < rs.length; i++) if (m[rs[i]]) return m[rs[i]];
+  return '';
+}
+/** รายการแผนกสำหรับ sel() — ต้องมีค่าเดิมอยู่ในรายการเสมอ ไม่งั้นค่าที่เคยกรอกไว้จะหายตอนเซฟ */
+function deptPairs(cur){
+  var list = DEPTS.slice();
+  if (cur && list.indexOf(cur) < 0) list.unshift(cur);
+  var out = [['','— เลือกแผนก —']];
+  for (var i = 0; i < list.length; i++) out.push([list[i], list[i]]);
+  return out;
+}
+function deptOpts(cur){
+  var list = DEPTS.slice(), t = '<option value="">— เลือกแผนก —</option>';
+  if (cur && list.indexOf(cur) < 0) list.push(cur);
+  for (var i = 0; i < list.length; i++)
+    t += '<option value="' + esc(list[i]) + '"' + (list[i] === cur ? ' selected' : '') + '>' + esc(list[i]) + '</option>';
+  return t;
+}
+/** ประเภทงาน = ตัวอักษรหน้า "-" ในเลขจ๊อบ (JT / JM) */
+function jobTypeOf(jobNo){
+  var m = String(jobNo || '').toUpperCase().match(/^([A-Z]{2,4})-/);
+  return m ? m[1] : '';
+}
 function hasRole(r){
   if (!ME) return false;
   var rs = (ME.roles && ME.roles.length) ? ME.roles : [ME.role];
@@ -240,10 +275,12 @@ function fillVendorList(){
 function jobLookup(){
   var j = $('f_jobNo').value.trim(); if (!j) return;
   CURJOB = j.toUpperCase();
+  if ($('f_jobType')) $('f_jobType').value = jobTypeOf(j);   // JT / JM ขึ้นทันทีไม่ต้องรอเซิร์ฟเวอร์
   srv('lookupJob', [j], function(r){
     if (!r || !r.found){ $('fmsg').innerHTML = '<div class="msg bad">ไม่พบเลขจ๊อบ ' + esc(j) + ' ในทะเบียนงาน — กรอกข้อมูลรถเองได้</div>'; return; }
     $('fmsg').innerHTML = '<div class="msg good">พบจ๊อบ ' + esc(r.jobNo) + ' แล้ว — เด้งข้อมูลให้อัตโนมัติ</div>';
     if (r.jobName) $('f_jobName').value = r.jobName;
+    if ($('f_jobType')) $('f_jobType').value = r.type || jobTypeOf(r.jobNo);
     if (r.model)   $('f_model').value   = r.model;
     if (r.loc && String(r.loc).indexOf('ต่าง') >= 0){ $('f_area').value = 'for'; areaChanged(); }
   }, function(m){ $('fmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; });
@@ -450,10 +487,10 @@ function paneClaim(c, docNo){
 
   t += '<div class="whokey">' +
        '<span><b class="req">*</b> ต้องมีก่อนส่งต่อขั้นถัดไป</span>' +
-       '<span><b class="who s1">ขั้น 1</b> ผลิต / ขาย / QC / ออกแบบ กรอก</span>' +
-       '<span><b class="who s2">ขั้น 2</b> สโตร์กรอก (จัดซื้อช่วยได้)</span>' +
-       '<span><b class="who au">อัตโนมัติ</b> ระบบเติมให้เอง</span>' +
-       '<span>ช่องสีเทา = ไม่ใช่หน้าที่คุณ หรือเลยขั้นไปแล้ว</span></div>';
+       '<span><i class="c1"></i><b class="k1">หัวข้อสีฟ้า</b> ผลิต / ขาย / QC / ออกแบบ กรอก</span>' +
+       '<span><i class="c2"></i><b class="k2">สีเหลือง</b> สโตร์กรอก (จัดซื้อช่วยได้)</span>' +
+       '<span><i class="c3"></i><b class="k3">สีเขียว</b> จัดซื้อกรอก</span>' +
+       '<span><i class="ca"></i><b class="ka">สีเทา</b> ระบบเติมให้เอง</span></div>';
 
   t += fr('ประเภทการเคลม', sel('c_claimType','saveClaimField','claimType',h['ประเภทการเคลม'],
             [['after','หลังส่งมอบ (After-Sales)'],['pre','ก่อนส่งมอบ (Pre-Delivery)']]), W1, true) +
@@ -462,6 +499,7 @@ function paneClaim(c, docNo){
        fr('วันที่', '<input value="' + esc(h['วันที่']) + '" disabled>', 'อัตโนมัติ|วันที่เปิดใบ');
   t += fr('เลขที่ JOB', ip('c_jobNo','saveClaimField','jobNo',h['เลขที่ JOB']), W1, true) +
        fr('ชื่อลูกค้า', ip('c_jobName','saveClaimField','jobName',h['ชื่อลูกค้า']), 'อัตโนมัติ|ขึ้นเองจากเลขที่ JOB') +
+       fr('ประเภทงาน', '<input value="' + esc(jobTypeOf(h['เลขที่ JOB'])) + '" disabled>', 'อัตโนมัติ|ตัวอักษรหน้า - ในเลขจ๊อบ') +
        fr('MODEL', ip('c_model','saveClaimField','model',h['MODEL']), W1, true);
   t += fr('SERIAL NO.', ip('c_serialNo','saveClaimField','serialNo',h['SERIAL NO.']), W1) +
        fr('CHASSIS <i>STT</i>', ip('c_chassisStt','saveClaimField','chassisStt',h['CHASSIS NO. (STT)']), W1, isFor) +
@@ -469,7 +507,8 @@ function paneClaim(c, docNo){
   t += fr('JMC ที่ผูก', ip('c_jmc','saveClaimField','jmc',h['JMC ที่ผูก'],'เว้นว่างได้ เติมทีหลัง'), 'ขั้น 1|ขั้น 1 · คนเปิดใบเป็นคนกรอก เติมทีหลังได้') +
        fr('เลขใบส่งมอบ', ip('c_deliveryNote','saveClaimField','deliveryNote',h['เลขใบส่งมอบ']), W2, true) +
        fr('ผู้ขอเคลม', '<input value="' + esc(h['ผู้ขอเคลม'] || '') + '" disabled>', 'อัตโนมัติ|ชื่อคนที่เปิดใบนี้');
-  t += fr('แผนกที่ขอเคลม', ip('c_dept','saveClaimField','dept',h['แผนก']), 'อัตโนมัติ|ขึ้นเองจากคนที่เปิดใบ · พิมพ์ทับได้', true) +
+  t += fr('แผนกที่ขอเคลม', sel('c_dept','saveClaimField','dept',h['แผนก'], deptPairs(h['แผนก'])),
+            'อัตโนมัติ|ขึ้นเองตามสิทธิ์ของคนที่เปิดใบ · เปลี่ยนได้', true) +
        fr('วันที่ต้องการของ', ip('c_wantDate','saveClaimField','wantDate',h['วันที่ต้องการของ'],'DD/MM/YYYY'), W1, true) +
        fr('สถานะ', sel('c_status','saveClaimField','status',h['สถานะ'],
             [['DRAFT','ร่าง'],['SENT','ส่ง Supplier แล้ว'],['REPLIED','Supplier ตอบแล้ว'],

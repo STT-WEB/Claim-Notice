@@ -298,7 +298,7 @@ function claimMissing_(d, docNo, stageKey){
     if (!norm_(h['เลขที่ JOB']))  miss.push('ยังไม่ใส่เลขที่ JOB');
     if (!items.length)            miss.push('ยังไม่มีรายการที่เคลม');
     var noPhoto = [];
-    var ph = listPhotos(docNo, null);
+    var ph = photosOf_(docNo);   // ห้ามเรียก listPhotos ที่นี่ มันบังคับล็อกอิน
     for (var k = 0; k < items.length; k++){
       var sq = norm_(items[k][1]);
       if (!ph[sq] || !ph[sq].length) noPhoto.push(sq);

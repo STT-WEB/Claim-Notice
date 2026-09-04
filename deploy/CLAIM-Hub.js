@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v0.7.0';
+var VERSION = 'v0.7.1';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -260,9 +260,13 @@ function authUser_(emp, pin){
 }
 
 /** ถ้าชีต USERS ไม่มีคอลัมน์แผนก ให้เดาจากสิทธิ์ที่ตั้งไว้ — เบียร์แก้ทับได้เสมอ */
+var DEPTS = ['ผลิต','ขาย','QC','ออกแบบ','สโตร์','จัดซื้อ','คลังสินค้า','บุคคล','ผู้บริหาร'];
+function listDepts(){ return DEPTS; }
+
 function deptFromRoles_(roles){
-  var map = { PRODUCTION:'ผลิต', SALES:'ขาย', QC:'QC', DESIGN:'ออกแบบ',
-              STORE:'สโตร์', PURCHASE:'จัดซื้อ', HR:'บุคคล', PICKER:'คลังสินค้า' };
+  var map = { ADMIN:'ผู้บริหาร', APPROVER:'ผู้บริหาร', PRODUCTION:'ผลิต', SALES:'ขาย',
+              QC:'QC', DESIGN:'ออกแบบ', STORE:'สโตร์', PURCHASE:'จัดซื้อ',
+              HR:'บุคคล', PICKER:'คลังสินค้า' };
   roles = roles || [];
   for (var i = 0; i < roles.length; i++) if (map[roles[i]]) return map[roles[i]];
   return '';
@@ -517,7 +521,13 @@ function nextDocNo_(prefix){
 /* ─────────── สิทธิ์ ─────────── */
 function requireLogin_(auth){
   var me = whoAmI_(auth);
-  if (me.role === 'GUEST') throw new Error('กรุณาเข้าสู่ระบบก่อน');
+  if (me.role === 'GUEST'){
+    /* บอกสาเหตุไปเลย จะได้ไม่ต้องเดา — ไม่เปิดเผย PIN หรือข้อมูลใคร */
+    var why = !auth ? 'ระบบไม่ได้รับข้อมูลผู้ใช้มาด้วย'
+            : (!auth.emp || !auth.pin) ? 'ข้อมูลผู้ใช้ที่ส่งมาไม่ครบ'
+            : 'รหัสพนักงาน ' + norm_(auth.emp) + ' ตรวจไม่ผ่าน (PIN ไม่ตรง หรือช่อง role for Claim ในชีต USERS ว่าง)';
+    throw new Error('กรุณาเข้าสู่ระบบก่อน — ' + why);
+  }
   return me;
 }
 function requireAny_(auth, roles){
@@ -779,6 +789,14 @@ function savePhoto(docNo, jobNo, seq, dataUrl, fname, auth){
 /** รูปทั้งหมดของใบนี้ (จัดกลุ่มตามรายการ) */
 function listPhotos(docNo, auth){
   requireLogin_(auth);
+  return photosOf_(docNo);
+}
+
+/* ⚠️ v0.7.1 — ตัวอ่านรูป "ภายใน" ที่ไม่ต้องตรวจล็อกอิน
+   เดิมโค้ดข้างในเรียก listPhotos(docNo, null) ซึ่งบังคับล็อกอิน
+   → เปิดใบเคลม/กดส่งต่อขั้น พังทันทีด้วยข้อความ "กรุณาเข้าสู่ระบบก่อน"
+   ทั้งที่ผู้ใช้ล็อกอินอยู่ · ฟังก์ชันที่คนเรียกจากหน้าเว็บยังตรวจสิทธิ์เหมือนเดิม */
+function photosOf_(docNo){
   docNo = norm_(docNo);
   var sh = photoTab_(), lr = sh.getLastRow();
   var out = {};
