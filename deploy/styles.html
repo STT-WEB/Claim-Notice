@@ -511,4 +511,16 @@ input.locked,textarea.locked,select.locked{
   .page:last-of-type{page-break-after:auto;break-after:auto}
   @page{margin:0;size:A4}
 }
+
+/* รูปหลักฐานในใบปริ้น — ต้องใหญ่พอที่ Supplier จะดูออกว่าเสียตรงไหน */
+.page .picbig{display:grid;grid-template-columns:1fr 1fr;gap:6px;border:1px solid #666;border-top:none;padding:6px;background:#fff}
+.page .picbig.one{grid-template-columns:1fr}
+.page .picbig>div{height:300px;display:flex;align-items:center;justify-content:center;
+                  background:#f7f7f8;border:1px solid #ccc;overflow:hidden}
+.page .picbig.one>div{height:430px}
+.page .picbig img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+
+/* รูปในหน้ารายงาน — ใหญ่ขึ้น กดขยายได้ */
+.phcell.rep{width:210px;height:158px}
+.phcell.rep .phseq{font-size:11px;padding:2px 8px}
 </style>

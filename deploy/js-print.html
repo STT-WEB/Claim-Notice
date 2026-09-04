@@ -121,7 +121,8 @@ function buildOneDoc(sup){
   if (isInternal() && h['หมายเหตุจาก Supplier']) blocks.push(blkReply(h));
   if (!isInternal()) blocks.push(blkReplyBox());
   blocks.push(blkSign(h));
-  if (isInternal()) blocks = blocks.concat(blkPhotos(items));
+  /* รูปอยู่ในทุกฉบับ — Supplier ต้องเห็นหลักฐานถึงจะยอมรับเคลม */
+  blocks = blocks.concat(blkPhotos(items));
 
   return '<div class="docset" data-sup="' + esc(sup || '') + '">' + blocks.join('') + '</div>';
 }
@@ -274,22 +275,41 @@ function blkSign(h){
   return t;
 }
 
-/** รูปหลักฐาน — ฉบับภายในเท่านั้น (ฉบับส่ง Supplier แนบไฟล์รูปไปทางอีเมลแทน จะได้ชัดกว่า) */
+/** รูปหลักฐาน — อยู่ในทุกฉบับ รวมฉบับส่ง Supplier ด้วย
+ *  เบียร์: "รูปภาพ มันดูเล็กเกินไปส่งหา Sup ไม่ได้หรอกนะ เค้าจะมองเห็นที่ไหนหล่ะ"
+ *  รูปคือหลักฐานที่ใช้เถียงกับ Supplier — เล็กแล้วมองไม่ออกก็ไม่มีประโยชน์
+ *  ขนาดที่ใช้ (เนื้อที่กว้าง 742px ต่อหน้า)
+ *    1 รูป  → เต็มความกว้าง สูง 430px
+ *    2 รูปขึ้นไป → 2 รูปต่อแถว กว้างรูปละ ~366px สูง 300px
+ *  คุมไม่ให้ 1 ก้อนสูงเกิน 1 หน้า → แบ่งเป็นก้อนละไม่เกิน 2 แถว (4 รูป) */
 function blkPhotos(items){
   var out = [];
   for (var i = 0; i < items.length; i++){
     var seq = String(items[i].seq), ph = PHOTOS[seq] || [];
     if (!ph.length) continue;
-    var t = '<div class="blk"><div class="capt">รายการที่ ' + esc(seq) + ' · ' + esc(items[i].name) + '</div><div class="pic3">';
-    for (var k = 0; k < 3; k++){
-      t += ph[k] ? '<div style="background:#fff"><img src="' + ph[k].thumb + '" style="max-width:100%;max-height:124px;object-fit:contain"></div>'
-                 : '<div></div>';
+
+    var one = (ph.length === 1);
+    /* ก้อนละ 1 แถว (2 รูป) สูงราว 330px → 3 ก้อนอยู่ในหน้าเดียวได้
+       ถ้าทำก้อนละ 2 แถว ก้อนจะสูง ~620px แล้วเหลือที่ว่างครึ่งหน้าเปล่า ๆ */
+    var perChunk = one ? 1 : 2;
+    for (var c = 0; c < ph.length; c += perChunk){
+      var part = ph.slice(c, c + perChunk);
+      var t = '<div class="blk"><div class="capt">รูปหลักฐาน · รายการที่ ' + esc(seq) + ' · ' + esc(items[i].name) +
+              (ph.length > perChunk ? ' <span style="font-weight:400;color:#666">(รูปที่ ' + (c+1) + '–' +
+                Math.min(c + perChunk, ph.length) + ' จาก ' + ph.length + ')</span>' : '') + '</div>';
+      t += '<div class="picbig' + (one ? ' one' : '') + '">';
+      for (var k = 0; k < part.length; k++){
+        t += '<div><img src="' + bigPhoto(part[k].thumb) + '" alt="รูปที่ ' + (c+k+1) + '"></div>';
+      }
+      t += '</div></div>';
+      out.push(t);
     }
-    t += '</div>';
-    if (ph.length > 3) t += '<div class="vd">และอีก ' + (ph.length - 3) + ' รูป — ดูทั้งหมดในโฟลเดอร์ Drive ของเอกสารนี้</div>';
-    out.push(t + '</div>');
   }
   return out;
+}
+/** ขอรูปความละเอียดสูงจาก Drive — ตัวย่อ w1000 ชัดพอสำหรับปริ้น A4 */
+function bigPhoto(url){
+  return String(url || '').replace(/sz=w\d+/, 'sz=w1600');
 }
 function num2(v){ var n = Number(String(v == null ? '' : v).replace(/,/g,'')); return isNaN(n) ? 0 : n; }
 

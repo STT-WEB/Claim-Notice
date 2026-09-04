@@ -44,9 +44,10 @@ function loadRepMedia(){
              esc(d.docNo) + ' ↗</a></div><div class="phwrap">';
         for (var p = 0; p < d.photos.length; p++){
           var ph = d.photos[p];
-          t += '<div class="phcell sm"><img src="' + ph.thumb + '" title="ข้อ ' + esc(ph.seq) + '" ' +
+          /* เบียร์: "ใน Report ก็ต้องชัดเจนด้วยนะ" — รูปใหญ่ขึ้น กดแล้วขยายเต็มจอได้ */
+          t += '<div class="phcell rep"><img src="' + ph.thumb + '" title="รายการที่ ' + esc(ph.seq) + ' — กดเพื่อดูเต็มจอ" ' +
                'onclick="zoomPhoto(\'' + ph.view + '\',\'' + ph.thumb + '\')"' +
-               ' onerror="this.parentNode.classList.add(\'bad\')"><span class="phseq">' + esc(ph.seq) + '</span></div>';
+               ' onerror="this.parentNode.classList.add(\'bad\')"><span class="phseq">ข้อ ' + esc(ph.seq) + '</span></div>';
         }
         t += '</div></div>';
       }

@@ -139,4 +139,32 @@ function applyGridLocks(gridId){
     }
   }
 }
+
+/** แถบขั้นตอนสำหรับ "ใบที่ยังไม่ได้บันทึก" — ยังไม่มีเลขเอกสาร ยังไม่มีข้อมูลจากเซิร์ฟเวอร์
+ *  แต่คนกรอกต้องเห็นตั้งแต่แรกว่ากำลังทำขั้นไหน และงานจะเดินไปทางไหนต่อ
+ *  (เบียร์จะเอาไป present — ต้องเห็นภาพรวมทั้งกระบวนการตั้งแต่หน้าแรกที่เปิด) */
+function flowBarNew(){
+  var stages = [
+    { no:1, name:'แจ้งเคลม',            who:'Production / Sales / QC / Design' },
+    { no:2, name:'สโตร์เติมข้อมูล',      who:'สโตร์' },
+    { no:3, name:'จัดซื้อตรวจข้อมูล',    who:'จัดซื้อ' },
+    { no:4, name:'ส่ง Supplier · รอคำตอบ', who:'จัดซื้อ' },
+    { no:5, name:'รับของกลับ + QC',      who:'QC / Production' },
+    { no:6, name:'ปิดงานแล้ว',           who:'—' }
+  ];
+  var t = '<div class="flowwrap"><div class="flowsteps">';
+  for (var i = 0; i < stages.length; i++){
+    t += '<div class="fstep ' + (i === 0 ? 'now' : '') + '" title="' + esc(stages[i].who) + '">' +
+         '<span class="fno">' + stages[i].no + '</span>' +
+         '<span class="fnm">' + esc(stages[i].name) + '</span></div>';
+    if (i < stages.length - 1) t += '<span class="farrow">›</span>';
+  }
+  t += '</div>';
+  t += '<div class="flownow"><div><b>ขั้นที่ 1 · แจ้งเคลม</b>' +
+       '<span class="fwho">คุณกำลังทำขั้นนี้</span></div>' +
+       '<div class="ftodo">กรอกข้อมูลรถและรายการที่เคลม แนบรูปทุกรายการ แล้วกดบันทึก · ' +
+       'บันทึกแล้วระบบจะให้ส่งต่อไปให้สโตร์เติม PO และเด้งแจ้งเตือนเข้า LINE ให้เอง</div></div>';
+  t += '</div>';
+  return t;
+}
 </script>

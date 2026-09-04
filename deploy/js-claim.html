@@ -50,6 +50,7 @@ function newClaimForm(){
   t += '<div class="card tight"><div class="cardhd"><h3>เปิดใบแจ้งเคลม (ใบใหม่)</h3>' +
        '<span class="sub">กรอกให้ครบในหน้านี้หน้าเดียว แล้วกดบันทึกครั้งเดียวจบ</span>' +
        '<button class="btn primary" id="saveBtn" onclick="submitClaim()">💾 บันทึกใบแจ้งเคลม</button></div>';
+  t += flowBarNew();
   t += '<div id="fmsg"></div>';
   t += '<div class="fgrid">';
   t += fr('ประเภทการเคลม', '<select id="f_claimType"><option value="after">หลังส่งมอบ (After-Sales)</option><option value="pre">ก่อนส่งมอบ (Pre-Delivery)</option></select>');
