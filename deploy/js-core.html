@@ -11,7 +11,7 @@
    วิธีแก้: ฝังเลขเวอร์ชันไว้ในไฟล์หน้าเว็บเองด้วย (CLIENT_VER ข้างล่างนี้)
    ถ้า 2 ค่าไม่ตรงกัน = จอที่เห็นเป็นของเก่าแน่นอน ระบบจะขึ้นแถบแดงบอกให้กด Ctrl+Shift+R
    ⚠️ แก้ไฟล์หน้าเว็บทุกครั้ง ต้องเลื่อน CLIENT_VER ให้ตรงกับ VERSION ใน CLAIM-Hub.js */
-var CLIENT_VER = 'v1.1.1';
+var CLIENT_VER = 'v1.1.2';
 
 var AUTH = null;        // {emp, pin} — อยู่ในหน่วยความจำหน้าเว็บเท่านั้น ไม่เก็บลงเครื่อง
 var ME   = null;
@@ -225,6 +225,7 @@ function go(v, arg){
   CURVIEW = v; CURARG = arg;
   window.scrollTo(0, 0);
   if (v === 'home')       return loadHome();
+  if (v === 'work')       return drawQueue(arg);
   /* ① Inspection */
   if (v === 'inslist')    return loadInspList();
   if (v === 'newins')     return newInspForm();
@@ -278,66 +279,121 @@ function loadHome(){
   });
 }
 
-/* ═══ หน้าแรก = แท็บตามขั้นงาน (ทำเหมือน NOVA) ═══
-   v1.1.0 — เพิ่ม 3 แท็บของขั้นใหม่ที่เบียร์สั่ง 7 ก.ย.
-   ของกลับต้องเข้าสโตร์ก่อน → สโตร์แจ้ง QC มาตรวจ → ตรวจผ่านแล้วสโตร์เบิกออก */
-var WTAB = 'open';
-var WTABS = [
-  ['open',    '①', 'เปิดใบขอเคลม',      'ทีมงานกรอก · บันทึกร่าง แล้วส่งอนุมัติ'],
-  ['approve', '②', 'อนุมัติใบเคลม',      'ผู้บังคับบัญชา รับเอกสาร → ส่งให้สโตร์'],
-  ['store',   '③', 'งานสโตร์',           'รับเรื่อง → เลขใบส่งมอบ · PO · Supplier'],
-  ['buy',     '④', 'งานจัดซื้อ',         'ส่งเคลม Supplier → บันทึกผล 4 กรณี → คิดต้นทุน'],
-  ['sin',     '⑤', 'ของกลับเข้าคลัง',    'สโตร์รับเข้า ออกเลข GR + วันที่ แล้วแจ้ง QC มาตรวจ'],
-  ['qcrecv',  '⑥', 'QC ตรวจรับของกลับ',  'ไปตรวจที่คลัง ถ่ายรูป ติ๊ก Accept → ออกใบตรวจ RCV'],
-  ['sout',    '⑦', 'เบิกออกให้หน้างาน',  'ตรวจผ่านแล้ว สโตร์จ่ายของออก ออกเลขใบเบิก IS'],
-  ['close',   '⑧', 'อนุมัติ ปิดจบ',      'ผู้บริหารกดปิดงาน → ส่งข้อมูลให้บัญชี/HR ต่อ']
+/* ═══════════ หน้าแรก = 4 กล่องงาน (ตาม Mockup v9 ที่เบียร์เคาะ) ═══════════
+   เบียร์: "กล่องงานที่ 1 เปิดใบเคลมหรือใบ Inspection แล้วส่งอนุมัติ ·
+            กล่องงานที่ 2 Pass ไปสโตร์ · กล่องงานที่ 3 Pass ไปจัดซื้อ"
+   + กล่องรายงาน & ทะเบียน · ตัวเลขแดง = ใบที่ค้างรอคุณทำในเมนูนั้น
+   โครงเดียวกับหน้าแรกของ NOVA (MODULES → ITEMS → สิทธิ์รายเมนู)                */
+var MODULES = [
+ { id:1, ic:'📝', name:'กล่องงานที่ 1 · เปิดเอกสาร + อนุมัติ',
+   ac:'#E2231A', acbg:'rgba(226,35,26,.14)',
+   role:'Production · QC · Design · Sales — และผู้บังคับบัญชา',
+   items:[
+    { k:'newclaim', q:'',       ic:'📋', t:'เปิดใบเคลมสินค้า',
+      d:'เปิดตรงได้เลย · กรอกข้อมูล + แนบรูป · บันทึกร่างไว้ก่อนได้' },
+    { k:'newins',   q:'',       ic:'🔍', t:'เปิดใบ Inspection',
+      d:'ตรวจของตอนมาถึง · ติ๊ก Acc / Un-Acc · ข้อที่ไม่ผ่าน ส่งไปสร้างใบเคลม' },
+    { k:'w:qcrecv', q:'qcrecv', ic:'🔎', t:'สโตร์เรียกมาตรวจรับของกลับ',
+      d:'สโตร์รับของเข้าคลังแล้วแจ้งมา · ไปตรวจที่คลัง ถ่ายรูป ติ๊ก Accept → ออกใบตรวจ RCV',
+      only:['QC','PRODUCTION','ADMIN'] },
+    { k:'w:open',   q:'open',   ic:'✏️', t:'เอกสารร่างของฉัน',
+      d:'ใบที่ยังไม่ส่งอนุมัติ · สโตร์กับจัดซื้อยังไม่เห็น · กลับมาแก้ได้' },
+    { k:'w:approve',q:'approve',ic:'✅', t:'อนุมัติเอกสาร',
+      d:'อนุมัติใบเคลม · ไม่โอเคตีกลับพร้อมเหตุผล', only:['APPROVER','ADMIN'] }
+   ],
+   tag:'ใครเปิดก็ได้ แต่หลัก ๆ คือ Production / QC / Design / Sales · '+
+       'ของที่ Supplier ส่งกลับมา QC ก็ตรวจรับที่กล่องนี้' },
+
+ { id:2, ic:'📦', name:'กล่องงานที่ 2 · สโตร์',
+   ac:'#2f7de1', acbg:'rgba(47,125,225,.14)', role:'Store',
+   items:[
+    { k:'w:store', q:'store', ic:'📦', t:'งานเคลมรอสโตร์',
+      d:'รับเรื่อง → ใส่เลขใบส่งมอบ · PO · Supplier แล้วส่งต่อจัดซื้อ' },
+    { k:'w:sin',   q:'sin',   ic:'📥', t:'ของกลับเข้าคลัง รอรับเข้า',
+      d:'ของจาก Supplier มาถึงคลัง · รับเข้า ออกเลข GR + วันที่ แล้วแจ้ง QC มาตรวจ' },
+    { k:'w:sout',  q:'sout',  ic:'📤', t:'ตรวจผ่านแล้ว รอเบิกออก',
+      d:'QC ตรวจผ่านแล้ว · จ่ายของออกให้หน้างาน ออกเลขใบเบิก IS + วันที่' }
+   ],
+   tag:'เอกสารวิ่งมาเองหลังผู้บังคับบัญชาอนุมัติ · ของที่ Supplier ส่งกลับมาก็เข้าคลังที่นี่ก่อน '+
+       'สโตร์แจ้ง QC มาตรวจ ตรวจผ่านแล้วค่อยเบิกออก' },
+
+ { id:3, ic:'🛒', name:'กล่องงานที่ 3 · จัดซื้อ',
+   ac:'#eba00c', acbg:'rgba(235,160,12,.16)', role:'Purchase',
+   items:[
+    { k:'w:buy',    q:'buy',    ic:'🛒', t:'รับเรื่อง + ส่งเคลม Supplier',
+      d:'ครบ 4 ลายเซ็นแล้วพิมพ์ ① ใบแจ้งเคลม (ไม่มีราคา แต่มีรูป) แยกใบตาม Supplier' },
+    { k:'w:result', q:'result', ic:'💬', t:'รอคำตอบ Supplier + คิดต้นทุน',
+      d:'เลือก 1 ใน 4 กรณี · ใส่ต้นทุน/ค่าแรง/กำไร · ออกใบ ② ถ้าต้องเรียกเงิน' },
+    { k:'w:close',  q:'close',  ic:'🏁', t:'รออนุมัติปิดใบเคลม',
+      d:'ใบที่จบขั้นตอนแล้ว รอผู้บริหารกดปิด', only:['ADMIN','APPROVER','PURCHASE'] },
+    { k:'supdoc',   q:'',       ic:'🗃️', t:'ทะเบียนเอกสารที่ส่ง Supplier',
+      d:'จ๊อบนี้เคยออกเอกสารอะไรไปให้ใครบ้าง ออกเมื่อไหร่ ใครออก' }
+   ],
+   tag:'ใบ ① ไม่มีราคา (แต่มีรูป) · ใบ ② มีราคา · ใบ ③ ภายในห้ามออกนอกบริษัท · '+
+       'ผู้บริหารเป็นคนอนุมัติปิด' },
+
+ { id:0, ic:'📊', name:'รายงาน & ทะเบียน',
+   ac:'#12a06f', acbg:'rgba(18,160,111,.14)', role:'ทุกคนเข้าดูได้',
+   items:[
+    { k:'list',    q:'', ic:'🗂️', t:'ทะเบียนเอกสารทั้งหมด',
+      d:'ใบเคลมทุกใบทุกจ๊อบ · สถานะล่าสุด · ยกเลิกใบได้ (ผู้บริหารเท่านั้น)' },
+    { k:'inslist', q:'', ic:'🔍', t:'ทะเบียนใบตรวจรับสินค้า',
+      d:'ใบ Inspection ทุกใบ · Tankers (มีรูป STD) และสินค้า (ไม่มี STD)' },
+    { k:'repjob',  q:'', ic:'🚛', t:'งานเคลมตามจ๊อบ',
+      d:'ดูรายจ๊อบว่ามีใบอะไรบ้าง · ต้นทุนเคลมรวมของรถคันนั้น' },
+    { k:'repbill', q:'', ic:'🧾', t:'รวมยอดเรียกเก็บ → ออกใบเดียว',
+      d:'รวมหลายใบเคลมของ Supplier เจ้าเดียวกัน ได้เลข CDN ของตัวเอง',
+      only:['PURCHASE','ADMIN','APPROVER'] },
+    { k:'rephr',   q:'', ic:'👥', t:'รายงานส่ง HR (หักเงินพนักงาน)',
+      d:'ใบที่ระบุว่าพนักงานทำเสียหาย · ส่งให้ HR ไปหักเงิน',
+      only:['PURCHASE','ADMIN','APPROVER'] },
+    { k:'repacc',  q:'', ic:'📒', t:'ข้อมูลส่งบัญชี',
+      d:'ใบที่ปิดจบแล้ว · บัญชีรับข้อมูลอย่างเดียว ไม่ต้องกดติ๊ก',
+      only:['PURCHASE','ADMIN','APPROVER'] },
+    { k:'replog',  q:'', ic:'🕘', t:'LOG ประวัติการใช้งาน',
+      d:'ใครทำอะไรกับใบไหน เมื่อไหร่ · ลบ LOG ไม่กระทบตัวเอกสาร',
+      only:['ADMIN','APPROVER'] }
+   ],
+   tag:'ทุกคนเปิดทะเบียนกับรายจ๊อบดูได้ · เมนูที่มีตัวเงินเปิดได้เฉพาะจัดซื้อและผู้บริหาร' }
 ];
-function goTab(k){ WTAB = k; if (HOME_LAST) drawWork(HOME_LAST, false); }
+
+/* คิวของแท็บ (workQueues) ยังใช้เหมือนเดิม แค่เอามาโชว์เป็นตัวเลขบนเมนูในกล่อง */
+var WTAB = '';
+function goTab(k){ WTAB = k; go('work', k); }
+
+function canSeeItem(it){
+  if (!it.only) return true;
+  for (var i = 0; i < it.only.length; i++) if (hasRole(it.only[i])) return true;
+  return false;
+}
 
 function drawWork(w, stale){
-  var t = '<div class="card tight"><div class="cardhd"><h3>งานเคลม</h3>' +
-    '<span class="sub">' + esc(w.me || '') + (w.dept ? ' · ' + esc(w.dept) : '') + '</span>' +
-    '<button class="btn ghost" onclick="go(\'inslist\')">🔍 ใบตรวจรับสินค้า</button>' +
-    '<button class="btn ghost" onclick="go(\'reports\')">📊 รายงาน</button>' +
-    '<button class="btn primary" onclick="go(\'newclaim\')">+ เปิดใบขอเคลมใหม่</button></div>';
+  var t = '<div class="hero"><h1>STT CLAIM HUB</h1>' +
+    '<p>งานเคลม · ตรวจรับสินค้า — เลือกกล่องงานของคุณ</p>' +
+    '<span class="hchip">' + esc(w.me || '') + (w.dept ? ' · ' + esc(w.dept) : '') + '</span></div>';
 
-  t += '<div class="wtabs">';
-  for (var i = 0; i < WTABS.length; i++){
-    var k = WTABS[i][0], q = (w.tabs && w.tabs[k]) || { n:0, mine:false };
-    t += '<button class="wtab' + (WTAB === k ? ' on' : '') + (q.mine ? ' mine' : '') + '" onclick="goTab(\'' + k + '\')">' +
-      '<span class="wno">' + WTABS[i][1] + '</span>' +
-      '<span class="wnm">' + esc(WTABS[i][2]) + '</span>' +
-      '<span class="wct' + (q.n ? ' has' : '') + '">' + q.n + '</span></button>';
-  }
-  t += '</div>';
-
-  var cur = (w.tabs && w.tabs[WTAB]) || { n:0, rows:[], mine:false };
-  var meta = null;
-  for (var m = 0; m < WTABS.length; m++) if (WTABS[m][0] === WTAB) meta = WTABS[m];
-  t += '<div class="wnote' + (cur.mine ? '' : ' notmine') + '">' +
-       (cur.mine ? '✋ <b>แท็บนี้เป็นงานของคุณ</b> — ' : '👁 <b>แท็บนี้ไม่ใช่หน้าที่คุณ</b> ดูได้อย่างเดียว — ') +
-       esc(meta[3]) + '</div>';
-
-  if (!cur.rows.length){
-    t += '<div class="empty">ยังไม่มีใบค้างในขั้นนี้' +
-         (WTAB === 'open' ? '<br><span>กด “+ เปิดใบขอเคลมใหม่” เพื่อเริ่มใบแรก</span>' : '') + '</div>';
-  } else {
-    t += '<table class="t"><thead><tr><th style="width:120px">เลขที่</th><th style="width:84px">วันที่</th>' +
-      '<th style="width:112px">เลขที่ JOB</th><th>ชื่อลูกค้า</th>' +
-      '<th style="width:170px">ขั้นตอนตอนนี้</th><th style="width:150px">รอใครทำ</th>' +
-      '<th style="width:74px">รูป</th><th style="width:120px">ผู้เปิดใบ</th></tr></thead><tbody>';
-    for (var r = 0; r < cur.rows.length; r++){
-      var x = cur.rows[r];
-      t += '<tr style="cursor:pointer" onclick="go(\'claim\',\'' + esc(x.docNo) + '\')">' +
-        '<td><b>' + esc(x.docNo) + '</b></td><td class="c">' + esc(x.date) + '</td>' +
-        '<td>' + esc(x.jobNo) + '</td><td>' + esc(x.jobName) + '</td>' +
-        '<td><span class="pill">' + x.stageNo + ' · ' + esc(x.stageName) + '</span></td>' +
-        '<td class="hint">' + esc(x.waitWho || '') + '</td>' +
-        '<td class="c">' + (x.nNoPhoto ? '<span class="pill red">ขาด ' + x.nNoPhoto + '</span>'
-                                       : '<span class="pill green">ครบ</span>') + '</td>' +
-        '<td>' + esc(x.by) + '</td></tr>';
+  t += '<div class="modgrid">';
+  for (var m = 0; m < MODULES.length; m++){
+    var mo = MODULES[m], body = '';
+    for (var i = 0; i < mo.items.length; i++){
+      var it = mo.items[i], allowed = canSeeItem(it);
+      var q = it.q ? ((w.tabs && w.tabs[it.q]) || { n:0 }) : null;
+      var act = allowed
+        ? (it.k.indexOf('w:') === 0 ? "goTab('" + it.k.slice(2) + "')" : "go('" + it.k + "')")
+        : "alert('เมนูนี้เปิดได้เฉพาะ " + esc(it.only.join(' / ')) + "')";
+      body += '<div class="moditem' + (allowed ? '' : ' off') + '" onclick="' + act + '">' +
+        '<div class="mi-ic">' + it.ic + '</div>' +
+        '<div><div class="mi-t">' + esc(it.t) + '</div>' +
+        '<div class="mi-d">' + esc(it.d) + '</div></div>' +
+        (q ? '<span class="mi-n' + (q.n ? '' : ' zero') + '">' + q.n + '</span>' : '') +
+        '</div>';
     }
-    t += '</tbody></table>';
+    t += '<div class="modcard" style="--ac:' + mo.ac + ';--acbg:' + mo.acbg + '">' +
+      '<div class="modhd"><div class="modic">' + mo.ic + '</div>' +
+      '<div class="modttl">' + esc(mo.name) + '</div>' +
+      (mo.id ? '<span class="modstep">ขั้นที่ ' + mo.id + '</span>' : '') + '</div>' +
+      '<div class="modrole">' + esc(mo.role) + '</div>' + body +
+      '<div class="modtag">' + esc(mo.tag) + '</div></div>';
   }
   t += '</div>';
 
@@ -352,6 +408,57 @@ function drawWork(w, stale){
   if (stale) t += '<div class="hint"><span class="spin"></span> กำลังอัปเดตตัวเลขล่าสุด…</div>';
   $('view').innerHTML = t;
 }
+
+/* ─── หน้ารายการของแต่ละเมนูในกล่อง ─── */
+var WTITLE = {
+  open   : ['✏️ เอกสารร่างของฉัน',            'ใบที่ยังไม่ส่งอนุมัติ — สโตร์กับจัดซื้อยังไม่เห็น'],
+  approve: ['✅ อนุมัติเอกสาร',                'อนุมัติ หรือ ตีกลับพร้อมเหตุผล'],
+  store  : ['📦 งานเคลมรอสโตร์',               'รับเรื่อง → เลขใบส่งมอบ · PO · Supplier → ส่งต่อจัดซื้อ'],
+  buy    : ['🛒 รับเรื่อง + ส่งเคลม Supplier',  'ครบ 4 ลายเซ็นแล้วพิมพ์ใบแจ้งเคลม แยกใบตาม Supplier'],
+  result : ['💬 รอคำตอบ Supplier + คิดต้นทุน',  'เลือก 1 ใน 4 กรณี · ใส่ต้นทุน ค่าแรง กำไร'],
+  sin    : ['📥 ของกลับเข้าคลัง รอสโตร์รับเข้า', 'รับเข้า ออกเลข GR + วันที่ แล้วแจ้ง QC มาตรวจ'],
+  qcrecv : ['🔎 ตรวจรับของกลับ (สโตร์เรียกมา)', 'ตรวจที่คลัง ถ่ายรูป ติ๊ก Accept → ออกใบตรวจ RCV'],
+  sout   : ['📤 ตรวจผ่านแล้ว รอเบิกออก',        'จ่ายของออกให้หน้างาน ออกเลขใบเบิก IS'],
+  close  : ['🏁 รออนุมัติปิดใบเคลม',            'ผู้บริหารกดปิด → ส่งข้อมูลให้บัญชีและ HR ต่อ']
+};
+function drawQueue(k){
+  var w = HOME_LAST;
+  if (!w){ srv('workQueues', [AUTH], function(x){ HOME_LAST = x; drawQueue(k); }); 
+           $('view').innerHTML = '<div class="card"><span class="spin"></span> กำลังโหลด…</div>'; return; }
+  var cur = (w.tabs && w.tabs[k]) || { n:0, rows:[], mine:false };
+  var ti = WTITLE[k] || ['งานเคลม',''];
+  var t = '<div class="card"><div class="cardhd"><h3>' + esc(ti[0]) + '</h3>' +
+    '<span class="sub">' + esc(ti[1]) + '</span>' +
+    '<button class="btn" onclick="go(\'home\')">← หน้าแรก</button>' +
+    (k === 'open' ? '<button class="btn primary" onclick="go(\'newclaim\')">+ เปิดใบขอเคลมใหม่</button>' : '') +
+    '</div>';
+  t += '<div class="wnote' + (cur.mine ? '' : ' notmine') + '">' +
+       (cur.mine ? '✋ <b>ขั้นนี้เป็นงานของคุณ</b>' : '👁 <b>ขั้นนี้ไม่ใช่หน้าที่คุณ</b> ดูได้อย่างเดียว') + '</div>';
+  if (!cur.rows.length){
+    t += '<div class="empty">ยังไม่มีใบค้างในขั้นนี้</div></div>';
+    $('view').innerHTML = t; return;
+  }
+  t += '<div class="tblwrap"><table class="grid"><thead><tr>' +
+    '<th style="width:124px">เลขที่</th><th style="width:92px">วันที่</th>' +
+    '<th style="width:116px">เลขที่ JOB</th><th>ชื่อลูกค้า</th>' +
+    '<th style="width:190px">ขั้นตอนตอนนี้</th><th style="width:150px">รอใครทำ</th>' +
+    '<th style="width:74px">รูป</th><th style="width:120px">ผู้เปิดใบ</th></tr></thead><tbody>';
+  for (var r = 0; r < cur.rows.length; r++){
+    var x = cur.rows[r];
+    t += '<tr style="cursor:pointer" onclick="go(\'claim\',\'' + esc(x.docNo) + '\')">' +
+      '<td><b>' + esc(x.docNo) + '</b></td>' +
+      '<td class="c" style="white-space:nowrap">' + esc(x.date) + '</td>' +
+      '<td>' + esc(x.jobNo) + '</td><td>' + esc(x.jobName) + '</td>' +
+      '<td class="c"><span class="pill">' + esc(x.stageNo) + ' · ' + esc(x.stageName) + '</span></td>' +
+      '<td class="hint">' + esc(x.waitWho || '') + '</td>' +
+      '<td class="c">' + (x.nNoPhoto ? '<span class="pill red">ขาด ' + x.nNoPhoto + '</span>'
+                                     : '<span class="pill green">ครบ</span>') + '</td>' +
+      '<td>' + esc(x.by) + '</td></tr>';
+  }
+  t += '</tbody></table></div></div>';
+  $('view').innerHTML = t;
+}
+
 
 function replink(v, no, ic, label, right){
   return '<a class="replink" onclick="go(\'' + v + '\')">' +
