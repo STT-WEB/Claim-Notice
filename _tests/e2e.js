@@ -380,7 +380,44 @@ T('QC ไม่ Accept → วนกลับเป็นเคลมรอบ�
   if(f.round!==2) throw new Error('ไม่ได้นับเป็นรอบที่ 2 ได้ '+f.round);
   return 'กลับไปขั้น '+r.stage+' · รอบที่ '+f.round+' · ล้างเลข GR/RCV/IS + ลายเซ็นรอบ 2 แล้ว'; });
 
-console.log('\n⑧ รายงานที่เบียร์สั่งเพิ่ม (7 ก.ย. 2569)');
+console.log('\n⑧ หน้าแรก — แท็บต้องครอบทุกขั้น ไม่งั้นใบหายจากหน้าจอ');
+T('ทุกขั้นในสายงาน ต้องมีแท็บรองรับ ไม่มีขั้นไหนตกหล่น', ()=>{
+  const stages=call('stageList',[]).map(s=>s.key).filter(k=>k!=='CANCELLED');
+  const TS=vm.runInContext('JSON.stringify(TAB_STAGES)', sandbox);
+  const tabs=JSON.parse(TS), covered={};
+  Object.keys(tabs).forEach(t=>(tabs[t]||[]).forEach(k=>covered[k]=t));
+  const miss=stages.filter(k=>!covered[k]);
+  if(miss.length) throw new Error('ขั้นที่ไม่มีแท็บรองรับ: '+miss.join(', ')+' → ใบจะหายจากหน้าแรก');
+  return stages.length+' ขั้น อยู่ใน '+Object.keys(tabs).length+' แท็บครบ'; });
+
+T('ใบที่อยู่ขั้นใหม่ ต้องโผล่ในแท็บของคนที่รับผิดชอบ', ()=>{
+  const n=mkClaim_();
+  call('saveClaimField',[n,'result','NEWPART',BUY]);
+  call('saveItemField',[n,1,'cost','500',BUY]);
+  call('advanceClaim',[n,BUY]);                        // → STORE_IN
+  const w=call('workQueues',[STORE]);
+  const inSin=(w.tabs.sin.rows||[]).some(r=>r.docNo===n);
+  if(!inSin) throw new Error('ใบขั้นสโตร์รับเข้า ไม่โผล่ในแท็บของสโตร์');
+  if(!w.tabs.sin.mine) throw new Error('สโตร์เปิดแท็บนี้ไม่ได้');
+  call('receiveClaim',[n,STORE]);
+  call('saveClaimField',[n,'storeLoc','B-9',STORE]);
+  call('advanceClaim',[n,STORE]);                      // → QC_RECV
+  const w2=call('workQueues',[QC]);
+  if(!(w2.tabs.qcrecv.rows||[]).some(r=>r.docNo===n)) throw new Error('ใบขั้น QC ตรวจรับ ไม่โผล่ในแท็บ QC');
+  if(!w2.tabs.qcrecv.mine) throw new Error('QC เปิดแท็บตรวจรับไม่ได้');
+  return n+' · โผล่ถูกแท็บทั้งขั้นสโตร์รับเข้าและขั้น QC ตรวจรับ'; });
+
+T('แถวในหน้าแรก มีเลขขั้น + ชื่อขั้นครบทุกใบ (ไม่ขึ้น undefined)', ()=>{
+  const w=call('workQueues',[AUTH]);
+  const bad=[];
+  Object.keys(w.tabs).forEach(t=>(w.tabs[t].rows||[]).forEach(r=>{
+    if(r.stageNo===undefined||r.stageNo===''||!r.stageName) bad.push(t+':'+r.docNo);
+  }));
+  if(bad.length) throw new Error('แถวที่ขั้นตอนไม่ครบ: '+bad.join(', '));
+  const n=Object.keys(w.tabs).reduce((a,t)=>a+(w.tabs[t].rows||[]).length,0);
+  return 'ตรวจ '+n+' แถว มีเลขขั้น+ชื่อขั้นครบทุกแถว'; });
+
+console.log('\n⑨ รายงานที่เบียร์สั่งเพิ่ม (7 ก.ย. 2569)');
 T('3.5 รวมยอดเรียกเก็บ — จัดกลุ่มตาม Supplier เฉพาะใบที่ต้องเรียกเงิน', ()=>{
   const n=mkClaim_();
   call('saveClaimField',[n,'result','BUYSELF',BUY]);

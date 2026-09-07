@@ -911,19 +911,28 @@ function createClaimWithPhotos(h, draftId, seqMap, auth, submit){
 /* ═══ เมนู 5 แท็บแบบ NOVA (v1.0.0) ═══════════════════════════
  * เบียร์: "มี Tab เปิดใบขอเคลม · Tab อนุมัติ · Tab งานสโตร์ · Tab งานจัดซื้อ · Tab อนุมัติปิดจบ"
  * แต่ละแท็บ = ใบที่ค้างอยู่ที่ขั้นนั้น · ตัวเลขบนแท็บ = จำนวนใบที่รอคุณทำ                */
+/* v1.1.0 — สายงานเป็น 10 ขั้น แท็บต้องครอบให้ครบทุกขั้น
+   ⚠️ ของเดิมแท็บ close ชี้ไปขั้น 'RETURN' ที่ยกเลิกไปแล้ว
+      ใบที่อยู่ขั้นสโตร์รับเข้า / QC ตรวจรับ / เบิกออก จะไม่โผล่ในแท็บไหนเลย = ใบหายจากหน้าแรก */
 var TAB_STAGES = {
   open   : ['REQUEST'],
   approve: ['APPROVAL'],
   store  : ['STORE'],
   buy    : ['PURCHASE','SUPPLIER'],
-  close  : ['RETURN','CLOSED']
+  sin    : ['STORE_IN'],
+  qcrecv : ['QC_RECV'],
+  sout   : ['STORE_OUT'],
+  close  : ['CLOSE_WAIT','CLOSED']
 };
 var TAB_ROLES = {
   open   : ['PRODUCTION','SALES','QC','DESIGN'],
   approve: ['APPROVER'],
   store  : ['STORE','PURCHASE'],
   buy    : ['PURCHASE','STORE'],
-  close  : ['ADMIN','APPROVER','QC','PRODUCTION']
+  sin    : ['STORE'],
+  qcrecv : ['QC','PRODUCTION'],
+  sout   : ['STORE'],
+  close  : ['ADMIN','APPROVER']
 };
 
 /** ใบที่ค้างอยู่ในแต่ละแท็บ — คำสั่งเดียวได้ครบทั้ง 5 แท็บ ไม่ต้องยิงทีละแท็บ */
