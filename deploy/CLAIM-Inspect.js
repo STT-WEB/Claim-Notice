@@ -124,15 +124,49 @@ function listInspTemplates(){
   return out;
 }
 
-function inspDb_(){
-  if (_IDB) return _IDB;                    // v0.4.0 — เปิดไฟล์ครั้งเดียวต่อคำสั่ง
-  var ss = ss_(), be = yearBE_();
-  _IDB = {
+/* ═══ แท็บใบตรวจรับ แยกตามปี — กติกาเดียวกับฝั่งใบเคลม (ดู CLAIM-Hub.js) ═══
+ *   • เปิดใบใหม่        → inspDb_()          (ปีปัจจุบัน)
+ *   • ทำงานกับใบใด ๆ     → inspDbOf_(docNo)   (ปีที่ระบุในเลขที่เอกสาร)
+ *   • ทะเบียน / รายงาน  → eachInspYear_()    (กวาดทุกปี)
+ * ⚠️ ห้ามกลับไปใช้ปีปัจจุบันตายตัว ไม่งั้นขึ้นปีใหม่แล้วใบตรวจปีก่อนหายทั้งหมด */
+function inspDbY_(be, create){
+  be = be || yearBE_();
+  var k = String(be) + (create ? 'C' : 'R');
+  if (!_IDB) _IDB = {};
+  if (_IDB[k]) return _IDB[k];
+  var ss = ss_();
+  if (!create && !ss.getSheetByName('INSP_' + be)) return null;
+  _IDB[k] = {
     ss    : ss,
+    be    : be,
     head  : ensureCols_(ensureTab_(ss, 'INSP_' + be, inspHdr_()), inspHdr_()),
     items : ensureTab_(ss, 'INSPIT_'  + be, HDR_INSPIT)
   };
-  return _IDB;
+  return _IDB[k];
+}
+function inspDb_(){ return inspDbY_(yearBE_(), true); }
+function inspDbOf_(docNo){
+  var be = beOfNo_(docNo);
+  return inspDbY_(be, be === yearBE_()) || inspDb_();
+}
+/** ปีทั้งหมดที่มีใบตรวจรับ (รวมปีปัจจุบันเสมอ) */
+function inspYearsBE_(){
+  var shs = ss_().getSheets(), out = [];
+  for (var i = 0; i < shs.length; i++){
+    var m = shs[i].getName().match(/^INSP_(\d{4})$/);
+    if (m) out.push(parseInt(m[1], 10));
+  }
+  var cur = yearBE_();
+  if (out.indexOf(cur) < 0) out.push(cur);
+  out.sort(function(a, b){ return b - a; });
+  return out;
+}
+function eachInspYear_(fn){
+  var ys = inspYearsBE_();
+  for (var i = 0; i < ys.length; i++){
+    var d = inspDbY_(ys[i], ys[i] === yearBE_());
+    if (d) fn(d, ys[i]);
+  }
 }
 
 /** เลขที่ INS-YY/NNNN — นับจากชีต INSP ของตัวเอง ไม่ปนกับ CLM */
@@ -211,7 +245,7 @@ function inspItemsOf_(d, docNo){
 function getInspection(docNo, auth){
   requireLogin_(auth);
   docNo = norm_(docNo);
-  var d = inspDb_(), r = findInspRow_(d.head, docNo);
+  var d = inspDbOf_(docNo), r = findInspRow_(d.head, docNo);
   if (r < 0) return null;
   var hdr = d.head.getRange(1,1,1,HDR_INSP.length).getDisplayValues()[0];
   var row = d.head.getRange(r,1,1,HDR_INSP.length).getDisplayValues()[0];
@@ -224,14 +258,23 @@ function getInspection(docNo, auth){
 function listInspections(filter, auth){
   var meL = requireLogin_(auth);
   filter = filter || {};
-  var d = inspDb_(), lr = d.head.getLastRow();
-  if (lr < 2) return [];
   var full = inspHdr_();
+  var pho  = photoCountByDoc_();
+  var out  = [];
+  /* ⚠️ ต้องกวาดทุกปี — ใบตรวจที่ยังไม่จบของปีก่อน ห้ามหายตอนขึ้นปีใหม่ */
+  eachInspYear_(function(d){
+    var lr = d.head.getLastRow(); if (lr < 2) return;
+    listInspYear_(d, lr, full, filter, meL, pho, out);
+  });
+  return out;
+}
+
+function listInspYear_(d, lr, full, filter, meL, pho, out){
   var hdr = d.head.getRange(1,1,1,HDR_INSP.length).getDisplayValues()[0];
   var rows = d.head.getRange(2,1,lr-1,full.length).getDisplayValues();
   var iSt = colOfI_('ขั้นตอน') - 1;
 
-  /* นับผลตรวจของทุกใบทีเดียว แล้วค่อยแจก — ไม่วนอ่านทีละใบ */
+  /* นับผลตรวจของทุกใบในปีนี้ทีเดียว แล้วค่อยแจก — ไม่วนอ่านทีละใบ */
   var cnt = {}, lrI = d.items.getLastRow();
   if (lrI >= 2){
     var vi = d.items.getRange(2,1,lrI-1,6).getDisplayValues();
@@ -245,9 +288,7 @@ function listInspections(filter, auth){
       else cnt[dn].todo++;
     }
   }
-  var pho = photoCountByDoc_();
 
-  var out = [];
   for (var i = rows.length - 1; i >= 0; i--){
     var o = {};
     for (var j = 0; j < hdr.length; j++) o[hdr[j]] = norm_(rows[i][j]);
@@ -278,14 +319,18 @@ function listInspections(filter, auth){
 
 /** นับรูปต่อเอกสาร (ใช้ได้ทั้ง CLM และ INS) */
 function photoCountByDoc_(){
-  var out = {}, pt = photoTab_(), lr = pt.getLastRow();
-  if (lr < 2) return out;
-  var v = pt.getRange(2,1,lr-1,HDR_PHOTO.length).getDisplayValues();
-  for (var i = 0; i < v.length; i++){
-    if (norm_(v[i][7]).toUpperCase() === 'N') continue;
-    var dn = norm_(v[i][0]); if (!dn) continue;
-    out[dn] = (out[dn] || 0) + 1;
-  }
+  var out = {};
+  /* รูปเก็บแยกแท็บตามปีเหมือนตัวเอกสาร จึงต้องนับทุกปี
+     ไม่งั้นใบปีก่อนจะขึ้นว่า "ไม่มีรูป" ทั้งที่รูปยังอยู่ครบ */
+  eachPhotoYear_(function(pt){
+    var lr = pt.getLastRow(); if (lr < 2) return;
+    var v = pt.getRange(2,1,lr-1,HDR_PHOTO.length).getDisplayValues();
+    for (var i = 0; i < v.length; i++){
+      if (norm_(v[i][7]).toUpperCase() === 'N') continue;
+      var dn = norm_(v[i][0]); if (!dn) continue;
+      out[dn] = (out[dn] || 0) + 1;
+    }
+  });
   return out;
 }
 
@@ -301,7 +346,7 @@ function saveInspHeadField(docNo, field, value, auth){
   requireAny_(auth, ['QC','PRODUCTION','STORE','PURCHASE','DESIGN','APPROVER']);
   var col = INSP_FIELD_COL[field];
   if (!col) throw new Error('ไม่รู้จักช่อง ' + field);
-  var d = inspDb_();
+  var d = inspDbOf_(docNo);
   var r = insEditable_(d, docNo, null);       // อนุมัติแล้วแก้ไม่ได้
   if (r < 0) throw new Error('ไม่พบใบตรวจ ' + docNo);
   var v = norm_(value);
@@ -329,7 +374,7 @@ function saveInspItemField(docNo, seq, field, value, auth){
   var me = requireAny_(auth, ['QC','PRODUCTION','STORE','PURCHASE','DESIGN','APPROVER']);
   var col = INSPIT_FIELD_COL[field];
   if (!col) throw new Error('ไม่รู้จักช่อง ' + field);
-  var d = inspDb_();
+  var d = inspDbOf_(docNo);
   insEditable_(d, docNo, me);                 // อนุมัติแล้วแก้ไม่ได้
   var lr = d.items.getLastRow();
   if (lr < 2) throw new Error('ไม่พบหัวข้อตรวจ');
@@ -349,7 +394,7 @@ function saveInspItemField(docNo, seq, field, value, auth){
 /** เพิ่มหัวข้อตรวจ 1 บรรทัด */
 function addInspItem(docNo, auth){
   requireAny_(auth, ['QC','PRODUCTION','STORE','PURCHASE','DESIGN','APPROVER']);
-  var d = inspDb_(), list = inspItemsOf_(d, norm_(docNo));
+  var d = inspDbOf_(docNo), list = inspItemsOf_(d, norm_(docNo));
   var seq = 1;
   for (var i = 0; i < list.length; i++) seq = Math.max(seq, num_(list[i].seq) + 1);
   d.items.appendRow([norm_(docNo), seq, '', '', '', '', '', '', '', '', '', '', '']);
@@ -359,7 +404,7 @@ function addInspItem(docNo, auth){
 /** ลบหัวข้อตรวจ (ลบได้เฉพาะข้อที่ยังไม่ได้ส่งไปเคลม) */
 function delInspItem(docNo, seq, auth){
   requireAny_(auth, ['QC','PRODUCTION','STORE','PURCHASE','DESIGN','APPROVER']);
-  var d = inspDb_(), lr = d.items.getLastRow();
+  var d = inspDbOf_(docNo), lr = d.items.getLastRow();
   if (lr < 2) return { ok:true };
   var v = d.items.getRange(2,1,lr-1,11).getDisplayValues();
   for (var i = 0; i < v.length; i++){
@@ -376,7 +421,7 @@ function delInspItem(docNo, seq, auth){
 /** ข้อมูลขั้นตอนของใบตรวจ สำหรับหน้าเว็บ */
 function inspFlow(docNo, auth){
   var me = requireLogin_(auth);
-  var d = inspDb_(), r = findInspRow_(d.head, norm_(docNo));
+  var d = inspDbOf_(docNo), r = findInspRow_(d.head, norm_(docNo));
   if (r < 0) return null;
   var key = insStageOf_(d.head, r), st = insStage_(key);
   var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
@@ -420,7 +465,7 @@ function insMissing_(d, docNo, key){
 function advanceInsp(docNo, auth){
   var me = requireLogin_(auth);
   docNo = norm_(docNo);
-  var d = inspDb_(), r = findInspRow_(d.head, docNo);
+  var d = inspDbOf_(docNo), r = findInspRow_(d.head, docNo);
   if (r < 0) throw new Error('ไม่พบใบตรวจ ' + docNo);
   var key = insStageOf_(d.head, r), st = insStage_(key);
   if (!st.next) throw new Error('ใบนี้อนุมัติแล้ว');
@@ -456,7 +501,7 @@ function rejectInsp(docNo, reason, auth){
     throw new Error('ตีกลับใบตรวจได้เฉพาะผู้บังคับบัญชา');
 
   docNo = norm_(docNo);
-  var d = inspDb_(), r = findInspRow_(d.head, docNo);
+  var d = inspDbOf_(docNo), r = findInspRow_(d.head, docNo);
   if (r < 0) throw new Error('ไม่พบใบตรวจ ' + docNo);
   setInsStage_(d.head, r, 'IDRAFT', me, 'ตีกลับ: ' + reason);
   d.head.getRange(r, colOfI_('เหตุผลที่ตีกลับ')).setValue(reason);
@@ -471,7 +516,7 @@ function rejectInsp(docNo, reason, auth){
 function inspCheck(docNo, auth){
   requireLogin_(auth);
   docNo = norm_(docNo);
-  var items = inspItemsOf_(inspDb_(), docNo);
+  var items = inspItemsOf_(inspDbOf_(docNo), docNo);
   var ph = listPhotos(docNo, auth);
   var un = [], noPhoto = [], todo = [];
   for (var i = 0; i < items.length; i++){
@@ -497,7 +542,7 @@ function inspCheck(docNo, auth){
 function sendUnAccToClaim(docNo, auth){
   /* เบียร์: Inspection ก็ต้องผ่านอนุมัติก่อน ถึงจะเปิดใบเคลมจากข้อที่ไม่ผ่านได้ */
   (function(){
-    var dd = inspDb_(), rr = findInspRow_(dd.head, norm_(docNo));
+    var dd = inspDbOf_(docNo), rr = findInspRow_(dd.head, norm_(docNo));
     if (rr >= 0 && insStageOf_(dd.head, rr) !== 'IDONE')
       throw new Error('ใบตรวจนี้ยังไม่ได้รับอนุมัติ — ให้ผู้บังคับบัญชาอนุมัติก่อน แล้วค่อยเปิดใบเคลม');
   })();
@@ -506,7 +551,7 @@ function sendUnAccToClaim(docNo, auth){
   var chk = inspCheck(docNo, auth);
   if (!chk.ok) throw new Error(chk.msg);
 
-  var d = inspDb_(), r = findInspRow_(d.head, docNo);
+  var d = inspDbOf_(docNo), r = findInspRow_(d.head, docNo);
   if (r < 0) throw new Error('ไม่พบใบตรวจ ' + docNo);
   var hdr = d.head.getRange(1,1,1,HDR_INSP.length).getDisplayValues()[0];
   var hrow = d.head.getRange(r,1,1,HDR_INSP.length).getDisplayValues()[0];
@@ -554,7 +599,7 @@ function sendUnAccToClaim(docNo, auth){
 
 /** ก๊อปแถวรูปจากเอกสารหนึ่งไปอีกเอกสาร — ชี้ไฟล์ Drive เดิม ไม่สร้างไฟล์ใหม่ */
 function copyPhotosToDoc_(fromDoc, toDoc, seqList, byName){
-  var pt = photoTab_(), lr = pt.getLastRow();
+  var pt = photoTabOf_(fromDoc), lr = pt.getLastRow();
   if (lr < 2) return 0;
   var v = pt.getRange(2,1,lr-1,HDR_PHOTO.length).getDisplayValues();
   var want = {};

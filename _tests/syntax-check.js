@@ -101,4 +101,37 @@ console.log('checked ' + checked + ' script blocks, ' + fail + ' problem(s)');
   console.log('stage names: อยู่ที่ไฟล์หลังบ้านที่เดียว (' + names.length + ' ขั้น) ไม่มีซ้ำในหน้าเว็บ');
 })();
 
+/* ═══ ④ ทะเบียนและรายงาน ต้องกวาด "ทุกปี" ไม่ใช่แท็บปีปัจจุบันแท็บเดียว ═══
+ * บั๊กที่เคยเจอ: 1 ม.ค. ปีใหม่ ใบค้างของปีก่อนหายจากทะเบียน กล่องงาน และรายงานทั้งหมด
+ * ตัวตรวจนี้กันไม่ให้ใครเผลอเขียน db_().claims ตรง ๆ ในฟังก์ชันพวกนี้อีก
+ * ถ้าจะเพิ่มรายงานใหม่ ต้องใช้ eachClaim_ / eachYear_ / eachInspYear_ / eachPhotoYear_ */
+(function(){
+  var _d = path.join(__dirname, '..', 'deploy');
+  var MUST = {
+    'CLAIM-Hub.js'    : ['listClaims'],
+    'CLAIM-Inspect.js': ['listInspections','photoCountByDoc_'],
+    'CLAIM-More.js'   : ['reportCost','reportBilling','reportHR','reportAccounting',
+                         'reportMedia','getHome2','photoCoverage_']
+  };
+  var SPAN = /each(Claim|Year|InspYear|PhotoYear)_/;
+  var bad = [];
+  Object.keys(MUST).forEach(function(f){
+    var body = fs.readFileSync(path.join(_d, f), 'utf8');
+    MUST[f].forEach(function(fn){
+      var i = body.indexOf('function ' + fn + '(');
+      if (i < 0){ bad.push(f + ' → หาฟังก์ชัน ' + fn + ' ไม่เจอ'); return; }
+      /* ตัดเอาเฉพาะตัวฟังก์ชัน จนถึงฟังก์ชันถัดไป */
+      var j = body.indexOf('\nfunction ', i + 1);
+      var seg = body.slice(i, j < 0 ? body.length : j);
+      if (!SPAN.test(seg)) bad.push(f + ' → ' + fn + '() อ่านแค่ปีเดียว (ไม่มี eachYear_/eachClaim_)');
+    });
+  });
+  if (bad.length){
+    console.error('!! รายงาน/ทะเบียนที่ยังอ่านแค่ปีปัจจุบัน — ขึ้นปีใหม่แล้วข้อมูลจะหาย:');
+    bad.forEach(function(b){ console.error('   ' + b); });
+    fail++; return;
+  }
+  console.log('ข้ามปี: ทะเบียนและรายงาน 10 ตัว กวาดครบทุกปีแล้ว');
+})();
+
 process.exit(fail ? 1 : 0);

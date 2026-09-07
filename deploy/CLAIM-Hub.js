@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v1.1.2';
+var VERSION = 'v1.2.0';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -251,7 +251,9 @@ function authUser_(emp, pin){
   for (var i = 0; i < us.length; i++){
     if (us[i].emp && us[i].emp === emp && us[i].pin && us[i].pin === pin){
       if (!us[i].active) return { ok:false, msg:'รหัสพนักงานนี้ถูกปิดการใช้งานแล้ว' };
-      if (us[i].role === 'GUEST') return { ok:false, msg:'ยังไม่ได้กำหนดสิทธิ์งานเคลมให้รหัสนี้ (ช่อง role for Claim ในชีต USERS ว่างอยู่)' };
+      /* เบียร์: "คนไหนที่เบียร์ไม่ได้ใส่ role คือคนนั้นไม่ได้อยู่ในระบบเคลม"
+         → ช่องว่าง = ตั้งใจไม่ให้เข้า ไม่ใช่ลืมกรอก ข้อความจึงต้องไม่ชวนให้ไปแก้ชีตเอง */
+      if (us[i].role === 'GUEST') return { ok:false, msg:'รหัสนี้ไม่ได้อยู่ในระบบเคลม — ถ้าต้องใช้งาน ให้ผู้ดูแลระบบกำหนดหน้าที่ (role for Claim) ให้ก่อน' };
       return { ok:true, name:us[i].name, role:us[i].role, roles:us[i].roles,
                emp:us[i].emp, dept:us[i].dept || deptFromRoles_(us[i].roles) };
     }
@@ -263,12 +265,18 @@ function authUser_(emp, pin){
 var DEPTS = ['ผลิต','ขาย','QC','ออกแบบ','สโตร์','จัดซื้อ','คลังสินค้า','บุคคล','ผู้บริหาร'];
 function listDepts(){ return DEPTS; }
 
+/** เบียร์ (7 ก.ย. 2569): "บางคนมีได้ 2 หน้าที่ เช่น Sales / Approve"
+ *  → "อนุมัติ" เป็นหน้าที่ ไม่ใช่แผนก · แผนกต้องเอาจากงานที่เขาทำจริง
+ *    ถ้าไล่ตามลำดับ roles ดื้อ ๆ คุณสุขุมาล (Sales / Approve) จะกลายเป็นแผนก "ผู้บริหาร"
+ *    แล้วใบร่างของฝ่ายขายจะไปโผล่ผิดแผนก — ต้องเรียงให้แผนกที่ทำงานจริงมาก่อน */
+var DEPT_PICK = ['PRODUCTION','SALES','QC','DESIGN','STORE','PURCHASE','HR','PICKER','ADMIN','APPROVER'];
 function deptFromRoles_(roles){
   var map = { ADMIN:'ผู้บริหาร', APPROVER:'ผู้บริหาร', PRODUCTION:'ผลิต', SALES:'ขาย',
               QC:'QC', DESIGN:'ออกแบบ', STORE:'สโตร์', PURCHASE:'จัดซื้อ',
               HR:'บุคคล', PICKER:'คลังสินค้า' };
   roles = roles || [];
-  for (var i = 0; i < roles.length; i++) if (map[roles[i]]) return map[roles[i]];
+  for (var i = 0; i < DEPT_PICK.length; i++)
+    if (roles.indexOf(DEPT_PICK[i]) >= 0) return map[DEPT_PICK[i]];
   return '';
 }
 
@@ -434,7 +442,7 @@ var HDR_LOG  = ['วันเวลา','ผู้ใช้','การกระ
  *   openById แต่ละครั้งกิน 0.5-1.5 วินาที → ยังไม่มีข้อมูลเลยก็ช้าแล้ว
  * แก้: จำไว้ในตัวแปรกลาง ภายใน 1 คำสั่งเปิดไฟล์ครั้งเดียวพอ
  *   (ตัวแปรกลางของ Apps Script อยู่แค่ในคำสั่งนั้น คำสั่งถัดไปเริ่มใหม่ = ไม่มีข้อมูลค้าง) */
-var _DBID = null, _SS = null, _DB = null, _IDB = null, _PT = null;
+var _DBID = null, _SS = null, _IDB = null, _PT = null;
 
 function ss_(){
   if (!_SS) _SS = SpreadsheetApp.openById(dbId_());
@@ -472,20 +480,115 @@ function ensureTab_(ss, name, header){
   return sh;
 }
 
-function db_(){
-  if (_DB) return _DB;
+/* ═══════════════ ตัวจัดเส้นทาง "ปี" (v1.2.0) ═══════════════════════════
+ * ข้อมูลเก็บแยกแท็บตามปี พ.ศ. — CLAIMS_2569 · ITEMS_2569 · PHOTOS_2569 …
+ * เหตุผลที่ต้องแยก: 10-20 ปีข้างหน้า ถ้ากองรวมแท็บเดียว ชีตจะช้าจนใช้งานไม่ได้
+ *
+ * ⚠️ บั๊กที่เจอและแก้ที่นี่ (ห้ามทำหายอีก):
+ *   ของเดิม db_() ชี้แท็บ "ปีปัจจุบัน" อย่างเดียว
+ *   → พอถึง 1 ม.ค. ปีใหม่ ใบที่ยังทำไม่จบของปีก่อน หายจากทะเบียน หายจากกล่องงาน
+ *     หายจากรายงาน ทั้งที่ข้อมูลยังอยู่ในชีต = งานค้างสูญทันทีตอนขึ้นปีใหม่
+ *
+ * กติกาที่ใช้ตอนนี้ (จำให้ขึ้นใจ):
+ *   • "เปิดใบใหม่" → เขียนลงแท็บปีปัจจุบันเสมอ            → db_()
+ *   • "ทำงานกับใบใด ๆ" → ดูจากเลขที่เอกสาร ว่าใบนั้นปีไหน → dbOf_(docNo)
+ *       CLM-69/0001 อยู่ CLAIMS_2569 ตลอดไป ไม่ว่าวันนี้จะปีอะไร
+ *   • "ทะเบียน / กล่องงาน / รายงาน" → กวาดทุกปีที่มีแท็บอยู่ → eachYear_()
+ * ────────────────────────────────────────────────────────────────────── */
+
+var _DBY = {}, _YEARS = null;
+
+/** ชุดแท็บของปีที่ระบุ · create=true คือยอมให้สร้างแท็บใหม่ (ใช้เฉพาะปีที่กำลังเขียน) */
+function dbY_(be, create){
+  be = be || yearBE_();
+  var k = String(be) + (create ? 'C' : 'R');
+  if (_DBY[k]) return _DBY[k];
   var ss = ss_();
-  var be = yearBE_();
+  if (!create && !ss.getSheetByName('CLAIMS_' + be)) return null;   // ปีนั้นไม่มีข้อมูล ห้ามสร้างแท็บเปล่าทิ้งไว้
   var o = {
     ss     : ss,
+    be     : be,
     claims : ensureCols_(ensureTab_(ss, 'CLAIMS_' + be, claimHdr_()), claimHdr_()),
     items  : ensureTab_(ss, 'ITEMS_'  + be, HDR_ITEM),
     labour : ensureTab_(ss, 'LABOUR_' + be, HDR_LAB),
     ack    : ensureTab_(ss, 'ACK_'    + be, HDR_ACK),
     log    : ensureTab_(ss, 'LOG',          HDR_LOG)
   };
-  _DB = o;
+  _DBY[k] = o;
   return o;
+}
+
+/** แท็บของ "ปีปัจจุบัน" — ที่สำหรับเขียนใบใหม่ */
+function db_(){ return dbY_(yearBE_(), true); }
+
+/** อ่านปี พ.ศ. ออกจากเลขที่เอกสาร  CLM-69/0001 → 2569 · INS-70/0004 → 2570
+ *  ปีท้ายสองหลักวนทุก 100 ปี จึงเทียบกับปีปัจจุบันเสมอ ไม่บวก 2500 ตายตัว */
+function beOfNo_(no){
+  var m = norm_(no).match(/^[A-Za-z]+-(\d{2})\//);
+  if (!m) return yearBE_();
+  var cur = yearBE_();
+  var be  = Math.floor(cur / 100) * 100 + parseInt(m[1], 10);
+  if (be > cur + 1) be -= 100;            // เลขปีที่ล้ำอนาคต = ใบของศตวรรษก่อน
+  return be;
+}
+
+/** ชุดแท็บของ "ใบนี้" — ตัดสินจากเลขที่เอกสาร ไม่ใช่จากวันนี้ */
+function dbOf_(docNo){
+  var be = beOfNo_(docNo);
+  var d = dbY_(be, be === yearBE_());
+  return d || db_();                      // ปีนั้นไม่มีแท็บ = ไม่มีใบนี้จริง ๆ ให้ไปเจอ -1 ที่ findClaimRow_
+}
+
+/** ปีทั้งหมดที่มีข้อมูลอยู่ในไฟล์ เรียงใหม่ไปเก่า (ปีปัจจุบันติดมาด้วยเสมอ) */
+function yearsBE_(){
+  if (_YEARS) return _YEARS;
+  var shs = ss_().getSheets(), out = [];
+  for (var i = 0; i < shs.length; i++){
+    var m = shs[i].getName().match(/^CLAIMS_(\d{4})$/);
+    if (m) out.push(parseInt(m[1], 10));
+  }
+  var cur = yearBE_();
+  if (out.indexOf(cur) < 0) out.push(cur);
+  out.sort(function(a, b){ return b - a; });
+  _YEARS = out;
+  return out;
+}
+
+/** วนทุกปีที่มีข้อมูล — ใช้กับทะเบียน กล่องงาน และรายงานทุกตัว
+ *  fn(d) เรียกทีละปี · ปีใหม่มาก่อน เพื่อให้ใบล่าสุดขึ้นบนสุดตามธรรมชาติ */
+function eachYear_(fn){
+  var ys = yearsBE_();
+  for (var i = 0; i < ys.length; i++){
+    var d = dbY_(ys[i], ys[i] === yearBE_());
+    if (d) fn(d, ys[i]);
+  }
+}
+
+/** วนทุกใบเคลม "ทุกปี" — ตัวช่วยมาตรฐานของรายงานทุกตัว
+ *  fn(o, stage, d, r, raw)
+ *    o     = แถวแปลงเป็น object ตามชื่อหัวคอลัมน์
+ *    stage = ขั้นตอนปัจจุบัน (ว่าง = REQUEST)
+ *    d     = ชุดแท็บของ "ปีนั้น" (ต้องใช้ตัวนี้ตอนอ่าน items/labour ห้ามใช้ db_())
+ *    r     = เลขแถวจริงในชีตปีนั้น (ไว้เขียนกลับ)
+ *  ⚠️ รายงานทุกตัวต้องผ่านตัวนี้ ห้ามอ่าน db_().claims ตรง ๆ
+ *     ไม่งั้นพอขึ้นปีใหม่ รายงานจะเหลือแต่ใบของปีปัจจุบัน */
+function eachClaim_(fn){
+  var full = claimHdr_();
+  eachYear_(function(d){
+    var lr = d.claims.getLastRow(); if (lr < 2) return;
+    /* อ่านหัวตาราง "เต็มความยาว" — ต้องได้คอลัมน์ฝั่งสายงานด้วย
+       (ความรับผิดชอบ · ชื่อผู้ทำเสียหาย · เลขที่ใบเรียกเก็บรวม ฯลฯ)
+       ⚠️ ถ้าอ่านแค่ HDR_CLAIM รายงาน HR/บัญชี จะว่างเปล่าแบบไม่มีใครรู้ */
+    var hdr    = d.claims.getRange(1,1,1,full.length).getDisplayValues()[0];
+    var rows   = d.claims.getRange(2,1,lr-1,full.length).getDisplayValues();
+    var iStage = colOf_('ขั้นตอน') - 1;
+    for (var i = 0; i < rows.length; i++){
+      var o = {};
+      for (var c = 0; c < hdr.length; c++) if (hdr[c]) o[hdr[c]] = norm_(rows[i][c]);
+      if (!o['เลขที่เอกสาร']) continue;
+      fn(o, norm_(rows[i][iStage]) || 'REQUEST', d, i + 2, rows[i]);
+    }
+  });
 }
 
 function log_(action, ref, detail){
@@ -525,7 +628,7 @@ function requireLogin_(auth){
     /* บอกสาเหตุไปเลย จะได้ไม่ต้องเดา — ไม่เปิดเผย PIN หรือข้อมูลใคร */
     var why = !auth ? 'ระบบไม่ได้รับข้อมูลผู้ใช้มาด้วย'
             : (!auth.emp || !auth.pin) ? 'ข้อมูลผู้ใช้ที่ส่งมาไม่ครบ'
-            : 'รหัสพนักงาน ' + norm_(auth.emp) + ' ตรวจไม่ผ่าน (PIN ไม่ตรง หรือช่อง role for Claim ในชีต USERS ว่าง)';
+            : 'รหัสพนักงาน ' + norm_(auth.emp) + ' เข้าใช้งานไม่ได้ (PIN ไม่ตรง หรือไม่ได้อยู่ในระบบเคลม)';
     throw new Error('กรุณาเข้าสู่ระบบก่อน — ' + why);
   }
   return me;
@@ -606,7 +709,7 @@ function saveItems_(d, docNo, items){
 function saveClaim(docNo, h, auth){
   var me = requireAny_(auth, ['PRODUCTION','QC','DESIGN','STORE','PURCHASE','APPROVER']);
   docNo = norm_(docNo);
-  var d = db_(), r = findClaimRow_(d.claims, docNo);
+  var d = dbOf_(docNo), r = findClaimRow_(d.claims, docNo);
   if (r < 0) throw new Error('ไม่พบเอกสาร ' + docNo);
 
   var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
@@ -641,7 +744,7 @@ function saveClaim(docNo, h, auth){
 function getClaim(docNo, auth){
   requireLogin_(auth);
   docNo = norm_(docNo);
-  var d = db_();
+  var d = dbOf_(docNo);
   var lr = d.claims.getLastRow(); if (lr < 2) return null;
   var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
   var r = findClaimRow_(d.claims, docNo);
@@ -674,18 +777,29 @@ function canSeeDraft_(me, createdBy, dept){
   return false;
 }
 
+/** ทะเบียนเอกสาร — ต้องกวาด "ทุกปี" ไม่ใช่เฉพาะปีปัจจุบัน
+ *  ⚠️ ของเดิมอ่านแท็บปีปัจจุบันแท็บเดียว → 1 ม.ค. ปีใหม่ ใบค้างของปีก่อนหายเกลี้ยง
+ *  ปีใหม่มาก่อน (yearsBE_ เรียงจากมากไปน้อย) และในแต่ละปีไล่จากแถวล่างขึ้นบน
+ *  = ใบล่าสุดอยู่บนสุดเสมอ ไม่ว่าจะข้ามปีมากี่ปี */
 function listClaims(filter, auth){
   var meL = requireLogin_(auth);
   filter = filter || {};
-  var d = db_(), lr = d.claims.getLastRow();
-  if (lr < 2) return [];
+  var pho = photoCoverage_();          // v0.2.0 — รูปครบไหม ดูได้ตั้งแต่หน้าทะเบียน
+  var out = [];
   var full = claimHdr_();
-  ensureCols_(d.claims, full);
+  eachYear_(function(d){
+    if (out.length >= 500) return;
+    var lr = d.claims.getLastRow();
+    if (lr < 2) return;
+    listClaimsYear_(d, lr, full, filter, meL, pho, out);
+  });
+  return out;
+}
+
+function listClaimsYear_(d, lr, full, filter, meL, pho, out){
   var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
   var rows = d.claims.getRange(2,1,lr-1,full.length).getDisplayValues();
   var iStage = colOf_('ขั้นตอน') - 1;
-  var pho = photoCoverage_();          // v0.2.0 — รูปครบไหม ดูได้ตั้งแต่หน้าทะเบียน
-  var out = [];
   for (var i = rows.length - 1; i >= 0; i--){      // ใหม่อยู่บน
     var o = claimRowObj_(hdr, rows[i]);
     var stg = norm_(rows[i][iStage]) || 'REQUEST';
@@ -714,7 +828,6 @@ function listClaims(filter, auth){
     });
     if (out.length >= 500) break;
   }
-  return out;
 }
 
 /** หน้าแรก: นับงานคร่าว ๆ */
@@ -732,6 +845,7 @@ function clearCaches(){
   var c = CacheService.getScriptCache();
   c.removeAll(['CLAIM_USERS','CLAIM_WIP','CLAIM_VENDORS','CLAIM_GOODS','CLAIM_HOME']);
   _USERS = _WIP = _VEND = null; _ME = {};
+  _DBY = {}; _YEARS = null; _IDB = null; _PT = null;   // ล้างแท็บที่จำไว้ด้วย ไม่งั้นชี้ปีเดิมค้าง
   return 'ล้างแคชแล้ว';
 }
 
@@ -750,9 +864,29 @@ function getDbLink(auth){
 
 var HDR_PHOTO = ['เลขที่เอกสาร','รายการที่','ลำดับรูป','ชื่อไฟล์','file id','ลิงก์รูป','ลิงก์เปิดเต็ม','ใช้งาน','โดย','เมื่อ'];
 
-function photoTab_(){
-  if (!_PT) _PT = ensureTab_(ss_(), 'PHOTOS_' + yearBE_(), HDR_PHOTO);
-  return _PT;
+/** แท็บรูปของปีที่ระบุ — รูปต้องอยู่ปีเดียวกับใบเสมอ
+ *  ⚠️ ของเดิมใช้ปีปัจจุบันตายตัว → ขึ้นปีใหม่แล้วเปิดใบเก่า รูปหายหมด */
+function photoTabY_(be){
+  var k = String(be || yearBE_());
+  if (!_PT) _PT = {};
+  if (!_PT[k]) _PT[k] = ensureTab_(ss_(), 'PHOTOS_' + k, HDR_PHOTO);
+  return _PT[k];
+}
+/** แท็บรูปของ "ใบนี้" — ตัดสินจากเลขที่เอกสาร */
+function photoTabOf_(docNo){ return photoTabY_(beOfNo_(docNo)); }
+function photoTab_(){ return photoTabY_(yearBE_()); }
+
+/** วนแท็บรูป "ทุกปี" — ใช้กับรายงานรูป และตัวนับรูปทุกตัว */
+function eachPhotoYear_(fn){
+  var shs = ss_().getSheets(), ys = [];
+  for (var i = 0; i < shs.length; i++){
+    var m = shs[i].getName().match(/^PHOTOS_(\d{4})$/);
+    if (m) ys.push(parseInt(m[1], 10));
+  }
+  var cur = yearBE_();
+  if (ys.indexOf(cur) < 0) ys.push(cur);
+  ys.sort(function(a, b){ return b - a; });
+  for (var k = 0; k < ys.length; k++) fn(photoTabY_(ys[k]), ys[k]);
 }
 
 /** โฟลเดอร์ Drive: รูป-วิดีโอ / <เลขจ๊อบ> / <เลขที่เอกสาร>  (ชื่อโฟลเดอร์ใช้ / ได้ ไม่ต้องแปลง) */
@@ -796,7 +930,7 @@ function savePhoto(docNo, jobNo, seq, dataUrl, fname, auth){
   var thumb = 'https://drive.google.com/thumbnail?id=' + id + '&sz=w1000';
   var view  = 'https://drive.google.com/file/d/' + id + '/view';
 
-  var sh = photoTab_();
+  var sh = photoTabOf_(docNo);
   var no = 1, lr = sh.getLastRow();
   if (lr > 1){
     var v = sh.getRange(2,1,lr-1,3).getDisplayValues();
@@ -853,7 +987,7 @@ function zipPhotos(docNo, auth){
 
 function photosOf_(docNo){
   docNo = norm_(docNo);
-  var sh = photoTab_(), lr = sh.getLastRow();
+  var sh = photoTabOf_(docNo), lr = sh.getLastRow();
   var out = {};
   if (lr < 2) return out;
   var v = sh.getRange(2,1,lr-1,HDR_PHOTO.length).getDisplayValues();
@@ -871,7 +1005,7 @@ function photosOf_(docNo){
 function removePhoto(docNo, fileId, auth){
   var me = requireLogin_(auth);
   docNo = norm_(docNo); fileId = norm_(fileId);
-  var sh = photoTab_(), lr = sh.getLastRow();
+  var sh = photoTabOf_(docNo), lr = sh.getLastRow();
   if (lr < 2) return { ok:false };
   var v = sh.getRange(2,1,lr-1,HDR_PHOTO.length).getDisplayValues();
   for (var i = 0; i < v.length; i++){

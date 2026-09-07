@@ -15,6 +15,10 @@ users.appendRow(['6406013','somchai@suteetankers.com','คุณสมชาย'
 users.appendRow(['6406020','store@suteetankers.com','คุณสโตร์','333333','Y','','Store','']);
 users.appendRow(['6406021','buy@suteetankers.com','คุณจัดซื้อ','444444','Y','','Purchase','']);
 users.appendRow(['6406099','boss@suteetankers.com','คุณหัวหน้า','555555','Y','','Approver','']);
+/* เบียร์ 7 ก.ย. 2569: "บางคนมีได้ 2 หน้าที่ เช่น นางสาวสุขุมาล ชวนะธิต — Sales / Approve" */
+users.appendRow(['6406031','sukuman@suteetankers.com','นางสาวสุขุมาล ชวนะธิต','666666','Y','','Sales / Approve','']);
+/* "คนไหนที่เบียร์ไม่ได้ใส่ role คือคนนั้นไม่ได้อยู่ในระบบเคลม" */
+users.appendRow(['6406032','nobody@suteetankers.com','คุณไม่อยู่ในระบบเคลม','777777','Y','Purchase','','จัดซื้อ']);
 
 /* ทำให้ตารางจ๊อบ "ใหญ่จริง" เพื่อพิสูจน์ว่าแคชหั่นชิ้นทำงาน (ของจริงก็ใหญ่แบบนี้) */
 const wip = ms.insertSheet('All WIP JT/JM');
@@ -53,7 +57,7 @@ const DEPLOY = require('path').join(__dirname,'..','deploy');
 });
 vm.runInContext("CFG.MASTER='"+MASTER+"'; CFG.TXN='"+TXN+"';", sandbox);
 const call = (fn,args)=>vm.runInContext('('+fn+').apply(null, __A)', Object.assign(sandbox,{__A:args||[]}));
-const reset = ()=>vm.runInContext('_USERS=null;_WIP=null;_VEND=null;_ME={};_GOODS=null;_SS=null;_DB=null;_IDB=null;_PT=null;_DBID=null;', sandbox);
+const reset = ()=>vm.runInContext('_USERS=null;_WIP=null;_VEND=null;_ME={};_GOODS=null;_SS=null;_DBY={};_YEARS=null;_IDB=null;_PT=null;_DBID=null;', sandbox);
 
 /* ── ชุดทดสอบ ── */
 let pass=0, fail=0; const problems=[];
@@ -380,7 +384,124 @@ T('QC ไม่ Accept → วนกลับเป็นเคลมรอบ�
   if(f.round!==2) throw new Error('ไม่ได้นับเป็นรอบที่ 2 ได้ '+f.round);
   return 'กลับไปขั้น '+r.stage+' · รอบที่ '+f.round+' · ล้างเลข GR/RCV/IS + ลายเซ็นรอบ 2 แล้ว'; });
 
-console.log('\n⑧ หน้าแรก — แท็บต้องครอบทุกขั้น ไม่งั้นใบหายจากหน้าจอ');
+console.log('\n⑧ อยู่ได้ 10-20 ปี — ข้ามปีแล้วต้องไม่หาย');
+T('เลขใบเคลมต้องต่อจากของเดิมในชีต ไม่ใช่เริ่มใหม่จาก 0001', ()=>{
+  /* จำลองระบบที่ใช้มาหลายปี: ในชีตมี CLM-69/0050 อยู่แล้ว
+     เลขถัดไปต้องเป็น 0051 ห้ามวนกลับไปชนเลขเดิม */
+  const d=call('db_',[]);
+  const sh=d.claims, lr=sh.getLastRow();
+  sh.getRange(lr+1,1).setValue('CLM-69/0050');
+  reset();
+  const nx=call('nextDocNo_',['CLM']);
+  if(nx==='CLM-69/0050') throw new Error('ออกเลขซ้ำกับใบที่มีอยู่แล้ว');
+  const n=parseInt(nx.split('/')[1],10);
+  if(n<=50) throw new Error('ออกเลข '+nx+' ทับของเดิมที่มีถึง 0050 — เอกสารเลขซ้ำ');
+  return 'ในชีตมีถึง 0050 → เลขถัดไป '+nx; });
+
+T('ใบที่เปิดปีก่อน พอขึ้นปีใหม่ ต้องยังเห็นในทะเบียนและกล่องงาน', ()=>{
+  const n=mkClaim_();                                  // เปิดปีนี้ เดินถึงขั้นจัดซื้อ
+  const before=call('listClaims',[{},AUTH]).filter(x=>x.docNo===n).length;
+  if(!before) throw new Error('ปีนี้ยังหาไม่เจอ');
+  /* ขยับนาฬิกาไปปีหน้า — เหมือน 1 ม.ค. ที่ระบบต้องยังทำงานต่อ */
+  const RealDate=Date;
+  const nextYear=new RealDate(new RealDate().getFullYear()+1, 0, 5).getTime();
+  sandbox.Date=class extends RealDate{
+    constructor(...a){ super(...(a.length?a:[nextYear])); }
+    static now(){ return nextYear; }
+  };
+  reset();
+  let after=0, err='';
+  try { after=call('listClaims',[{},AUTH]).filter(x=>x.docNo===n).length; }
+  catch(e){ err=e.message; }
+  const w=call('workQueues',[AUTH]);
+  const inQueue=Object.keys(w.tabs).some(t=>(w.tabs[t].rows||[]).some(r=>r.docNo===n));
+  sandbox.Date=RealDate; reset();
+  if(err) throw new Error('ขึ้นปีใหม่แล้วระบบพัง: '+err);
+  if(!after) throw new Error('ใบ '+n+' หายจากทะเบียนทันทีที่ขึ้นปีใหม่ — งานที่ยังไม่จบจะสูญ');
+  if(!inQueue) throw new Error('ใบ '+n+' หายจากกล่องงาน ไม่มีใครรู้ว่าต้องทำอะไรต่อ');
+  return 'ข้ามปีแล้วยังเห็นใบ '+n+' ครบทั้งทะเบียนและกล่องงาน'; });
+
+/* ── ตัวช่วย: รันโค้ดชุดหนึ่ง "เสมือนอยู่ปีหน้า" ─────────────────────── */
+function inNextYear_(fn){
+  const RealDate=Date;
+  const t=new RealDate(new RealDate().getFullYear()+1, 5, 15).getTime();
+  sandbox.Date=class extends RealDate{
+    constructor(...a){ super(...(a.length?a:[t])); }
+    static now(){ return t; }
+  };
+  reset();
+  try { return fn(); }
+  finally { sandbox.Date=RealDate; reset(); }
+}
+
+T('ขึ้นปีใหม่แล้ว ใบเก่ายังเปิดอ่านได้ ยังแก้ได้ ยังเดินงานต่อได้', ()=>{
+  const n=mkClaim_();
+  return inNextYear_(()=>{
+    const c=call('getClaimFull',[n,AUTH]);
+    if(!c||!c.head) throw new Error('เปิดใบ '+n+' ไม่ได้ในปีถัดไป — ข้อมูลอยู่คนละแท็บปี');
+    call('saveClaimField',[n,'supplierNote','แก้ข้ามปี',AUTH]);
+    const again=call('getClaimFull',[n,AUTH]);
+    if(again.head['หมายเหตุจาก Supplier']!=='แก้ข้ามปี')
+      throw new Error('แก้ใบเก่าข้ามปีแล้วค่าไม่เข้า — เขียนลงแท็บผิดปี');
+    return 'เปิด/แก้ใบ '+n+' ข้ามปีได้ปกติ';
+  }); });
+
+T('ขึ้นปีใหม่ เลขใบเริ่มชุดใหม่ของปีนั้น และไม่ชนกับใบปีเก่า', ()=>{
+  const old=call('listClaims',[{},AUTH]).map(x=>x.docNo);
+  return inNextYear_(()=>{
+    const yy=String(call('yearBE_',[])).slice(-2);
+    const nx=call('nextDocNo_',['CLM']);
+    if(nx.indexOf('CLM-'+yy+'/')!==0) throw new Error('ปีใหม่ยังออกเลขปีเก่า: '+nx);
+    if(old.indexOf(nx)>=0) throw new Error('เลข '+nx+' ชนกับใบที่มีอยู่แล้ว');
+    if(call('beOfNo_',[nx])!==call('yearBE_',[]))
+      throw new Error('อ่านปีจากเลขที่เอกสารไม่ตรง');
+    return 'ปีใหม่ออกเลข '+nx+' · ไม่ชนกับใบเดิม '+old.length+' ใบ';
+  }); });
+
+T('อ่านปีจากเลขที่เอกสารต้องถูกทุกกรณี (ตัวนี้คือหัวใจของการข้ามปี)', ()=>{
+  const cur=call('beOfNo_',['']);                       // ไม่มีเลข = ปีปัจจุบัน
+  const cases=[['CLM-69/0001',2569],['INS-70/0123',2570],['CDN-69/0001',2569]];
+  for(const [no,want] of cases){
+    const got=call('beOfNo_',[no]);
+    if(got!==want) throw new Error(no+' → ควรเป็น '+want+' แต่ได้ '+got);
+  }
+  return 'CLM-69→2569 · INS-70→2570 · CDN-69→2569 · ไม่มีเลข→'+cur; });
+
+T('ขึ้นปีใหม่ รายงานทุกตัวยังต้องเห็นใบของปีก่อน', ()=>{
+  /* ปักหมุดใบของ "ปีนี้" ให้เป็นความผิดพนักงานไว้ก่อน แล้วค่อยข้ามปีไปดูว่ารายงานยังเห็น */
+  const nEmp=mkClaim_();
+  call('saveClaimField',[nEmp,'blame','EMP',AUTH]);
+  call('saveClaimField',[nEmp,'blameWho','คุณทดสอบข้ามปี',AUTH]);
+  return inNextYear_(()=>{
+    const acc=call('reportAccounting',[AUTH]);
+    const hr =call('reportHR',[AUTH]);
+    const cost=call('reportCost',[AUTH]);
+    const med =call('reportMedia',[AUTH]);
+    if(!acc.rows.length) throw new Error('ข้อมูลส่งบัญชีว่างเปล่าหลังขึ้นปีใหม่');
+    if(!hr.rows.length)  throw new Error('รายงาน HR ว่างเปล่าหลังขึ้นปีใหม่');
+    if(!cost.rows.length)throw new Error('สรุปต้นทุนว่างเปล่าหลังขึ้นปีใหม่');
+    if(!med.length)      throw new Error('รายงานรูปว่างเปล่าหลังขึ้นปีใหม่ — รูปอยู่แท็บ PHOTOS ของปีเก่า');
+    return 'บัญชี '+acc.rows.length+' ใบ · HR '+hr.rows.length+' ใบ · ต้นทุน '+cost.rows.length+' ใบ · รูป '+med.length+' จ๊อบ'; }); });
+
+T('ขึ้นปีใหม่ หน้าแรกยังนับใบค้างของปีก่อน ไม่ใช่ 0', ()=>{
+  const now=call('getHome2',[AUTH]);
+  return inNextYear_(()=>{
+    const h=call('getHome2',[AUTH]);
+    if(h.clm.total<now.clm.total)
+      throw new Error('หน้าแรกนับใบเคลมได้ '+h.clm.total+' ใบ น้อยกว่าปีก่อนที่มี '+now.clm.total+' ใบ — ใบเก่าหายจากหน้าแรก');
+    if(!h.clm.open) throw new Error('หน้าแรกบอกว่าไม่มีงานค้างเลย ทั้งที่ใบปีก่อนยังไม่จบ');
+    return 'ใบเคลมรวม '+h.clm.total+' ใบ · ค้างอยู่ '+h.clm.open+' ใบ · ใบตรวจ '+h.ins.total+' ใบ'; }); });
+
+T('ขึ้นปีใหม่ รูปของใบเก่าต้องยังอยู่ครบ', ()=>{
+  const n=mkClaim_();
+  const before=call('listPhotos',[n,AUTH]);
+  return inNextYear_(()=>{
+    const after=call('listPhotos',[n,AUTH]);
+    const a=Object.keys(after||{}).length, b=Object.keys(before||{}).length;
+    if(a<b) throw new Error('รูปของใบ '+n+' หายไป '+(b-a)+' ชุด ตอนขึ้นปีใหม่');
+    return 'ใบ '+n+' รูปยังอยู่ครบ '+a+' ชุด'; }); });
+
+console.log('\n⑨ หน้าแรก — แท็บต้องครอบทุกขั้น ไม่งั้นใบหายจากหน้าจอ');
 T('ทุกขั้นในสายงาน ต้องมีแท็บรองรับ ไม่มีขั้นไหนตกหล่น', ()=>{
   const stages=call('stageList',[]).map(s=>s.key).filter(k=>k!=='CANCELLED');
   const TS=vm.runInContext('JSON.stringify(TAB_STAGES)', sandbox);
@@ -492,6 +613,48 @@ T('ยกเลิกใบเคลม — ผู้บริหารกดไ
   const seen=call('listClaims',[{},AUTH]).filter(x=>x.docNo===DOC).length;
   if(seen) throw new Error('ยกเลิกแล้วยังโผล่ในทะเบียน');
   return r.stage+' · หายจากทะเบียนแล้ว'; });
+
+console.log('\n⑩ หน้าที่ (role for Claim) — 1 คนมีได้หลายหน้าที่');
+const SUKUMAN = {emp:'6406031', pin:'666666'};     // Sales / Approve
+const NOROLE  = {emp:'6406032', pin:'777777'};     // ไม่ได้ใส่ role = ไม่อยู่ในระบบเคลม
+
+T('1 คนมี 2 หน้าที่ได้ — Sales / Approve ต้องได้ทั้งคู่ ไม่ใช่ตัวเดียว', ()=>{
+  const me=call('whoAmI_',[SUKUMAN]);
+  if(!me.roles || me.roles.indexOf('SALES')<0) throw new Error('หน้าที่ SALES หายไป ได้ '+JSON.stringify(me.roles));
+  if(me.roles.indexOf('APPROVER')<0) throw new Error('หน้าที่ APPROVER หายไป ได้ '+JSON.stringify(me.roles));
+  return me.name+' → '+me.roles.join(' · '); });
+
+T('คนที่มี 2 หน้าที่ ต้องเปิดใบเคลมเองก็ได้ อนุมัติก็ได้', ()=>{
+  const dft='DRAFT-S'+Math.floor(Math.random()*9999);
+  call('savePhoto',[dft,'JT-69/0001','r1',px,'x.jpg',SUKUMAN]);
+  const r=call('createClaimWithPhotos',[{claimType:'pre', area:'dom', jobNo:'JT-69/0001',
+      jobName:'ทดสอบสองหน้าที่', dept:'ขาย', wantDate:'30/09/2569',
+      items:[{code:'X1',name:'ของทดสอบ',th:'ของทดสอบ',qty:'1',unit:'PCS',supplier:'เจ้าทดสอบ',_rid:'r1'}]},
+      dft, {r1:1}, SUKUMAN]);
+  if(!r.ok) throw new Error('เปิดใบเคลมเองไม่ได้');
+  call('advanceClaim',[r.docNo, SUKUMAN]);                 // ส่งขออนุมัติ
+  const ap=call('advanceClaim',[r.docNo, SUKUMAN]);        // แล้วอนุมัติเอง (มีสิทธิ์ทั้งสองอย่าง)
+  if(!ap || !ap.stage) throw new Error('มีสิทธิ์อนุมัติ แต่กดอนุมัติไม่ได้');
+  return r.docNo+' → เปิดเองแล้วอนุมัติเองได้ ถึงขั้น '+ap.stage; });
+
+T('แผนกของคนที่เป็น Sales / Approve ต้องเป็น "ขาย" ไม่ใช่ "ผู้บริหาร"', ()=>{
+  const dp=call('deptFromRoles_',[['APPROVER','SALES']]);
+  if(dp!=='ขาย') throw new Error('ได้แผนก '+dp+' — "อนุมัติ" เป็นหน้าที่ ไม่ใช่แผนก');
+  return 'Sales / Approve → แผนก '+dp; });
+
+T('คนที่ไม่ได้ใส่ role for Claim = ไม่อยู่ในระบบเคลม เข้าไม่ได้', ()=>{
+  const r=call('loginEmpPin',[NOROLE.emp, NOROLE.pin]);
+  if(r.ok) throw new Error('คนที่ไม่ได้ใส่ role เข้าระบบได้ — สิทธิ์รั่ว');
+  if(!/ไม่ได้อยู่ในระบบเคลม/.test(r.msg)) throw new Error('ข้อความไม่ตรงกับที่เบียร์สั่ง: '+r.msg);
+  let blocked=false;
+  try { call('listClaims',[{},NOROLE]); } catch(e){ blocked=true; }
+  if(!blocked) throw new Error('เข้าไม่ได้ แต่ยังอ่านทะเบียนใบเคลมได้');
+  return r.msg; });
+
+T('รหัสถูกแต่ PIN ผิด ต้องไม่หลุดเข้าไป', ()=>{
+  const r=call('loginEmpPin',[SUKUMAN.emp,'000000']);
+  if(r.ok) throw new Error('PIN ผิดแล้วยังเข้าได้');
+  return r.msg; });
 
 console.log('\n──────────────────────────────');
 console.log('ผ่าน '+pass+' · ไม่ผ่าน '+fail);

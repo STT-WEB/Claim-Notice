@@ -43,7 +43,7 @@ var CLAIM_FIELD_HDR = {
 
 function saveClaimField(docNo, field, value, auth){
   var me = requireAny_(auth, ['PRODUCTION','QC','DESIGN','STORE','PURCHASE','APPROVER']);
-  var d = db_(), r = findClaimRow_(d.claims, norm_(docNo));
+  var d = dbOf_(docNo), r = findClaimRow_(d.claims, norm_(docNo));
   if (r < 0) throw new Error('ไม่พบใบเคลม ' + docNo);
 
   var col = CLAIM_FIELD_COL[field];
@@ -114,7 +114,7 @@ function saveItemField(docNo, seq, field, value, auth){
   var me = requireAny_(auth, ['PRODUCTION','SALES','QC','DESIGN','STORE','PURCHASE','APPROVER']);
   var col = ITEM_FIELD_COL[field];
   if (!col) throw new Error('ไม่รู้จักช่อง ' + field);
-  var d = db_(), r = itemRow_(d, docNo, seq);
+  var d = dbOf_(docNo), r = itemRow_(d, docNo, seq);
   if (r < 0) throw new Error('ไม่พบรายการที่ ' + seq);
 
   var cr = findClaimRow_(d.claims, norm_(docNo));
@@ -154,7 +154,7 @@ function printedAt_(d, r){
 function markPrinted(docNo, kind, auth){
   var me = requireLogin_(auth);
   if (norm_(kind) === 'int') return { ok:true, locked:false };   // ฉบับภายใน ไม่ล็อก
-  var d = db_(), r = findClaimRow_(d.claims, norm_(docNo));
+  var d = dbOf_(docNo), r = findClaimRow_(d.claims, norm_(docNo));
   if (r < 0) throw new Error('ไม่พบใบเคลม ' + docNo);
   ensureCols_(d.claims, claimHdr_());
   if (!printedAt_(d, r)){
@@ -167,7 +167,7 @@ function markPrinted(docNo, kind, auth){
 
 function addClaimItem(docNo, auth){
   requireAny_(auth, ['PRODUCTION','QC','DESIGN','STORE','PURCHASE','APPROVER']);
-  var d = db_();
+  var d = dbOf_(docNo);
   var rc = findClaimRow_(d.claims, norm_(docNo));
   if (rc >= 0){
     var pat = printedAt_(d, rc);
@@ -187,7 +187,7 @@ function addClaimItem(docNo, auth){
 /** ลบรายการเคลม (ลบรูปของรายการนั้นออกจากใบด้วย ไฟล์ยังอยู่ Drive) */
 function delClaimItem(docNo, seq, auth){
   requireAny_(auth, ['PRODUCTION','QC','DESIGN','STORE','PURCHASE','APPROVER']);
-  var d = db_(), r = itemRow_(d, docNo, seq);
+  var d = dbOf_(docNo), r = itemRow_(d, docNo, seq);
   if (r > 0) d.items.deleteRow(r);
   return { ok:true };
 }
@@ -195,7 +195,7 @@ function delClaimItem(docNo, seq, auth){
 /* ═══════════ แท็บ 3 · ค่าแรง (ลงเป็นก้อน ระบุว่าครอบคลุมข้อไหน) ═══════════ */
 function listLabour(docNo, auth){
   requireLogin_(auth);
-  var d = db_(), lr = d.labour.getLastRow(); if (lr < 2) return [];
+  var d = dbOf_(docNo), lr = d.labour.getLastRow(); if (lr < 2) return [];
   var v = d.labour.getRange(2,1,lr-1,HDR_LAB.length).getDisplayValues(), out = [];
   for (var i = 0; i < v.length; i++){
     if (norm_(v[i][0]) !== norm_(docNo)) continue;
@@ -209,7 +209,7 @@ function listLabour(docNo, auth){
 function saveLabour(docNo, rows, auth){
   requireAny_(auth, ['PURCHASE','PRODUCTION','APPROVER']);
   docNo = norm_(docNo);
-  var d = db_(), lr = d.labour.getLastRow();
+  var d = dbOf_(docNo), lr = d.labour.getLastRow();
   if (lr > 1){
     var col = d.labour.getRange(2,1,lr-1,1).getDisplayValues();
     for (var i = col.length - 1; i >= 0; i--) if (norm_(col[i][0]) === docNo) d.labour.deleteRow(i + 2);
@@ -231,7 +231,7 @@ function saveLabour(docNo, rows, auth){
 function claimTotals(docNo, auth){
   requireLogin_(auth);
   docNo = norm_(docNo);
-  var d = db_(), r = findClaimRow_(d.claims, docNo);
+  var d = dbOf_(docNo), r = findClaimRow_(d.claims, docNo);
   if (r < 0) return null;
   var cur  = norm_(d.claims.getRange(r, 18).getDisplayValue());
   var rate = num_(d.claims.getRange(r, 19).getDisplayValue());
@@ -387,44 +387,42 @@ function reportDocs(auth){
 /** 3.4 สรุปต้นทุนการเคลม — เห็นเงิน = จำกัดสิทธิ์ */
 function reportCost(auth){
   var me = requireAny_(auth, ['APPROVER','PURCHASE']);
-  var d = db_(), lr = d.claims.getLastRow();
-  if (lr < 2) return { rows:[], grand:0, canSee:true };
 
-  var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
-  var rows = d.claims.getRange(2,1,lr-1,HDR_CLAIM.length).getDisplayValues();
-
-  /* อ่านรายการและค่าแรงทีเดียวทั้งชีต แล้วรวมยอดในหน่วยความจำ */
-  var sumItem = {}, lrI = d.items.getLastRow();
-  if (lrI > 1){
-    var vi = d.items.getRange(2,1,lrI-1,HDR_ITEM.length).getDisplayValues();
-    for (var i = 0; i < vi.length; i++){
-      var dn = norm_(vi[i][0]); if (!dn) continue;
-      sumItem[dn] = (sumItem[dn] || 0) + num_(vi[i][6]) * num_(vi[i][13]);
+  /* อ่านรายการและค่าแรงทีละปี แล้วรวมยอดในหน่วยความจำ (เร็วกว่าไล่ทีละใบ)
+     ⚠️ ต้องรวมทุกปี — ใบปีก่อนที่เพิ่งปิดจบ ก็ต้องอยู่ในสรุปต้นทุนด้วย */
+  var sumItem = {}, sumLab = {};
+  eachYear_(function(d){
+    var lrI = d.items.getLastRow();
+    if (lrI > 1){
+      var vi = d.items.getRange(2,1,lrI-1,HDR_ITEM.length).getDisplayValues();
+      for (var i = 0; i < vi.length; i++){
+        var dn = norm_(vi[i][0]); if (!dn) continue;
+        sumItem[dn] = (sumItem[dn] || 0) + num_(vi[i][6]) * num_(vi[i][13]);
+      }
     }
-  }
-  var sumLab = {}, lrL = d.labour.getLastRow();
-  if (lrL > 1){
-    var vl = d.labour.getRange(2,1,lrL-1,HDR_LAB.length).getDisplayValues();
-    for (var k = 0; k < vl.length; k++){
-      var dl = norm_(vl[k][0]); if (!dl) continue;
-      sumLab[dl] = (sumLab[dl] || 0) + num_(vl[k][6]);
+    var lrL = d.labour.getLastRow();
+    if (lrL > 1){
+      var vl = d.labour.getRange(2,1,lrL-1,HDR_LAB.length).getDisplayValues();
+      for (var k = 0; k < vl.length; k++){
+        var dl = norm_(vl[k][0]); if (!dl) continue;
+        sumLab[dl] = (sumLab[dl] || 0) + num_(vl[k][6]);
+      }
     }
-  }
+  });
 
   var out = [], grand = 0;
-  for (var r = rows.length - 1; r >= 0; r--){
-    var o = {};
-    for (var c = 0; c < hdr.length; c++) o[hdr[c]] = norm_(rows[r][c]);
+  eachClaim_(function(o){
     var dn2 = o['เลขที่เอกสาร'];
     var it = money_(sumItem[dn2] || 0), lb = money_(sumLab[dn2] || 0), tot = money_(it + lb);
-    if (!tot) continue;                                   // ยังไม่มีเงิน = ยังไม่ออกใบเรียกเก็บ
+    if (!tot) return;                                     // ยังไม่มีเงิน = ยังไม่ออกใบเรียกเก็บ
     grand += tot;
     var rate = num_(o['อัตราแลกเปลี่ยน']);
     out.push({ docNo:dn2, date:o['วันที่'], jobNo:o['เลขที่ JOB'], jobName:o['ชื่อลูกค้า'],
       jmc:o['JMC ที่ผูก'], currency:o['สกุลเงิน'], rate:o['อัตราแลกเปลี่ยน'],
       items:it, labour:lb, thb:tot, foreign: rate > 0 ? money_(tot / rate) : '',
       status:o['สถานะ'] });
-  }
+  });
+  out.sort(function(x,y){ return x.docNo < y.docNo ? 1 : -1; });   // ใหม่อยู่บน
   return { rows:out, grand:money_(grand), canSee:true, who:me.name };
 }
 
@@ -478,31 +476,24 @@ function mainSupplier_(d, docNo){
 /** 3.5 · ใบที่ถึงคิวเรียกเก็บเงินแล้ว จัดกลุ่มตาม Supplier */
 function reportBilling(auth){
   requireAny_(auth, ['APPROVER','PURCHASE']);
-  var d = db_(), lr = d.claims.getLastRow();
-  if (lr < 2) return { groups:[] };
-  ensureCols_(d.claims, claimHdr_());
-  var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
-  var rows = d.claims.getRange(2,1,lr-1,HDR_CLAIM.length).getDisplayValues();
   var OKST = ['STORE_IN','QC_RECV','STORE_OUT','CLOSE_WAIT','CLOSED'];
   var g = {}, order = [];
 
-  for (var r = 0; r < rows.length; r++){
-    var o = {};
-    for (var c = 0; c < hdr.length; c++) o[hdr[c]] = norm_(rows[r][c]);
-    var dn = o['เลขที่เอกสาร']; if (!dn) continue;
-    var stage = norm_(d.claims.getRange(r + 2, colOf_('ขั้นตอน')).getDisplayValue()) || 'REQUEST';
-    if (stage === 'CANCELLED') continue;
-    if (OKST.indexOf(stage) < 0) continue;
+  /* ต้องกวาดทุกปี — ใบที่เปิดปลายปีแล้วของกลับมาต้นปีถัดไป ยังต้องเรียกเก็บเงินได้ */
+  eachClaim_(function(o, stage, d){
+    var dn = o['เลขที่เอกสาร'];
+    if (stage === 'CANCELLED') return;
+    if (OKST.indexOf(stage) < 0) return;
     var B = billOfClaim_(d, dn, o);
-    if (!B.bill) continue;                                  // เคสที่ไม่ต้องเรียกเงิน ไม่ต้องขึ้น
+    if (!B.bill) return;                                    // เคสที่ไม่ต้องเรียกเงิน ไม่ต้องขึ้น
     var sup = mainSupplier_(d, dn);
     if (!g[sup]){ g[sup] = { supplier:sup, rows:[], sum:0 }; order.push(sup); }
     g[sup].rows.push({ docNo:dn, date:o['วันที่'], jobNo:o['เลขที่ JOB'], jobName:o['ชื่อลูกค้า'],
       result:B.resultText, amount:B.total,
-      billNo:norm_(d.claims.getRange(r + 2, colOf_('เลขที่ใบเรียกเก็บรวม')).getDisplayValue()),
-      billDate:norm_(d.claims.getRange(r + 2, colOf_('วันที่ใบเรียกเก็บรวม')).getDisplayValue()) });
+      billNo:o['เลขที่ใบเรียกเก็บรวม'] || '',
+      billDate:o['วันที่ใบเรียกเก็บรวม'] || '' });
     g[sup].sum = money_(g[sup].sum + B.total);
-  }
+  });
   return { groups: order.map(function(k){ return g[k]; }) };
 }
 
@@ -511,11 +502,13 @@ function reportBilling(auth){
 function makeConsolidatedBill(docNos, auth){
   var me = requireAny_(auth, ['APPROVER','PURCHASE']);
   if (!docNos || !docNos.length) throw new Error('ยังไม่ได้เลือกใบเคลมที่จะรวม');
-  var d = db_(); ensureCols_(d.claims, claimHdr_());
 
+  /* ⚠️ ใบที่เอามารวม อาจอยู่คนละปีกัน (เปิดปลายปี ของกลับต้นปีถัดไป)
+     จึงต้องหาแท็บของ "ปีของใบนั้น" ทีละใบ ห้ามยึด db_() ตัวเดียว */
   var sup = '', total = 0, list = [];
   for (var i = 0; i < docNos.length; i++){
     var dn = norm_(docNos[i]);
+    var d = dbOf_(dn);
     var r = findClaimRow_(d.claims, dn);
     if (r < 0) throw new Error('ไม่พบใบเคลม ' + dn);
     if (norm_(d.claims.getRange(r, colOf_('เลขที่ใบเรียกเก็บรวม')).getDisplayValue()))
@@ -527,13 +520,13 @@ function makeConsolidatedBill(docNos, auth){
                             d.claims.getRange(r,1,1,HDR_CLAIM.length).getDisplayValues()[0]);
     var B = billOfClaim_(d, dn, head);
     total = money_(total + B.total);
-    list.push({ docNo:dn, jobNo:head['เลขที่ JOB'], date:head['วันที่'], amount:B.total, row:r });
+    list.push({ docNo:dn, jobNo:head['เลขที่ JOB'], date:head['วันที่'], amount:B.total, row:r, d:d });
   }
 
-  var no = nextDocNo_('CDN'), today = nowStamp_().split(' ')[0];
+  var no = nextFlowNo_('CDN', 'เลขที่ใบเรียกเก็บรวม'), today = nowStamp_().split(' ')[0];
   for (var k = 0; k < list.length; k++){
-    d.claims.getRange(list[k].row, colOf_('เลขที่ใบเรียกเก็บรวม')).setValue(no);
-    d.claims.getRange(list[k].row, colOf_('วันที่ใบเรียกเก็บรวม')).setValue(today);
+    list[k].d.claims.getRange(list[k].row, colOf_('เลขที่ใบเรียกเก็บรวม')).setValue(no);
+    list[k].d.claims.getRange(list[k].row, colOf_('วันที่ใบเรียกเก็บรวม')).setValue(today);
   }
   log_('makeConsolidatedBill', no, sup + ' · ' + list.length + ' ใบ · ' + total + ' บาท');
   try { CacheService.getScriptCache().remove('CLAIM_HOME'); } catch(e){}
@@ -545,49 +538,34 @@ function makeConsolidatedBill(docNos, auth){
 /** 3.6 · รายงานส่ง HR — เฉพาะใบที่ระบุว่าพนักงานทำเสียหาย */
 function reportHR(auth){
   requireAny_(auth, ['APPROVER','PURCHASE']);
-  var d = db_(), lr = d.claims.getLastRow();
-  if (lr < 2) return { rows:[] };
-  ensureCols_(d.claims, claimHdr_());
-  var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
-  var rows = d.claims.getRange(2,1,lr-1,HDR_CLAIM.length).getDisplayValues();
   var out = [];
-  for (var r = 0; r < rows.length; r++){
-    if (norm_(d.claims.getRange(r + 2, colOf_('ความรับผิดชอบ')).getDisplayValue()) !== 'EMP') continue;
-    if (norm_(d.claims.getRange(r + 2, colOf_('ขั้นตอน')).getDisplayValue()) === 'CANCELLED') continue;
-    var o = {};
-    for (var c = 0; c < hdr.length; c++) o[hdr[c]] = norm_(rows[r][c]);
+  /* ต้องกวาดทุกปี — HR หักเงินตอนไหนก็ได้ ใบอาจปิดข้ามปีมาแล้ว */
+  eachClaim_(function(o, stage, d){
+    if (o['ความรับผิดชอบ'] !== 'EMP') return;
+    if (stage === 'CANCELLED') return;
     var B = billOfClaim_(d, o['เลขที่เอกสาร'], o);
     out.push({ docNo:o['เลขที่เอกสาร'], date:o['วันที่'], jobNo:o['เลขที่ JOB'], jobName:o['ชื่อลูกค้า'],
-      who:norm_(d.claims.getRange(r + 2, colOf_('ชื่อผู้ทำเสียหาย')).getDisplayValue()),
-      dept:norm_(d.claims.getRange(r + 2, colOf_('แผนกผู้ทำเสียหาย')).getDisplayValue()),
+      who:o['ชื่อผู้ทำเสียหาย'] || '', dept:o['แผนกผู้ทำเสียหาย'] || '',
       damage:B.goods, status:o['สถานะ'] });
-  }
+  });
   return { rows:out };
 }
 
 /** 3.7 · ข้อมูลส่งบัญชี — ใบที่จบขั้นตอนแล้ว บัญชีรับอย่างเดียว ไม่ต้องกดอะไร */
 function reportAccounting(auth){
   requireAny_(auth, ['APPROVER','PURCHASE']);
-  var d = db_(), lr = d.claims.getLastRow();
-  if (lr < 2) return { rows:[], sum:{ goods:0, labour:0, bill:0 } };
-  ensureCols_(d.claims, claimHdr_());
-  var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
-  var rows = d.claims.getRange(2,1,lr-1,HDR_CLAIM.length).getDisplayValues();
   var out = [], sg = 0, sl = 0, sb = 0;
-  for (var r = 0; r < rows.length; r++){
-    var stage = norm_(d.claims.getRange(r + 2, colOf_('ขั้นตอน')).getDisplayValue());
-    if (['CLOSE_WAIT','CLOSED'].indexOf(stage) < 0) continue;
-    var o = {};
-    for (var c = 0; c < hdr.length; c++) o[hdr[c]] = norm_(rows[r][c]);
+  /* ต้องกวาดทุกปี — บัญชีปิดงบข้ามปี ต้องเห็นใบที่จบไปแล้วของปีก่อนด้วย */
+  eachClaim_(function(o, stage, d){
+    if (['CLOSE_WAIT','CLOSED'].indexOf(stage) < 0) return;
     var B = billOfClaim_(d, o['เลขที่เอกสาร'], o);
     sg = money_(sg + num_(B.goods)); sl = money_(sl + num_(B.labour)); sb = money_(sb + num_(B.total));
     out.push({ docNo:o['เลขที่เอกสาร'], jobNo:o['เลขที่ JOB'], jmc:o['JMC ที่ผูก'],
       supplier:mainSupplier_(d, o['เลขที่เอกสาร']),
       goods:B.goods, labour:B.labour, bill:B.total,
-      blame:norm_(d.claims.getRange(r + 2, colOf_('ความรับผิดชอบ')).getDisplayValue()),
-      cdn:norm_(d.claims.getRange(r + 2, colOf_('เลขที่ใบเรียกเก็บรวม')).getDisplayValue()),
+      blame:o['ความรับผิดชอบ'] || '', cdn:o['เลขที่ใบเรียกเก็บรวม'] || '',
       status:o['สถานะ'] });
-  }
+  });
   return { rows:out, sum:{ goods:sg, labour:sl, bill:sb } };
 }
 
@@ -610,35 +588,37 @@ function reportLog(limit, auth){
 /** 3.1 รูปและวิดีโอทั้งระบบ — จัดกลุ่มตามจ๊อบ → เอกสาร */
 function reportMedia(auth){
   requireLogin_(auth);
-  var pt = photoTab_(), lr = pt.getLastRow();
-  if (lr < 2) return [];
-  var v = pt.getRange(2,1,lr-1,HDR_PHOTO.length).getDisplayValues();
 
-  /* เอกสาร → จ๊อบ (อ่านจากทั้งใบเคลมและใบตรวจ) */
+  /* เอกสาร → จ๊อบ (อ่านจากทั้งใบเคลมและใบตรวจ · ทุกปี)
+     ⚠️ รูปของงานหนึ่ง ๆ อยู่ได้หลายปี เพราะจ๊อบเดียวเคลมได้เรื่อย ๆ */
   var jobOf = {}, nameOf = {};
-  var d = db_(), lrC = d.claims.getLastRow();
-  if (lrC > 1){
+  eachYear_(function(d){
+    var lrC = d.claims.getLastRow(); if (lrC <= 1) return;
     var vc = d.claims.getRange(2,1,lrC-1,8).getDisplayValues();
     for (var i = 0; i < vc.length; i++){ jobOf[norm_(vc[i][0])] = norm_(vc[i][6]); nameOf[norm_(vc[i][0])] = norm_(vc[i][7]); }
-  }
-  var di = inspDb_(), lrIn = di.head.getLastRow();
-  if (lrIn > 1){
+  });
+  eachInspYear_(function(di){
+    var lrIn = di.head.getLastRow(); if (lrIn <= 1) return;
     var vin = di.head.getRange(2,1,lrIn-1,7).getDisplayValues();
     for (var k = 0; k < vin.length; k++){ jobOf[norm_(vin[k][0])] = norm_(vin[k][5]); nameOf[norm_(vin[k][0])] = norm_(vin[k][6]); }
-  }
+  });
 
   var byJob = {};
-  for (var p = 0; p < v.length; p++){
-    if (norm_(v[p][7]).toUpperCase() === 'N') continue;
-    var doc = norm_(v[p][0]); if (!doc) continue;
-    var j = jobOf[doc] || '(ไม่ทราบจ๊อบ)';
-    if (!byJob[j]) byJob[j] = { jobNo:j, jobName:nameOf[doc] || '', n:0, docs:{} };
-    if (!byJob[j].docs[doc]) byJob[j].docs[doc] = { docNo:doc, kind:(doc.indexOf('INS') === 0 ? 'ใบตรวจรับ' : 'ใบเคลม'), photos:[] };
-    byJob[j].n++;
-    if (byJob[j].docs[doc].photos.length < 12){
-      byJob[j].docs[doc].photos.push({ seq:norm_(v[p][1]), thumb:norm_(v[p][5]), view:norm_(v[p][6]) });
+  eachPhotoYear_(function(pt){
+    var lr = pt.getLastRow(); if (lr < 2) return;
+    var v = pt.getRange(2,1,lr-1,HDR_PHOTO.length).getDisplayValues();
+    for (var p = 0; p < v.length; p++){
+      if (norm_(v[p][7]).toUpperCase() === 'N') continue;
+      var doc = norm_(v[p][0]); if (!doc) continue;
+      var j = jobOf[doc] || '(ไม่ทราบจ๊อบ)';
+      if (!byJob[j]) byJob[j] = { jobNo:j, jobName:nameOf[doc] || '', n:0, docs:{} };
+      if (!byJob[j].docs[doc]) byJob[j].docs[doc] = { docNo:doc, kind:(doc.indexOf('INS') === 0 ? 'ใบตรวจรับ' : 'ใบเคลม'), photos:[] };
+      byJob[j].n++;
+      if (byJob[j].docs[doc].photos.length < 12){
+        byJob[j].docs[doc].photos.push({ seq:norm_(v[p][1]), thumb:norm_(v[p][5]), view:norm_(v[p][6]) });
+      }
     }
-  }
+  });
   var out = [];
   for (var jj in byJob){
     var o2 = byJob[jj], docs = [];
@@ -663,7 +643,6 @@ function getHome2(auth){
     catch(e){}
   }
 
-  var d = db_(), di = inspDb_();
   var out = {
     version:VERSION, name:me.name, role:me.role, roles:me.roles || [], year:yearBE_(),
     stages: stageList(), insStages: insStageList(),
@@ -673,54 +652,59 @@ function getHome2(auth){
   };
   var jobs = {};
 
-  /* ── ใบเคลม: อ่านคอลัมน์ A(เลขที่) G(จ๊อบ) V(สถานะ) พอ ── */
-  var lrC = d.claims.getLastRow();
+  /* ── ใบเคลม: อ่านคอลัมน์ A(เลขที่) G(จ๊อบ) V(สถานะ) พอ · ทุกปี ──
+     ⚠️ หน้าแรกต้องนับใบค้างของปีก่อนด้วย ไม่งั้นขึ้นปีใหม่แล้วตัวเลขเป็น 0 ทั้งที่งานยังค้าง */
   var claimSeq = {};                                   // เลขที่ใบ -> ชุดลำดับรายการ
-  if (lrC > 1){
-    var vc = d.claims.getRange(2,1,lrC-1,22).getDisplayValues();
-    for (var i = 0; i < vc.length; i++){
-      var dn = norm_(vc[i][0]); if (!dn) continue;
-      out.clm.total++;
-      if (norm_(vc[i][21]) !== 'CLOSED') out.clm.open++;
-      var j = norm_(vc[i][6]); if (j) jobs[j] = 1;
-      claimSeq[dn] = {};
+  eachYear_(function(d){
+    var lrC = d.claims.getLastRow();
+    if (lrC > 1){
+      var vc = d.claims.getRange(2,1,lrC-1,22).getDisplayValues();
+      for (var i = 0; i < vc.length; i++){
+        var dn = norm_(vc[i][0]); if (!dn) continue;
+        out.clm.total++;
+        if (norm_(vc[i][21]) !== 'CLOSED') out.clm.open++;
+        var j = norm_(vc[i][6]); if (j) jobs[j] = 1;
+        claimSeq[dn] = {};
+      }
     }
-  }
-  var lrI = d.items.getLastRow();
-  if (lrI > 1){
-    var vi = d.items.getRange(2,1,lrI-1,2).getDisplayValues();
-    for (var k = 0; k < vi.length; k++){
-      var dk = norm_(vi[k][0]);
-      if (claimSeq[dk]) claimSeq[dk][norm_(vi[k][1])] = false;   // false = ยังไม่มีรูป
+    var lrI = d.items.getLastRow();
+    if (lrI > 1){
+      var vi = d.items.getRange(2,1,lrI-1,2).getDisplayValues();
+      for (var k = 0; k < vi.length; k++){
+        var dk = norm_(vi[k][0]);
+        if (claimSeq[dk]) claimSeq[dk][norm_(vi[k][1])] = false;   // false = ยังไม่มีรูป
+      }
     }
-  }
+  });
 
-  /* ── ใบตรวจรับ ── */
-  var lrH = di.head.getLastRow();
+  /* ── ใบตรวจรับ · ทุกปีเช่นกัน ── */
   var insDocs = {};
-  if (lrH > 1){
-    var vh = di.head.getRange(2,1,lrH-1,7).getDisplayValues();
-    for (var h = 0; h < vh.length; h++){
-      var dh = norm_(vh[h][0]); if (!dh) continue;
-      out.ins.total++;
-      var jh = norm_(vh[h][5]); if (jh) jobs[jh] = 1;
-      insDocs[dh] = { todo:0, un:0, photo:0 };
+  eachInspYear_(function(di){
+    var lrH = di.head.getLastRow();
+    if (lrH > 1){
+      var vh = di.head.getRange(2,1,lrH-1,7).getDisplayValues();
+      for (var h = 0; h < vh.length; h++){
+        var dh = norm_(vh[h][0]); if (!dh) continue;
+        out.ins.total++;
+        var jh = norm_(vh[h][5]); if (jh) jobs[jh] = 1;
+        insDocs[dh] = { todo:0, un:0, photo:0 };
+      }
     }
-  }
-  var lrIt = di.items.getLastRow();
-  if (lrIt > 1){
-    var vit = di.items.getRange(2,1,lrIt-1,6).getDisplayValues();
-    for (var t = 0; t < vit.length; t++){
-      var dt = norm_(vit[t][0]); if (!insDocs[dt]) continue;
-      var a = norm_(vit[t][5]).toUpperCase();
-      if (a === 'UNACC') insDocs[dt].un++;
-      else if (a !== 'ACC') insDocs[dt].todo++;
+    var lrIt = di.items.getLastRow();
+    if (lrIt > 1){
+      var vit = di.items.getRange(2,1,lrIt-1,6).getDisplayValues();
+      for (var t = 0; t < vit.length; t++){
+        var dt = norm_(vit[t][0]); if (!insDocs[dt]) continue;
+        var a = norm_(vit[t][5]).toUpperCase();
+        if (a === 'UNACC') insDocs[dt].un++;
+        else if (a !== 'ACC') insDocs[dt].todo++;
+      }
     }
-  }
+  });
 
-  /* ── รูป: อ่านครั้งเดียว ใช้ตอบทั้ง 3 กล่อง ── */
-  var pt = photoTab_(), lrP = pt.getLastRow();
-  if (lrP > 1){
+  /* ── รูป: อ่านทีเดียวทุกปี ใช้ตอบทั้ง 3 กล่อง ── */
+  eachPhotoYear_(function(pt){
+    var lrP = pt.getLastRow(); if (lrP <= 1) return;
     var vp = pt.getRange(2,1,lrP-1,8).getDisplayValues();
     for (var p = 0; p < vp.length; p++){
       if (norm_(vp[p][7]).toUpperCase() === 'N') continue;
@@ -729,7 +713,7 @@ function getHome2(auth){
       if (claimSeq[pd] && claimSeq[pd][norm_(vp[p][1])] === false) claimSeq[pd][norm_(vp[p][1])] = true;
       if (insDocs[pd]) insDocs[pd].photo++;
     }
-  }
+  });
 
   for (var c in claimSeq){
     var seqs = claimSeq[c], miss = 0;
@@ -868,7 +852,12 @@ function newDraftId(){
 function claimDraftPhotos_(draftId, docNo, jobNo, seqMap, byName){
   draftId = norm_(draftId); if (!draftId) return 0;
   seqMap = seqMap || {};
-  var pt = photoTab_(), lr = pt.getLastRow();
+  /* รูปตอนร่างเก็บในแท็บ "ปีที่แนบ" · ใบจริงอยู่แท็บ "ปีที่บันทึก"
+     ปกติเป็นปีเดียวกัน — ยกเว้นร่างค้างข้ามคืนวันสิ้นปี ถ้าไม่ย้ายข้ามแท็บ รูปจะหาย */
+  var pt  = photoTab_();                    // แท็บที่รูปร่างอยู่ (ปีปัจจุบัน)
+  var pt2 = photoTabOf_(docNo);             // แท็บของใบจริง
+  var cross = (pt.getName() !== pt2.getName());
+  var lr = pt.getLastRow();
   if (lr < 2) return 0;
   var v = pt.getRange(2,1,lr-1,HDR_PHOTO.length).getDisplayValues();
   var n = 0;
@@ -876,8 +865,15 @@ function claimDraftPhotos_(draftId, docNo, jobNo, seqMap, byName){
     if (norm_(v[i][0]) !== draftId) continue;
     var newSeq = seqMap[norm_(v[i][1])];
     if (newSeq == null) continue;                     // แถวนั้นไม่ได้ถูกบันทึก = รูปไม่ต้องย้าย
-    pt.getRange(i + 2, 1).setValue(docNo);
-    pt.getRange(i + 2, 2).setValue(newSeq);
+    if (cross){
+      var row = v[i].slice();
+      row[0] = docNo; row[1] = newSeq;
+      pt2.appendRow(row);                             // ย้ายไปแท็บปีของใบจริง
+      pt.getRange(i + 2, 8).setValue('N');            // แถวเดิมปิดใช้งาน (เก็บไว้เป็นร่องรอย)
+    } else {
+      pt.getRange(i + 2, 1).setValue(docNo);
+      pt.getRange(i + 2, 2).setValue(newSeq);
+    }
     n++;
     try {                                        // ย้ายไฟล์ไปโฟลเดอร์ของเลขจริง
       var f = DriveApp.getFileById(norm_(v[i][4]));
@@ -966,32 +962,34 @@ function workQueues(auth){
 function photoCoverage_(){
   var res = { item:{}, photo:{}, noPhoto:{} };
   var seqOf = {};                                   // docNo -> { ลำดับรายการจริง: true }
-  var d = db_();
+  var seen  = {};
 
-  var lrI = d.items.getLastRow();
-  if (lrI >= 2){
-    var vi = d.items.getRange(2,1,lrI-1,2).getDisplayValues();
-    for (var i = 0; i < vi.length; i++){
-      var dn = norm_(vi[i][0]); if (!dn) continue;
-      res.item[dn] = (res.item[dn] || 0) + 1;
-      if (!seqOf[dn]) seqOf[dn] = {};
-      seqOf[dn][norm_(vi[i][1])] = true;
+  /* ต้องนับข้ามปี — ใบปีก่อนที่ยังทำไม่จบ ก็ต้องรู้ว่ารูปครบหรือยังเหมือนกัน */
+  eachYear_(function(d, be){
+    var lrI = d.items.getLastRow();
+    if (lrI >= 2){
+      var vi = d.items.getRange(2,1,lrI-1,2).getDisplayValues();
+      for (var i = 0; i < vi.length; i++){
+        var dn = norm_(vi[i][0]); if (!dn) continue;
+        res.item[dn] = (res.item[dn] || 0) + 1;
+        if (!seqOf[dn]) seqOf[dn] = {};
+        seqOf[dn][norm_(vi[i][1])] = true;
+      }
     }
-  }
-
-  var seen = {}, pt = photoTab_(), lrP = pt.getLastRow();
-  if (lrP >= 2){
-    var vp = pt.getRange(2,1,lrP-1,HDR_PHOTO.length).getDisplayValues();
-    for (var k = 0; k < vp.length; k++){
-      if (norm_(vp[k][7]).toUpperCase() === 'N') continue;
-      var dn2 = norm_(vp[k][0]); if (!dn2) continue;
-      var sq  = norm_(vp[k][1]);
-      if (!seqOf[dn2] || !seqOf[dn2][sq]) continue;          // ไม่ใช่รายการจริง = ไม่นับ
-      res.photo[dn2] = (res.photo[dn2] || 0) + 1;
-      if (!seen[dn2]) seen[dn2] = {};
-      seen[dn2][sq] = true;
+    var pt = photoTabY_(be), lrP = pt.getLastRow();
+    if (lrP >= 2){
+      var vp = pt.getRange(2,1,lrP-1,HDR_PHOTO.length).getDisplayValues();
+      for (var k = 0; k < vp.length; k++){
+        if (norm_(vp[k][7]).toUpperCase() === 'N') continue;
+        var dn2 = norm_(vp[k][0]); if (!dn2) continue;
+        var sq  = norm_(vp[k][1]);
+        if (!seqOf[dn2] || !seqOf[dn2][sq]) continue;        // ไม่ใช่รายการจริง = ไม่นับ
+        res.photo[dn2] = (res.photo[dn2] || 0) + 1;
+        if (!seen[dn2]) seen[dn2] = {};
+        seen[dn2][sq] = true;
+      }
     }
-  }
+  });
 
   for (var dk in res.item){
     var have = seen[dk] ? Object.keys(seen[dk]).length : 0;

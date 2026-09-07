@@ -246,14 +246,32 @@ function nextStage_(sh, row, key){
   var R = CLAIM_RESULTS[res];
   return (R && R.back) ? 'STORE_IN' : 'CLOSE_WAIT';
 }
-/** ระบบออกเลขเอกสารให้เอง เรียงต่อกันรายปี ไม่ซ้ำ */
-function nextDocNo_(prefix){
-  var p = PropertiesService.getScriptProperties();
-  var yy = String(new Date().getFullYear() + 543).slice(-2);
-  var k = 'SEQ_' + prefix + '_' + yy;
-  var n = num_(p.getProperty(k)) + 1;
-  p.setProperty(k, String(n));
-  return prefix + '-' + yy + '/' + ('0000' + n).slice(-4);
+/** ออกเลขเอกสารของขั้นงาน (GR · RCV · IS · CDN) — เลขต้องอยู่ได้ 10-20 ปี ห้ามซ้ำ
+ *  ⚠️ ห้ามตั้งชื่อ nextDocNo_ ซ้ำกับตัวใน CLAIM-Hub.js
+ *     Apps Script เอาไฟล์ทุกไฟล์มารวมใน scope เดียว ชื่อซ้ำ = ตัวที่โหลดทีหลังทับตัวแรกเงียบ ๆ
+ *     (เคยพลาดมาแล้ว v1.1.x — เลขใบเคลมเกือบวนกลับไปชนเลขเดิม)
+ *  หลักการ: **นับจากชีตเสมอ** ไม่พึ่ง Script Properties
+ *     Properties หายได้ (ย้ายโปรเจกต์ · ล้างค่า) แต่ชีตคือของจริง นับจากชีตจึงไม่มีทางซ้ำ
+ *  ล็อกสคริปต์ไว้ — คนสองคนกดพร้อมกันจะไม่ได้เลขเดียวกัน                                */
+function nextFlowNo_(prefix, headerName){
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var d = db_(), yy = yy_(yearBE_());
+    var sh = d.claims, lr = sh.getLastRow(), max = 0;
+    var c = colOf_(headerName);
+    if (lr > 1 && c > 0){
+      var col = sh.getRange(2, c, lr - 1, 1).getDisplayValues();
+      var re = new RegExp('^' + prefix + '-' + yy + '\\/(\\d+)$');
+      for (var i = 0; i < col.length; i++){
+        var m = norm_(col[i][0]).match(re);
+        if (m) max = Math.max(max, parseInt(m[1], 10));
+      }
+    }
+    var n = String(max + 1);
+    while (n.length < 4) n = '0' + n;
+    return prefix + '-' + yy + '/' + n;
+  } finally { lock.releaseLock(); }
 }
 
 /** เซ็นชื่อลงช่องของขั้นนั้น — ชื่อ · แผนก · วันเวลา · เซ็นแล้วไม่ทับซ้ำ */
@@ -333,7 +351,7 @@ function setStage_(sh, row, key, me, note){
 /** ข้อมูลขั้นตอนสำหรับหน้าเว็บ — บอกได้เลยว่าใครทำอะไรต่อ และคนที่เปิดดูทำอะไรได้ */
 function claimFlow(docNo, auth){
   var me = requireLogin_(auth);
-  var d = db_(), r = findClaimRow_(d.claims, norm_(docNo));
+  var d = dbOf_(docNo), r = findClaimRow_(d.claims, norm_(docNo));
   if (r < 0) return null;
   ensureCols_(d.claims, claimHdr_());
 
@@ -406,7 +424,7 @@ function lockMap_(stageKey, me, received){
 function receiveClaim(docNo, auth){
   var me = requireLogin_(auth);
   docNo = norm_(docNo);
-  var d = db_(), r = findClaimRow_(d.claims, docNo);
+  var d = dbOf_(docNo), r = findClaimRow_(d.claims, docNo);
   if (r < 0) throw new Error('ไม่พบใบเคลม ' + docNo);
   ensureCols_(d.claims, claimHdr_());
 
@@ -441,7 +459,7 @@ function cancelClaim(docNo, reason, auth){
   if (!reason) throw new Error('ต้องบอกเหตุผลที่ยกเลิก จะได้รู้ทีหลังว่าทำไมถึงยกเลิก');
 
   docNo = norm_(docNo);
-  var d = db_(), r = findClaimRow_(d.claims, docNo);
+  var d = dbOf_(docNo), r = findClaimRow_(d.claims, docNo);
   if (r < 0) throw new Error('ไม่พบใบเคลม ' + docNo);
   ensureCols_(d.claims, claimHdr_());
   if (claimStage_(d.claims, r) === 'CANCELLED') throw new Error('ใบนี้ยกเลิกไปแล้ว');
@@ -461,7 +479,7 @@ function rejectReturn(docNo, reason, auth){
   docNo = norm_(docNo); reason = norm_(reason);
   if (!reason) throw new Error('ต้องบอกเหตุผลที่ไม่ Accept จะได้บอก Supplier ได้ว่าไม่ผ่านตรงไหน');
 
-  var d = db_(), r = findClaimRow_(d.claims, docNo);
+  var d = dbOf_(docNo), r = findClaimRow_(d.claims, docNo);
   if (r < 0) throw new Error('ไม่พบใบเคลม ' + docNo);
   ensureCols_(d.claims, claimHdr_());
 
@@ -500,7 +518,7 @@ function rejectReturn(docNo, reason, auth){
 function advanceClaim(docNo, auth){
   var me = requireLogin_(auth);
   docNo = norm_(docNo);
-  var d = db_(), r = findClaimRow_(d.claims, docNo);
+  var d = dbOf_(docNo), r = findClaimRow_(d.claims, docNo);
   if (r < 0) throw new Error('ไม่พบใบเคลม ' + docNo);
   ensureCols_(d.claims, claimHdr_());
 
@@ -524,18 +542,18 @@ function advanceClaim(docNo, auth){
   /* ระบบออกเลขเอกสาร + วันที่ให้ตรงขั้นที่เพิ่งทำเสร็จ (เบียร์สั่ง 7 ก.ย.) */
   var today = nowStamp_().split(' ')[0], emit = '';
   if (key === 'STORE_IN' && !norm_(d.claims.getRange(r, colOf_('เลขที่รับของเข้าคลัง')).getDisplayValue())){
-    emit = nextDocNo_('GR');
+    emit = nextFlowNo_('GR', 'เลขที่รับของเข้าคลัง');
     d.claims.getRange(r, colOf_('เลขที่รับของเข้าคลัง')).setValue(emit);
     d.claims.getRange(r, colOf_('วันที่รับของเข้าคลัง')).setValue(today);
   }
   if (key === 'QC_RECV' && !norm_(d.claims.getRange(r, colOf_('เลขที่ใบตรวจรับของกลับ')).getDisplayValue())){
-    emit = nextDocNo_('RCV');
+    emit = nextFlowNo_('RCV', 'เลขที่ใบตรวจรับของกลับ');
     d.claims.getRange(r, colOf_('เลขที่ใบตรวจรับของกลับ')).setValue(emit);
     d.claims.getRange(r, colOf_('วันที่ตรวจรับของกลับ')).setValue(today);
     d.claims.getRange(r, colOf_('ผู้ตรวจรับของกลับ')).setValue(me.name + (me.dept ? ' · ' + me.dept : ''));
   }
   if (key === 'STORE_OUT' && !norm_(d.claims.getRange(r, colOf_('เลขที่ใบเบิกออก')).getDisplayValue())){
-    emit = nextDocNo_('IS');
+    emit = nextFlowNo_('IS', 'เลขที่ใบเบิกออก');
     d.claims.getRange(r, colOf_('เลขที่ใบเบิกออก')).setValue(emit);
     d.claims.getRange(r, colOf_('วันที่เบิกออก')).setValue(today);
   }
@@ -568,7 +586,7 @@ function rejectClaim(docNo, toStage, reason, auth){
   docNo = norm_(docNo); reason = norm_(reason);
   if (!reason) throw new Error('ต้องบอกเหตุผลที่ตีกลับ ไม่งั้นคนรับไม่รู้ว่าต้องแก้อะไร');
 
-  var d = db_(), r = findClaimRow_(d.claims, docNo);
+  var d = dbOf_(docNo), r = findClaimRow_(d.claims, docNo);
   if (r < 0) throw new Error('ไม่พบใบเคลม ' + docNo);
   ensureCols_(d.claims, claimHdr_());
 
