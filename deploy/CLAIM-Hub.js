@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v1.2.5';
+var VERSION = 'v1.2.6';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -233,6 +233,118 @@ function getUsers_(){
   cachePut_('CLAIM_USERS', JSON.stringify(out), 300);
   _USERS = out;
   return out;
+}
+
+/* ═══════════ ตั้ง PIN ครั้งแรก — ทำในระบบนี้ได้เลย (v1.2.6) ═══════════
+ * เบียร์ 7 ก.ย.: "คนที่ยังไม่มี PIN ทำไมต้องไป register ฝั่ง NOVA ทำไมทำผ่านอันนี้เลยไม่ได้"
+ * ตอบ: ทำได้ครับ — ชีต USERS มีช่อง PIN **ช่องเดียว ใช้ร่วมกันทั้ง NOVA และงานเคลม**
+ *      ตั้งที่นี่ = ใช้เข้า NOVA ได้ด้วย ไม่ต้องตั้งสองที่
+ *
+ * ⚠️ กติกาความปลอดภัย (สำคัญมาก อย่าถอดออก):
+ *   · ตั้งเองได้เฉพาะ "คนที่ยังไม่มี PIN" เท่านั้น — มี PIN แล้วต้องให้ผู้ดูแลรีเซ็ตให้
+ *   · ต้องพิมพ์ชื่อ-สกุลตัวเองให้ตรงกับในทะเบียน จะได้ไม่ใช่แค่รู้รหัสพนักงานแล้วสวมสิทธิ์
+ *   · **สิทธิ์ระดับผู้บริหาร/ผู้อนุมัติ ตั้งเองไม่ได้** ต้องให้ผู้ดูแลตั้งให้เท่านั้น
+ *     (ไม่งั้นใครก็ตามที่รู้รหัสพนักงานของ President จะยึดบัญชีที่เห็นเงินทั้งบริษัทได้)   */
+var PIN_SELF_BLOCK = ['ADMIN','APPROVER'];
+
+/** ชื่อในทะเบียนกับที่พิมพ์มา ตรงกันไหม — ตัดช่องว่างและคำนำหน้าออกก่อนเทียบ */
+function nameLike_(a, b){
+  function clean(x){
+    return norm_(x).replace(/\s+/g,'')
+      .replace(/^(นาย|นาง|นางสาว|น\.ส\.|ว่าที่ร\.?ต\.?|คุณ|mr\.?|mrs\.?|ms\.?)/i,'');
+  }
+  var x = clean(a), y = clean(b);
+  return !!x && x === y;
+}
+
+/** เช็คก่อนว่ารหัสพนักงานนี้ตั้ง PIN เองได้ไหม (ไม่ต้องล็อกอิน) */
+function checkPinSetup(emp){
+  emp = norm_(emp);
+  if (!emp) return { ok:false, msg:'กรอกรหัสพนักงานก่อน' };
+  var us = getUsers_();
+  for (var i = 0; i < us.length; i++){
+    if (us[i].emp !== emp) continue;
+    if (!us[i].active) return { ok:false, msg:'รหัสพนักงานนี้ถูกปิดการใช้งานแล้ว' };
+    if (us[i].role === 'GUEST')
+      return { ok:false, msg:'รหัสนี้ไม่ได้อยู่ในระบบเคลม — ให้ผู้ดูแลกำหนดหน้าที่ (role for Claim) ให้ก่อน' };
+    if (us[i].pin)
+      return { ok:false, msg:'รหัสนี้ตั้ง PIN ไว้แล้ว — ถ้าลืม PIN ให้ผู้ดูแลรีเซ็ตให้' };
+    for (var k = 0; k < (us[i].roles || []).length; k++){
+      if (PIN_SELF_BLOCK.indexOf(us[i].roles[k]) >= 0)
+        return { ok:false, msg:'สิทธิ์ระดับผู้บริหาร/ผู้อนุมัติ ตั้ง PIN เองไม่ได้ — ให้ผู้ดูแลตั้งให้เพื่อความปลอดภัย' };
+    }
+    /* บอกชื่อแบบปิดบางส่วน ให้คนที่เป็นเจ้าของรู้ว่าใช่ตัวเอง แต่คนอื่นเดาไม่ได้ */
+    var nm = us[i].name || '';
+    var hint = nm ? (nm.slice(0, 2) + '••••' + nm.slice(-2)) : '';
+    return { ok:true, hint:hint, dept:us[i].dept || '', role:us[i].roleRaw || '' };
+  }
+  return { ok:false, msg:'ไม่พบรหัสพนักงาน ' + emp + ' ในทะเบียน — ตรวจเลขอีกครั้ง หรือแจ้งฝ่ายบุคคล' };
+}
+
+/** ตั้ง PIN ครั้งแรกด้วยตัวเอง */
+function setupPin(emp, fullName, pin, pin2){
+  emp = norm_(emp); pin = norm_(pin); pin2 = norm_(pin2);
+  var pre = checkPinSetup(emp);
+  if (!pre.ok) return pre;
+  if (!/^\d{6}$/.test(pin)) return { ok:false, msg:'PIN ต้องเป็นตัวเลข 6 หลัก' };
+  if (pin !== pin2)          return { ok:false, msg:'PIN สองช่องไม่ตรงกัน' };
+  if (/^(\d)\1{5}$/.test(pin) || pin === '123456' || pin === '000000')
+    return { ok:false, msg:'PIN นี้เดาง่ายเกินไป ใช้เลขอื่นครับ' };
+
+  var us = getUsers_(), who = null;
+  for (var i = 0; i < us.length; i++) if (us[i].emp === emp) who = us[i];
+  if (!who) return { ok:false, msg:'ไม่พบรหัสพนักงานนี้' };
+  if (!nameLike_(who.name, fullName))
+    return { ok:false, msg:'ชื่อ-สกุลไม่ตรงกับในทะเบียน — พิมพ์ให้ตรงกับที่ฝ่ายบุคคลบันทึกไว้' };
+
+  var r = writeUserPin_(emp, pin);
+  if (!r.ok) return r;
+  log_('setupPin', emp, who.name + ' ตั้ง PIN ครั้งแรกเอง');
+  return { ok:true, msg:'ตั้ง PIN เรียบร้อย — เข้าสู่ระบบได้เลย (PIN นี้ใช้กับ NOVA ได้ด้วย)' };
+}
+
+/** เขียน PIN ลงชีต USERS — ที่เดียวที่แตะช่องนี้ */
+function writeUserPin_(emp, pin){
+  var ss = SpreadsheetApp.openById(CFG.MASTER);
+  var sh = ss.getSheetByName('USERS');
+  if (!sh) return { ok:false, msg:'ไม่พบชีต USERS' };
+  var lr = sh.getLastRow(), lc = sh.getLastColumn();
+  var rows = sh.getRange(1,1,lr,lc).getDisplayValues();
+  var hr = findHeaderRow_(rows, ['email','อีเมล'], 5);
+  var iPin = colIdx_(rows[hr], ['pin','รหัสผ่าน']);
+  var iEmp = colIdx_(rows[hr], ['รหัสพนักงาน','employee','emp']);
+  if (iPin < 0 || iEmp < 0) return { ok:false, msg:'ชีต USERS ไม่มีคอลัมน์ PIN หรือรหัสพนักงาน' };
+  for (var r = hr + 1; r < rows.length; r++){
+    if (norm_(rows[r][iEmp]) !== norm_(emp)) continue;
+    sh.getRange(r + 1, iPin + 1).setValue(String(pin));
+    try { CacheService.getScriptCache().remove('CLAIM_USERS'); } catch(e){}
+    _USERS = null;                       // ล้างที่จำไว้ ไม่งั้นต้องรอ 5 นาทีถึงเข้าได้
+    return { ok:true };
+  }
+  return { ok:false, msg:'ไม่พบแถวของรหัสพนักงาน ' + emp };
+}
+
+/** ผู้ดูแล: ดูว่าใครยังไม่มี PIN + ตั้ง/รีเซ็ตให้ได้จากในระบบนี้เลย */
+function listUsersPin(auth){
+  requireAny_(auth, ['ADMIN']);
+  var us = getUsers_(), out = [];
+  for (var i = 0; i < us.length; i++){
+    if (!us[i].active) continue;
+    out.push({ emp:us[i].emp, name:us[i].name, dept:us[i].dept,
+               role:us[i].roleRaw, inClaim:us[i].role !== 'GUEST', hasPin:!!us[i].pin });
+  }
+  out.sort(function(a,b){ return (a.hasPin === b.hasPin) ? 0 : (a.hasPin ? 1 : -1); });
+  return out;
+}
+
+function adminSetPin(emp, pin, auth){
+  var me = requireAny_(auth, ['ADMIN']);
+  emp = norm_(emp); pin = norm_(pin);
+  if (!/^\d{6}$/.test(pin)) return { ok:false, msg:'PIN ต้องเป็นตัวเลข 6 หลัก' };
+  var r = writeUserPin_(emp, pin);
+  if (!r.ok) return r;
+  log_('adminSetPin', emp, 'ตั้งโดย ' + me.name);
+  return { ok:true, msg:'ตั้ง PIN ให้รหัส ' + emp + ' แล้ว' };
 }
 
 function getEmail_(){

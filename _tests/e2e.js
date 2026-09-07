@@ -19,6 +19,10 @@ users.appendRow(['6406099','boss@suteetankers.com','คุณหัวหน้�
 users.appendRow(['6406031','sukuman@suteetankers.com','นางสาวสุขุมาล ชวนะธิต','666666','Y','','Sales / Approve','']);
 /* "คนไหนที่เบียร์ไม่ได้ใส่ role คือคนนั้นไม่ได้อยู่ในระบบเคลม" */
 users.appendRow(['6406032','nobody@suteetankers.com','คุณไม่อยู่ในระบบเคลม','777777','Y','Purchase','','จัดซื้อ']);
+/* คนที่ยังไม่มี PIN — ใช้ทดสอบการตั้ง PIN ครั้งแรกในระบบนี้ (เบียร์ถาม 7 ก.ย.) */
+users.appendRow(['6811001','','นายศิวาวัฒน์ มะลิดา','','Y','Production Bom','Production','']);
+users.appendRow(['4900044','','นาย สุกิจ เพียพยัคฆ์','','Y','Production Bom','Production','']);
+users.appendRow(['999999','boriphat@suteetankers.com','คุณแบล็ค (VP)','','Y','EXEC','EXEC','']);
 
 /* ทำให้ตารางจ๊อบ "ใหญ่จริง" เพื่อพิสูจน์ว่าแคชหั่นชิ้นทำงาน (ของจริงก็ใหญ่แบบนี้) */
 const wip = ms.insertSheet('All WIP JT/JM');
@@ -892,6 +896,50 @@ T('งานซ่อม/ฝีมือ ไม่มีอะไหล่ — �
   if(f.missing.length) throw new Error('ใส่ค่าแรงแล้วยังส่งต่อไม่ได้: '+f.missing.join(' · '));
   const a=call('advanceClaim',[n,QC]);
   return n+' → ส่งขออนุมัติได้โดยไม่มีรายการของ (ขั้น '+a.stage+')'; });
+
+console.log('\n⑭ ตั้ง PIN ครั้งแรกในระบบนี้เลย (ไม่ต้องไป NOVA)');
+T('คนที่ยังไม่มี PIN ตั้งเองได้ แล้วเข้าระบบได้ทันที', ()=>{
+  const emp='6811001';                               // นายศิวาวัฒน์ — Production, PIN ว่าง
+  const chk=call('checkPinSetup',[emp]);
+  if(!chk.ok) throw new Error('ควรตั้งได้ แต่ระบบบอกว่า: '+chk.msg);
+  if(!chk.hint) throw new Error('ไม่ได้บอกชื่อแบบปิดบางส่วนให้เจ้าตัวยืนยัน');
+  let r=call('setupPin',[emp,'ชื่อผิด','445566','445566']);
+  if(r.ok) throw new Error('ชื่อไม่ตรงทะเบียน แต่ตั้ง PIN ได้ — สวมสิทธิ์กันได้');
+  r=call('setupPin',[emp,'นายศิวาวัฒน์ มะลิดา','111111','111111']);
+  if(r.ok) throw new Error('PIN เดาง่ายอย่าง 111111 ไม่ควรผ่าน');
+  r=call('setupPin',[emp,'นายศิวาวัฒน์ มะลิดา','445566','445567']);
+  if(r.ok) throw new Error('PIN สองช่องไม่ตรงกัน แต่ผ่าน');
+  r=call('setupPin',[emp,'ศิวาวัฒน์ มะลิดา','445566','445566']);   // ไม่ใส่คำนำหน้าก็ต้องผ่าน
+  if(!r.ok) throw new Error('ตั้ง PIN ไม่สำเร็จ: '+r.msg);
+  const lg=call('loginEmpPin',[emp,'445566']);
+  if(!lg.ok) throw new Error('ตั้ง PIN แล้วเข้าระบบไม่ได้: '+lg.msg);
+  const again=call('checkPinSetup',[emp]);
+  if(again.ok) throw new Error('มี PIN แล้วยังตั้งซ้ำได้ — คนอื่นยึดบัญชีได้');
+  return lg.name+' ตั้ง PIN เองแล้วเข้าระบบได้ · ตั้งซ้ำไม่ได้แล้ว'; });
+
+T('สิทธิ์ผู้บริหาร/ผู้อนุมัติ ตั้ง PIN เองไม่ได้ (กันคนยึดบัญชีที่เห็นเงินทั้งบริษัท)', ()=>{
+  const r=call('checkPinSetup',['999999']);          // คุณแบล็ค (VP) — EXEC → ADMIN
+  if(r.ok) throw new Error('บัญชีผู้บริหารตั้ง PIN เองได้ — อันตรายมาก');
+  if(!/ผู้บริหาร|ผู้ดูแล/.test(r.msg)) throw new Error('ข้อความไม่ได้บอกเหตุผล: '+r.msg);
+  const s2=call('setupPin',['999999','คุณแบล็ค (VP)','778899','778899']);
+  if(s2.ok) throw new Error('กันแค่หน้าเช็ค แต่ setupPin ยังตั้งได้จริง');
+  return 'กันไว้ถูกแล้ว: '+r.msg; });
+
+T('คนที่ไม่มี role for Claim ตั้ง PIN ไม่ได้', ()=>{
+  const r=call('checkPinSetup',['6406032']);         // ไม่ได้ใส่ role
+  if(r.ok) throw new Error('คนที่ไม่อยู่ในระบบเคลม ตั้ง PIN ได้');
+  return r.msg; });
+
+T('ผู้ดูแลตั้ง PIN ให้คนอื่นได้จากในระบบ — คนอื่นทำไม่ได้', ()=>{
+  let blocked=false;
+  try { call('adminSetPin',['4900044','223344',BUY]); } catch(e){ blocked=true; }
+  if(!blocked) throw new Error('จัดซื้อตั้ง PIN ให้คนอื่นได้ — ต้องเป็นผู้บริหารเท่านั้น');
+  const r=call('adminSetPin',['4900044','223344',AUTH]);
+  if(!r.ok) throw new Error('ผู้บริหารตั้งไม่สำเร็จ: '+r.msg);
+  if(!call('loginEmpPin',['4900044','223344']).ok) throw new Error('ตั้งแล้วเข้าไม่ได้');
+  const list=call('listUsersPin',[AUTH]);
+  if(!list.length) throw new Error('รายชื่อผู้ใช้ว่าง');
+  return 'ผู้บริหารตั้งให้ได้ · คนอื่นกันไว้ · รายชื่อ '+list.length+' คน'; });
 
 console.log('\n──────────────────────────────');
 console.log('ผ่าน '+pass+' · ไม่ผ่าน '+fail);

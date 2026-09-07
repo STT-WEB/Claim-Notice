@@ -71,14 +71,30 @@
         <div class="muted" style="font-size:12px;margin-top:10px">ระบบจะจำว่าคุณคือใคร (บันทึกประวัติ) · ลืม PIN → ติดต่อผู้ดูแล</div>
       </div>
       <div id="loginReg" style="display:none">
-        <div class="muted" style="font-size:13.5px;line-height:1.7">
-          <b style="color:#fff">ลงทะเบียนที่ STT NOVA ที่เดียว</b><br>
-          ทะเบียนผู้ใช้กับ PIN ใช้ร่วมกันทั้ง 2 ระบบ — ระบบเคลม<b>อ่านอย่างเดียว ไม่สร้าง PIN เอง</b>
-          เพื่อไม่ให้มีทะเบียนคนใช้ 2 ชุดที่ไม่ตรงกัน<br><br>
-          ไปที่ STT NOVA → แท็บ <b>“📝 ลงทะเบียนครั้งแรก”</b> → ใส่รหัสพนักงาน + ชื่อ-นามสกุล
-          → ระบบให้ PIN 6 หลัก → กลับมาใช้ PIN นั้นเข้าที่นี่ได้เลย
+        <!-- เบียร์ 7 ก.ย. 2569: "คนที่ยังไม่มี PIN ทำไมต้องไป register ฝั่ง NOVA
+             ทำไมทำผ่านอันนี้เลยไม่ได้" → ตั้งที่นี่ได้เลยแล้ว
+             ช่อง PIN ในชีต USERS มีช่องเดียว ใช้ร่วมกันทั้ง NOVA และงานเคลม
+             ตั้งที่นี่ = ใช้เข้า NOVA ได้ด้วย ไม่ต้องตั้งสองที่ -->
+        <label class="lglabel">รหัสพนักงาน</label>
+        <input type="text" id="rgEmp" class="pininput" placeholder="เช่น 6406013"
+               onkeydown="if(event.key==='Enter')checkReg()">
+        <button class="lbtn ghost" onclick="checkReg()">ตรวจสอบรหัส →</button>
+        <div id="rgStep2" style="display:none;margin-top:12px">
+          <div class="muted" style="font-size:12.5px;line-height:1.6" id="rgWho"></div>
+          <label class="lglabel">ชื่อ-สกุลของคุณ</label>
+          <input type="text" id="rgName" class="pininput" placeholder="พิมพ์ให้ตรงกับที่ฝ่ายบุคคลบันทึกไว้">
+          <label class="lglabel">ตั้ง PIN (ตัวเลข 6 หลัก)</label>
+          <input type="password" inputmode="numeric" id="rgPin" class="pininput pin" placeholder="● ● ● ● ● ●">
+          <label class="lglabel">ยืนยัน PIN อีกครั้ง</label>
+          <input type="password" inputmode="numeric" id="rgPin2" class="pininput pin" placeholder="● ● ● ● ● ●"
+                 onkeydown="if(event.key==='Enter')doReg()">
+          <button class="lbtn" onclick="doReg()">ตั้ง PIN แล้วเข้าใช้งาน →</button>
         </div>
-        <div class="muted" style="font-size:12px;margin-top:12px">ถ้าลงทะเบียนแล้วยังเข้าไม่ได้ = ยังไม่ได้กำหนดสิทธิ์งานเคลม ติดต่อผู้ดูแล</div>
+        <div class="lerr" id="rgErr"></div>
+        <div class="muted" style="font-size:12px;margin-top:10px">
+          PIN นี้ใช้ได้ทั้ง <b>งานเคลม</b> และ <b>STT NOVA</b> (ทะเบียนเดียวกัน)<br>
+          ตั้งเองได้เฉพาะคนที่ยังไม่เคยมี PIN · ลืม PIN แล้วต้องให้ผู้ดูแลรีเซ็ตให้
+        </div>
       </div>
     </div>
   </div>
