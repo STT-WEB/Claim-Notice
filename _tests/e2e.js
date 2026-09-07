@@ -683,6 +683,38 @@ T('ไฟล์ฐานข้อมูลต้องหาเจอเสม�
   if(!before) throw new Error('อ่านเลขไฟล์ฐานข้อมูลไม่ได้');
   return 'เลขไฟล์ปัจจุบัน '+before+' — ยังพึ่ง Script Properties อยู่ (รอทำตัวสำรองในรุ่นถัดไป)'; });
 
+console.log('\n⑪ เอกสารที่ปริ้นออกมา — ลายเซ็นใบตรวจต้องขึ้นเอง');
+T('ใบตรวจ: ใครกดตรวจ/อนุมัติ ลายเซ็นต้องขึ้นบนเอกสารเอง', ()=>{
+  const ins = call('createInspection',[{area:'dom', kind:'สินค้า', jobNo:'JT-69/0001',
+      jobName:'ทดสอบลายเซ็นใบตรวจ', supplier:'เจ้าทดสอบ', inspector:'คุณสมชาย', tpl:''}, QC]);
+  const n = ins.docNo;
+  const its = call('getInspection',[n,QC]).items;
+  if(its.length){
+    call('saveInspItemField',[n, its[0].seq, 'acc', 'ACC', QC]);
+    for(let i=1;i<its.length;i++) call('saveInspItemField',[n, its[i].seq, 'acc', 'ACC', QC]);
+  }
+  call('advanceInsp',[n, QC]);                       // QC ส่งขออนุมัติ → เซ็นช่องผู้ตรวจ
+  let f = call('inspFlow',[n, AUTH]);
+  if(!f.signs || f.signs.length !== 2) throw new Error('ไม่ได้ส่งลายเซ็นกลับมา');
+  if(!f.signs[0].text) throw new Error('ผู้ตรวจกดส่งแล้ว แต่ลายเซ็นผู้ตรวจยังว่าง');
+  call('advanceInsp',[n, BOSS]);                     // ผู้บังคับบัญชาอนุมัติ → เซ็นช่องอนุมัติ
+  f = call('inspFlow',[n, AUTH]);
+  if(!f.signs[1].text) throw new Error('อนุมัติแล้ว แต่ลายเซ็นผู้อนุมัติยังว่าง');
+  return f.signs.map(x=>x.role+': '+x.text.split(' · ')[0]).join(' · '); });
+
+T('ใบตรวจ: ตีกลับแล้วลายเซ็นต้องถูกล้าง (ไม่ให้เอกสารโกหก)', ()=>{
+  const ins = call('createInspection',[{area:'dom', kind:'สินค้า', jobNo:'JT-69/0001',
+      jobName:'ทดสอบตีกลับ', supplier:'เจ้าทดสอบ', inspector:'คุณสมชาย', tpl:''}, QC]);
+  const n = ins.docNo;
+  const its = call('getInspection',[n,QC]).items;
+  for(const it of its) call('saveInspItemField',[n, it.seq, 'acc', 'ACC', QC]);
+  call('advanceInsp',[n, QC]);
+  if(!call('inspFlow',[n,AUTH]).signs[0].text) throw new Error('ยังไม่ได้เซ็นตั้งแต่แรก');
+  call('rejectInsp',[n, 'ตรวจไม่ครบ ให้กลับไปดูใหม่', BOSS]);
+  const f = call('inspFlow',[n, AUTH]);
+  if(f.signs[0].text) throw new Error('ตีกลับแล้วลายเซ็นผู้ตรวจยังค้างอยู่ — เอกสารจะบอกว่ามีคนเซ็นทั้งที่ผลตรวจถูกแก้ใหม่');
+  return 'ตีกลับแล้วล้างลายเซ็นครบ ' + f.signs.length + ' ช่อง'; });
+
 console.log('\n──────────────────────────────');
 console.log('ผ่าน '+pass+' · ไม่ผ่าน '+fail);
 console.log('เปิดไฟล์ '+G.STATS.openById+' ครั้ง · เขียนแคช '+G.STATS.cachePut+' ครั้ง · ไฟล์รูปใน Drive '+G.STATS.driveFiles);

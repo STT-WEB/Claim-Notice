@@ -32,7 +32,37 @@ var INS_STAGES = [
   { key:'IDONE', no:3, name:'อนุมัติแล้ว', who:'—', roles:[],
     todo:'ผลตรวจถูกอนุมัติแล้ว · ข้อที่ Un-Acc กดส่งไปเปิดใบเคลมได้', next:'', nextLabel:'', lineKey:'' }
 ];
-var HDR_INSP_FLOW = ['ขั้นตอน','รอใครทำ','เหตุผลที่ตีกลับ','ตีกลับโดย','ตีกลับเมื่อ','ประวัติขั้นตอน'];
+/* ลายเซ็นใบตรวจ — หลักการเดียวกับใบเคลม: ใครกดขั้นไหน ชื่อ-แผนก-วันเวลาขึ้นบนเอกสารเอง
+   เอกสารที่ปริ้นออกมาต้องบอกได้ว่า "ใครตรวจ ใครอนุมัติ เมื่อไหร่" ไม่งั้นเก็บไว้ 10-20 ปีก็พิสูจน์อะไรไม่ได้ */
+var INS_SIGN = ['ลายเซ็น ผู้ตรวจ','ลายเซ็น ผู้อนุมัติผลตรวจ'];
+var INS_SIGN_SLOT = { IDRAFT:'ลายเซ็น ผู้ตรวจ', IAPPROVAL:'ลายเซ็น ผู้อนุมัติผลตรวจ' };
+var INS_SIGN_ROLE = { 'ลายเซ็น ผู้ตรวจ':'ผู้ตรวจ (QC)', 'ลายเซ็น ผู้อนุมัติผลตรวจ':'ผู้อนุมัติผลตรวจ' };
+
+var HDR_INSP_FLOW = ['ขั้นตอน','รอใครทำ','เหตุผลที่ตีกลับ','ตีกลับโดย','ตีกลับเมื่อ','ประวัติขั้นตอน'].concat(INS_SIGN);
+
+/** ประทับลายเซ็นของขั้นที่ "เพิ่งทำเสร็จ" — เซ็นแล้วไม่ทับซ้ำ */
+function signInsStage_(sh, row, stageKey, me){
+  var name = INS_SIGN_SLOT[norm_(stageKey)];
+  if (!name) return '';
+  var c = colOfI_(name);
+  if (c < 0) return '';
+  var cur = norm_(sh.getRange(row, c).getDisplayValue());
+  if (cur) return cur;
+  var txt = me.name + (me.dept ? ' · ' + me.dept : '') + ' · ' + nowStamp_();
+  sh.getRange(row, c).setValue(txt);
+  return txt;
+}
+
+/** อ่านลายเซ็นทั้งใบ ส่งให้หน้าปริ้น */
+function insSigns_(sh, row){
+  var out = [];
+  for (var i = 0; i < INS_SIGN.length; i++){
+    var c = colOfI_(INS_SIGN[i]);
+    out.push({ role: INS_SIGN_ROLE[INS_SIGN[i]],
+               text: c > 0 ? norm_(sh.getRange(row, c).getDisplayValue()) : '' });
+  }
+  return out;
+}
 function inspHdr_(){ return HDR_INSP.concat(HDR_INSP_FLOW); }
 function insStage_(key){
   key = norm_(key) || 'IDRAFT';
@@ -438,7 +468,7 @@ function inspFlow(docNo, auth){
     rejectBy:   norm_(d.head.getRange(r, colOfI_('ตีกลับโดย')).getDisplayValue()),
     rejectAt:   norm_(d.head.getRange(r, colOfI_('ตีกลับเมื่อ')).getDisplayValue()),
     history:    norm_(d.head.getRange(r, colOfI_('ประวัติขั้นตอน')).getDisplayValue()),
-    stages: insStageList(), lock:{}, missing:miss,
+    stages: insStageList(), lock:{}, missing:miss, signs: insSigns_(d.head, r),
     canEdit: (key === 'IDRAFT') && isOwner,
     canSendClaim: key === 'IDONE'
   };
@@ -478,6 +508,7 @@ function advanceInsp(docNo, auth){
   var miss = insMissing_(d, docNo, key);
   if (miss.length) throw new Error('ยังส่งต่อไม่ได้ — ' + miss.join(' · '));
 
+  signInsStage_(d.head, r, key, me);        // เซ็นขั้นที่เพิ่งทำเสร็จ ก่อนย้ายไปขั้นถัดไป
   setInsStage_(d.head, r, st.next, me, '');
   d.head.getRange(r, colOfI_('เหตุผลที่ตีกลับ')).setValue('');
   d.head.getRange(r, colOfI_('สถานะ')).setValue(st.next === 'IDONE' ? 'อนุมัติแล้ว' : 'รออนุมัติ');
@@ -504,6 +535,12 @@ function rejectInsp(docNo, reason, auth){
   var d = inspDbOf_(docNo), r = findInspRow_(d.head, docNo);
   if (r < 0) throw new Error('ไม่พบใบตรวจ ' + docNo);
   setInsStage_(d.head, r, 'IDRAFT', me, 'ตีกลับ: ' + reason);
+  /* ตีกลับแล้วต้องล้างลายเซ็น — ของเดิมที่เซ็นไว้ใช้กับ "ผลตรวจชุดเก่า"
+     ถ้าไม่ล้าง แก้ผลตรวจใหม่แล้วลายเซ็นเดิมยังค้าง = เอกสารโกหก */
+  for (var si = 0; si < INS_SIGN.length; si++){
+    var sc = colOfI_(INS_SIGN[si]);
+    if (sc > 0) d.head.getRange(r, sc).setValue('');
+  }
   d.head.getRange(r, colOfI_('เหตุผลที่ตีกลับ')).setValue(reason);
   d.head.getRange(r, colOfI_('ตีกลับโดย')).setValue(me.name);
   d.head.getRange(r, colOfI_('ตีกลับเมื่อ')).setValue(nowStamp_());

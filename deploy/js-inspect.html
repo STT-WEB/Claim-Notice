@@ -3,6 +3,7 @@
    ตรวจทีละหัวข้อ · ติ๊ก Acc / Un-Acc · ถ่ายรูปทุกข้อ
    ข้อที่ Un-Acc กดส่งไปเปิดใบเคลมได้เลย รูปตามไปด้วย                  */
 
+var INSP = null;          // ใบตรวจที่เปิดอยู่ — หน้าปริ้นใช้ตัวนี้ (คู่กับ CLAIM ของใบเคลม)
 var INSTPL = null;
 var INSFOREIGN = false;   // งานในประเทศไม่ต้องมีช่องภาษาอังกฤษให้รก
 
@@ -133,6 +134,7 @@ function openInspection(docNo){
   srv('getInspFull', [docNo, AUTH], function(c){
     if (!c){ $('view').innerHTML = '<div class="msg bad">ไม่พบใบตรวจ ' + esc(docNo) + '</div>'; return; }
     var h = c.head;
+    INSP = c;                       // เก็บไว้ให้หน้าปริ้นใช้ ไม่ต้องยิงเซิร์ฟเวอร์ซ้ำ
     CURDOC = docNo; CURJOB = h['เลขที่ JOB'] || '';
     PHOTOS = c.photos || {};
     INSFOREIGN = (h['สถานที่ผลิต'] === 'for');
@@ -152,6 +154,7 @@ function openInspection(docNo){
     var t = '<div class="card noprint"><div class="cardhd">' +
       '<h3>' + esc(h['เลขที่เอกสาร']) + ' — ใบตรวจรับสินค้า</h3>' +
       '<span class="sub">' + esc(h['แม่แบบเช็คลิสต์']) + '</span>' +
+      '<button class="btn" onclick="openPrintIns()">🖨️ ปริ้น / PDF</button>' +
       '<span class="savebar ok" id="savebar">✓ บันทึกอัตโนมัติ</span></div>';
 
     INSFLOW = c.flow || null;

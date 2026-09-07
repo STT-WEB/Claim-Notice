@@ -19,7 +19,15 @@ window.STT_LOGO = STT_LOGO;
 
    1 ใบเคลมมีได้หลาย Supplier → **แยกใบให้อัตโนมัติ** แต่ละเจ้าเห็นเฉพาะรายการของตัวเอง  */
 
-var PR = { kind:'int', sup:'', cols:{} };
+var PR = { kind:'int', sup:'', cols:{}, doc:'clm' };   // doc = 'clm' ใบเคลม · 'ins' ใบตรวจรับสินค้า
+
+/** หัวเอกสารของใบที่กำลังปริ้น — ใบเคลมกับใบตรวจใช้หน้ากระดาษชุดเดียวกัน
+ *  ⚠️ ทุกที่ที่เคยเขียน CLAIM.head ตรง ๆ ต้องผ่านตัวนี้ ไม่งั้นปริ้นใบตรวจแล้วขึ้นข้อมูลใบเคลม */
+function prHead(){
+  if (PR.doc === 'ins') return (INSP && INSP.head) || {};
+  return (CLAIM && CLAIM.head) || {};
+}
+function isIns(){ return PR.doc === 'ins'; }
 
 /* A4 ที่ 96dpi = 794 × 1122 px เป๊ะ ๆ
    เนื้อที่ใส่ของได้ = 1122 − 16(ขอบบน) − 34(ขอบล่าง) − 30(ท้ายกระดาษ) = 1042 */
@@ -27,7 +35,7 @@ var PAGE_H = 1042;
 
 function openPrint(){
   if (!CLAIM){ alert('เปิดใบเคลมก่อนครับ'); return; }
-  PR.sup = '';
+  PR.doc = 'clm'; PR.sup = '';
   drawPrint();
 }
 
@@ -124,6 +132,7 @@ function showMoney(){ return PR.kind !== 'notice' && PR.kind !== 'rcv'; }
 function showCost(){  return PR.kind === 'int'; }      // ต้นทุน/กำไร/เรท = ภายในเท่านั้น
 
 function docTitle(){
+  if (isIns()) return ['ใบตรวจรับสินค้า', 'INSPECTION REPORT'];
   if (PR.kind === 'int')    return ['ใบสรุปงานเคลม (ภายใน)', 'INTERNAL CLAIM SUMMARY'];
   if (PR.kind === 'notice') return ['ใบแจ้งเคลมสินค้า', 'CLAIM NOTICE'];
   if (PR.kind === 'rcv')    return ['ใบตรวจรับของกลับ', 'GOODS RETURN INSPECTION'];
@@ -341,25 +350,55 @@ function blkSign(h){
  *    ใช้ grid 3 คอลัมน์ตายตัว รูปที่เหลือรูปเดียวจึงอยู่คอลัมน์แรกด้วยขนาดเท่าเดิม
  *    ไม่ยืดเต็มแถว (ถ้ายืด รูปจะใหญ่ไม่เท่ากันแล้วดูเทียบกันไม่ได้)
  *  ก้อนละ 1 แถว (3 รูป) สูงราว 260px → 3 ก้อนอยู่ในหน้าเดียวได้ */
+/** รูปหลักฐานท้ายเอกสาร — ยึดตาม "Mockup-ใบเคลม-ร่าง5" ที่เบียร์เคาะไว้
+ *  แถบหัวข้อสีเทา → รูป 3 ช่องต่อแถว (ใหญ่เต็มความกว้างกระดาษ) → บรรทัดวิดีโอ/โฟลเดอร์
+ *  เบียร์: "ต้องเป็นรูปเห็นชัด ๆ" — จึงตั้ง 3 รูป/แถว สูง 230px ไม่ใช่รูปจิ๋ว
+ *  ใช้ได้ทั้งใบเคลมและใบตรวจรับสินค้า (ข้อมูลรูปเก็บวิธีเดียวกัน) */
 function blkPhotos(items){
   var out = [];
+  var h = prHead();
+  var docNo = h['เลขที่เอกสาร'] || '', jobNo = h['เลขที่ JOB'] || '';
+  var any = false;
+
   for (var i = 0; i < items.length; i++){
-    var seq = String(items[i].seq), ph = PHOTOS[seq] || [];
+    var it = items[i];
+    var seq = String(it.seq), ph = PHOTOS[seq] || [];
     if (!ph.length) continue;
+    any = true;
+
+    /* ชื่อรายการต่างกันระหว่าง 2 ระบบ — ใบเคลมใช้ name/th · ใบตรวจใช้ title/found */
+    var nm  = it.name || it.title || '';
+    var dsc = it.th   || it.found || '';
 
     var perChunk = 3;                                 // 3 รูปต่อแถว = 1 ก้อน
     for (var c = 0; c < ph.length; c += perChunk){
       var part = ph.slice(c, c + perChunk);
-      var t = '<div class="blk"><div class="capt">รูปหลักฐาน · รายการที่ ' + esc(seq) + ' · ' + esc(items[i].name) +
+      var t = '<div class="blk"><div class="capt">ข้อ ' + esc(seq) + ' · ' + esc(nm) +
+              (dsc ? ' — ' + esc(String(dsc).slice(0, 52)) + (String(dsc).length > 52 ? '…' : '') : '') +
               (ph.length > perChunk ? ' <span style="font-weight:400;color:#666">(รูปที่ ' + (c+1) + '–' +
                 Math.min(c + perChunk, ph.length) + ' จาก ' + ph.length + ')</span>' : '') + '</div>';
       t += '<div class="picbig">';
       for (var k = 0; k < part.length; k++){
         t += '<div><img src="' + bigPhoto(part[k].thumb) + '" alt="รูปที่ ' + (c+k+1) + '"></div>';
       }
-      t += '</div></div>';
+      /* เติมช่องว่างให้ครบ 3 ช่อง กรอบจะได้ไม่แหว่ง เวลารูปไม่ครบแถว */
+      for (var z = part.length; z < perChunk; z++) t += '<div class="none">— ไม่มีรูป —</div>';
+      t += '</div>';
+      /* บรรทัดวิดีโอ/โฟลเดอร์ ตาม Mockup — ไฟล์ใหญ่อัปไว้ใน Drive ไม่ได้อยู่บนกระดาษ
+         พิมพ์ "ทางไป" ไว้ให้ ใครถือกระดาษอยู่ก็ตามไปดูของจริงได้ */
+      if (c + perChunk >= ph.length){
+        t += '<div class="vd">🎬 วิดีโอและไฟล์เพิ่มเติมของข้อนี้ · ' +
+             '📁 ดูใน Google Drive → <b>รูป-วิดีโอ / ' + esc(jobNo || 'ไม่ระบุจ๊อบ') + ' / ' + esc(docNo) + '</b></div>';
+      }
+      t += '</div>';
       out.push(t);
     }
+  }
+
+  if (!any){
+    out.push('<div class="blk"><div class="capt">รูปหลักฐาน</div>' +
+             '<div class="vd" style="border-top:1px solid #666">— ใบนี้ยังไม่มีรูปแนบ — ' +
+             'ถ้าเป็นฉบับส่ง Supplier ต้องแนบรูปก่อนส่ง ไม่งั้นเขาไม่รับเคลม</div></div>');
   }
   return out;
 }
@@ -376,9 +415,21 @@ function paginate(){
   var host = $('prPages');
   var sets = host.querySelectorAll('.docset');
   var out = '';
+
+  /* ⚠️ ต้องวัดความสูง "ในกระดาษจริง" เท่านั้น
+     CSS ของเอกสารทุกอันผูกกับ .page ทั้งหมด (ดู styles.html)
+     ถ้าวัดตอนที่ยังไม่อยู่ในกระดาษ ตารางลายเซ็น 9 ช่องจะกางเป็นแนวตั้ง
+     วัดได้ 710px ทั้งที่ของจริงสูงแค่ ~100px → ระบบดันลายเซ็นไปขึ้นหน้าใหม่
+     ทั้งที่หน้าแรกยังว่างครึ่งหน้า = ทุกใบปริ้นเปลืองกระดาษไปหนึ่งแผ่นฟรี ๆ */
+  var mez = document.createElement('div');
+  mez.className = 'page';
+  mez.style.cssText = 'position:absolute;left:-99999px;top:0;height:auto;visibility:hidden';
+  document.body.appendChild(mez);
+
   for (var s = 0; s < sets.length; s++){
     var sup = sets[s].getAttribute('data-sup');
-    var blks = sets[s].querySelectorAll('.blk');
+    mez.innerHTML = sets[s].innerHTML;                 // วัดในกระดาษจริง
+    var blks = mez.querySelectorAll('.blk');
     var pages = [[]], used = 0;
     for (var b = 0; b < blks.length; b++){
       var hgt = blks[b].offsetHeight + 6;
@@ -395,13 +446,14 @@ function paginate(){
         pageFoot(p + 1, pages.length) + '</div>';
     }
   }
+  if (mez.parentNode) mez.parentNode.removeChild(mez);
   host.innerHTML = out;
 }
 function headHeight(){ return 210; }     // หัวกระดาษเต็ม + ชื่อเอกสาร
 function contHeight(){ return 62; }      // หัวกระดาษย่อของหน้า 2 เป็นต้นไป
 
 function pageHead(sup){
-  var h = CLAIM.head, ti = docTitle();
+  var h = prHead(), ti = docTitle();
   /* หัวกระดาษจริงของบริษัท ฝัง base64 ไว้ในหน้า — ปริ้นแล้วติดแน่นอน
      ไม่ต้องรอโหลดไฟล์จากที่อื่นซึ่งอาจมาไม่ทันตอนสั่งปริ้น */
   var t = '<div class="hdr"><img src="' + STT_LOGO + '" alt="SUTEE"></div><div class="hdrline"></div>' +
@@ -411,18 +463,189 @@ function pageHead(sup){
     '</table></div>';
   t += '<h1 class="tt">' + ti[0] + '<small>' + ti[1] + '</small></h1>';
   t += '<div class="c"><span class="ribbon' + (isInternal() ? '' : ' ext') + '">' +
-       (isInternal() ? 'ฉบับภายในบริษัท — ห้ามส่งออก' : 'ฉบับส่ง Supplier' + (sup ? ' · ' + esc(sup) : '')) +
+       (isInternal() ? 'ฉบับภายในบริษัท — ห้ามส่งออก'
+                     : 'ฉบับส่ง Supplier' + (sup ? ' · ' + esc(sup) : (isIns() && h['Supplier'] ? ' · ' + esc(h['Supplier']) : ''))) +
        '</span></div>';
   return t;
 }
 function pageHeadCont(sup, n){
-  var h = CLAIM.head, ti = docTitle();
+  var h = prHead(), ti = docTitle();
   return '<div class="hcnote">' + ti[0] + ' · เลขที่ ' + esc(h['เลขที่เอกสาร']) +
          ' · JOB ' + esc(h['เลขที่ JOB']) + (sup ? ' · ' + esc(sup) : '') + ' — หน้า ' + n + '</div>';
 }
 function pageFoot(n, total){
-  /* FM-WH-03 Rev.00 = รหัสฟอร์มของใบเคลม (เบียร์กำหนด) · ใบตรวจรับยังไม่มีรหัส จึงไม่ใส่ */
-  return '<div class="pf"><span>FM-WH-03 Rev.00</span><span class="sp"></span>' +
+  /* FM-WH-03 Rev.00 = รหัสฟอร์มใบเคลม (เบียร์กำหนด)
+     ใบตรวจรับสินค้ายังไม่ได้กำหนดรหัสฟอร์ม — รอเบียร์เคาะ แล้วมาเติมที่บรรทัดนี้จุดเดียว */
+  var code = isIns() ? '' : 'FM-WH-03 Rev.00';
+  return '<div class="pf"><span>' + code + '</span><span class="sp"></span>' +
          '<span>หน้า ' + n + '/' + total + '</span></div>';
+}
+/* ═══════════════ ใบตรวจรับสินค้า — หน้าปริ้น (v1.2.1) ═══════════════
+ * เบียร์ถาม 7 ก.ย. 2569: "หน้าตา PDF ที่จะปริ้นออกมา ทั้ง claim และ Inspection จะเป็นยังไง"
+ * → ฝั่งใบเคลมมีมาตั้งแต่ v0.6.0 แต่ **ฝั่งใบตรวจยังไม่มีเลย** ผมพลาดเอง อันนี้คือตัวที่เพิ่มให้
+ *
+ * ใช้กระดาษ หัวจดหมาย ตัวแบ่งหน้า และกล่องลายเซ็น ชุดเดียวกับใบเคลมทั้งหมด
+ * เอกสารพนักงานจะได้หน้าตาเป็นชุดเดียวกัน ไม่ใช่คนละแบบ
+ *
+ * ปริ้นได้ 2 ฉบับ ใช้กฎเดียวกับใบเคลม (เบียร์เคาะไว้ 4 ก.ย.):
+ *   ภายใน        — มีชื่อลูกค้า มีหมายเหตุ มีประวัติการส่งต่อ
+ *   ส่ง Supplier — ตัดชื่อลูกค้าออก เหลือเลขจ๊อบไว้อ้างอิง (ไม่บอก Supplier ว่าเราขายให้ใคร)
+ * ═══════════════════════════════════════════════════════════════ */
+
+function openPrintIns(){
+  if (!INSP){ alert('เปิดใบตรวจก่อนครับ'); return; }
+  PR.doc = 'ins'; PR.sup = ''; PR.kind = 'int';
+  drawPrintIns();
+}
+
+function drawPrintIns(){
+  var h = INSP.head;
+  var t = '<div class="card noprint"><div class="cardhd"><h3>ปริ้นใบตรวจรับ ' + esc(h['เลขที่เอกสาร']) + '</h3>' +
+    '<button class="btn" onclick="go(\'ins\',CURDOC)">← กลับใบตรวจ</button>' +
+    '<button class="btn dark" onclick="doPrintIns()">🖨️ ปริ้น / บันทึกเป็น PDF</button></div>';
+
+  t += '<div class="prbar"><div class="prgrp"><span>ฉบับ</span>' +
+    prBtnIns('int',    '📋 ภายใน', 'มีชื่อลูกค้า หมายเหตุ และประวัติการส่งต่อ') +
+    prBtnIns('notice', '📤 ส่ง Supplier', 'ตัดชื่อลูกค้าออก เหลือเลขจ๊อบไว้อ้างอิง') +
+    '</div></div>';
+
+  t += '<div class="prnote">' + (isInternal()
+      ? '📋 ฉบับภายใน — เห็นชื่อลูกค้าและข้อมูลครบ ใช้เก็บเป็นหลักฐานในบริษัท'
+      : '📤 ฉบับส่ง Supplier — ตัดชื่อลูกค้าออกแล้ว เหลือแต่เลขจ๊อบไว้อ้างอิง') + '</div>';
+  t += '</div><div id="prPages"></div>';
+
+  $('view').innerHTML = t;
+  $('prPages').innerHTML = buildInsDoc();
+  paginate();
+}
+
+function prBtnIns(k, label, sub){
+  return '<button class="prb' + (PR.kind === k ? ' on' : '') + '" title="' + esc(sub) + '" ' +
+         'onclick="PR.kind=\'' + k + '\';drawPrintIns()">' + label + '</button>';
+}
+
+function doPrintIns(){ window.print(); }     // ใบตรวจปริ้นได้ไม่จำกัด ไม่ล็อกเหมือนใบแจ้งเคลม
+
+function buildInsDoc(){
+  var h = INSP.head, items = INSP.items || [];
+  var blocks = [];
+  blocks.push(blkInsJob(h));
+  blocks.push(blkInsSummary(items));
+  blocks.push(blkInsItems(items, h));
+  if (isInternal() && h['หมายเหตุ']) blocks.push(blkInsNote(h));
+  if (h['ใบเคลมที่ออกจากใบนี้']) blocks.push(blkInsClaimRef(h));
+  blocks.push(blkInsSign(h));
+  blocks = blocks.concat(blkPhotos(items));       // รูปหลักฐานชุดเดียวกับใบเคลม
+  return '<div class="docset" data-sup="">' + blocks.join('') + '</div>';
+}
+
+/** ข้อมูลงาน — ฉบับส่ง Supplier ตัดชื่อลูกค้าออก (กฎเดียวกับใบเคลม) */
+function blkInsJob(h){
+  var AREA = { dom:'ในประเทศ', for:'ต่างประเทศ' };
+  var t = '<div class="blk"><div class="sec"><div class="sech">ข้อมูลงาน<span>JOB INFORMATION</span></div>' +
+          '<div class="box"><table class="f">';
+  t += row2('เลขที่ JOB (อ้างอิง)', '<b>' + esc(h['เลขที่ JOB']) + '</b>',
+            isInternal() ? 'ชื่อลูกค้า' : 'Supplier',
+            esc(isInternal() ? h['ชื่อลูกค้า'] : (h['Supplier'] || '—')));
+  t += row2('MODEL', esc(h['MODEL'] || '—'), 'CHASSIS NO.', esc(h['CHASSIS NO. (STT)'] || h['CHASSIS NO. (ผู้ผลิต)'] || '—'));
+  t += row2('SERIAL NO.', esc(h['SERIAL NO.'] || '—'), 'PO', esc(h['PO'] || '—'));
+  t += row2('ชนิดงานที่ตรวจ', esc(h['ชนิดงาน'] || '—'), 'สถานที่ผลิต', esc(AREA[h['สถานที่ผลิต']] || h['สถานที่ผลิต'] || '—'));
+  t += row2('วันรับสินค้า', esc(h['วันรับสินค้า'] || '—'), 'ผู้ตรวจ', esc(h['ผู้ตรวจ'] || '—'));
+  t += row2('แม่แบบเช็คลิสต์', esc(h['แม่แบบเช็คลิสต์'] || '—'),
+            isInternal() ? 'Supplier' : 'วันที่ตรวจ',
+            esc(isInternal() ? (h['Supplier'] || '—') : (h['วันที่'] || '—')));
+  t += '</table></div></div></div>';
+  return t;
+}
+
+/** สรุปผลตรวจ — ให้คนอ่านรู้ผลตั้งแต่ยังไม่ไล่ตาราง */
+function blkInsSummary(items){
+  var acc = 0, un = 0, todo = 0;
+  for (var i = 0; i < items.length; i++){
+    var a = String(items[i].acc || '').toUpperCase();
+    if (a === 'ACC') acc++; else if (a === 'UNACC') un++; else todo++;
+  }
+  var t = '<div class="blk"><div class="sec"><div class="sech">สรุปผลตรวจ<span>INSPECTION SUMMARY</span></div>' +
+          '<div class="box"><table class="f"><tr>' +
+    '<td class="lb">หัวข้อที่ตรวจทั้งหมด :</td><td class="in"><b>' + items.length + '</b> ข้อ</td>' +
+    '<td class="lb" style="padding-left:12px">ผ่าน (Accepted) :</td><td class="in"><b>' + acc + '</b> ข้อ</td>' +
+    '<td class="lb" style="padding-left:12px">ไม่ผ่าน (Un-Accepted) :</td><td class="in"><b>' + un + '</b> ข้อ</td>';
+  if (todo) t += '<td class="lb" style="padding-left:12px">ยังไม่ตรวจ :</td><td class="in"><b>' + todo + '</b> ข้อ</td>';
+  t += '</tr></table></div></div></div>';
+  return t;
+}
+
+/** ตารางหัวข้อตรวจ — ฉบับส่ง Supplier ขึ้น 2 ภาษาเสมอ */
+function blkInsItems(items, h){
+  var bi = !isInternal() || h['สถานที่ผลิต'] === 'for';
+  var t = '<div class="blk"><div class="sec"><div class="sech">ผลการตรวจรายหัวข้อ<span>INSPECTION RESULT</span></div></div>' +
+          '<table class="g"><thead><tr>' +
+    '<th style="width:26px">ที่<span class="en">No.</span></th>' +
+    '<th style="width:96px">หมวด<span class="en">Group</span></th>' +
+    '<th>หัวข้อตรวจ / สิ่งที่พบ<span class="en">Check point / Findings</span></th>' +
+    '<th style="width:38px">จำนวน<span class="en">Qty</span></th>' +
+    '<th style="width:38px">หน่วย<span class="en">Unit</span></th>' +
+    '<th style="width:74px">ผลตรวจ<span class="en">Result</span></th>' +
+    '</tr></thead><tbody>';
+
+  for (var i = 0; i < items.length; i++){
+    var it = items[i];
+    var a = String(it.acc || '').toUpperCase();
+    var res = a === 'ACC'   ? '<b>ผ่าน</b><span class="en">Accepted</span>'
+            : a === 'UNACC' ? '<b style="color:#A32D2D">ไม่ผ่าน</b><span class="en">Un-Accepted</span>'
+            : '<span style="color:#888">— ยังไม่ตรวจ —</span>';
+    t += '<tr>' +
+      '<td class="c">' + esc(it.seq) + '</td>' +
+      '<td>' + esc(it.cat || '') + '</td>' +
+      '<td><b>' + esc(it.title || '') + '</b>' +
+        (bi && it.titleEn ? '<span class="den">' + esc(it.titleEn) + '</span>' : '') + '</td>' +
+      '<td class="c">' + esc(it.qty || '') + '</td>' +
+      '<td class="c">' + esc(it.unit || '') + '</td>' +
+      '<td class="c">' + res + '</td></tr>';
+    if (it.found || it.foundEn){
+      t += '<tr class="dsc"><td></td><td colspan="5"><div class="dth">พบ: ' + esc(it.found || '') + '</div>' +
+           (bi && it.foundEn ? '<span class="den">' + esc(it.foundEn) + '</span>' : '') + '</td></tr>';
+    }
+  }
+  t += '</tbody></table></div>';
+  return t;
+}
+
+function blkInsNote(h){
+  return '<div class="blk"><div class="sec"><div class="sech">หมายเหตุ<span>REMARKS</span></div>' +
+         '<div class="box" style="min-height:34px">' + esc(h['หมายเหตุ']) + '</div></div></div>';
+}
+
+function blkInsClaimRef(h){
+  return '<div class="blk"><div class="sec"><div class="sech">ใบเคลมที่เปิดจากใบตรวจนี้<span>CLAIM RAISED</span></div>' +
+         '<div class="box"><b>' + esc(h['ใบเคลมที่ออกจากใบนี้']) + '</b>' +
+         ' <span style="color:#666;font-size:12px">— ข้อที่ไม่ผ่านถูกส่งไปเปิดใบเคลมแล้ว</span></div></div></div>';
+}
+
+/** ลายเซ็นใบตรวจ — ใครกดไปแล้วชื่อขึ้นเอง คนที่ยังไม่ถึงคิวเว้นเส้นให้เซ็นมือ
+ *  (หลักการเดียวกับใบเคลม ต่างแค่ใบตรวจมี 2 ช่อง ไม่ใช่ 9) */
+function blkInsSign(h){
+  var f = INSP.flow, signs = (f && f.signs) ? f.signs : [];
+  var cells = [];
+  for (var k = 0; k < signs.length; k++){
+    var parts = String(signs[k].text || '').split(' · ');
+    cells.push([signs[k].role, parts[0] || '', parts.length > 2 ? parts[1] : '', parts[parts.length - 1] || '']);
+  }
+  if (!cells.length){
+    cells = [['ผู้ตรวจ (QC)', h['ผู้ตรวจ'] || '', 'QC', ''], ['ผู้อนุมัติผลตรวจ', '', '', '']];
+  }
+  var t = '<div class="blk"><div class="sg manual">';
+  for (var i = 0; i < cells.length; i++){
+    t += '<div><div class="role">' + esc(cells[i][0]) + '</div>' +
+         (cells[i][1] ? '<div class="nm">' + esc(cells[i][1]) + '</div><div class="ps">' + esc(cells[i][2]) + '</div>'
+                      : '<div class="ln">ลงชื่อ</div>') +
+         '<div class="dt">' + (cells[i][3] ? esc(cells[i][3]) : 'วันที่ ______________') + '</div></div>';
+  }
+  t += '</div></div>';
+  if (f && f.history && isInternal()){
+    t += '<div class="blk"><div class="phcap" style="margin-top:4px">ประวัติการส่งต่อ: ' +
+         esc(String(f.history).split('\n').join(' · ')) + '</div></div>';
+  }
+  return t;
 }
 </script>
