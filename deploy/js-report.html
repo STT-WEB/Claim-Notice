@@ -241,6 +241,44 @@ function loadRepJob(){
 }
 
 /* ─── 3.3 ทะเบียนเอกสาร ─── */
+/* ═══ ทะเบียนเอกสารที่ส่ง Supplier ═══════════════════════════
+ * เบียร์: "จ๊อบนี้เคยออกเอกสารอะไรไปให้ใครบ้าง ออกเมื่อไหร่ ใครออก"
+ * ⚠️ v1.2.3 — เมนูนี้อยู่ในกล่องงานที่ 3 มาตั้งแต่ v1.1.2 แต่ไม่เคยมีหน้าจริง
+ *    กดแล้วขึ้น "ไม่รู้จักหน้า supdoc" ตัวแดง — ตอนนี้มีของจริงแล้ว */
+function loadSupDocs(){
+  busy(true, 'กำลังโหลดทะเบียนเอกสารที่ส่ง Supplier…');
+  srv('reportSupplierDocs', [AUTH], function(r){
+    var rows = (r && r.rows) || [];
+    var t = '<div class="card">' + repHead('ทะเบียนเอกสารที่ส่ง Supplier',
+        rows.length + ' ฉบับ · ' + ((r && r.nJob) || 0) + ' จ๊อบ — นับเฉพาะฉบับที่ส่งออกจริง (ฉบับภายในไม่นับ)');
+    if (!rows.length){
+      t += '<div class="empty">ยังไม่เคยส่งเอกสารให้ Supplier<br>' +
+           '<span>พอกดปริ้นฉบับ ① แจ้งเคลม หรือ ② เรียกเก็บ ระบบจะบันทึกไว้ที่นี่เอง</span></div></div>';
+      $('view').innerHTML = t; busy(false); return;
+    }
+    t += '<div class="tblwrap"><table class="grid"><thead><tr>' +
+      '<th>เลขที่ใบเคลม</th><th>เลขที่ JOB</th><th>ส่งให้ Supplier</th>' +
+      '<th>ส่งออกเมื่อ</th><th>ใครออก</th><th>ใบเรียกเก็บรวม</th>' +
+      '<th>คำตอบจาก Supplier</th><th>ขั้นตอนตอนนี้</th></tr></thead><tbody>';
+    for (var i = 0; i < rows.length; i++){
+      var x = rows[i];
+      t += '<tr>' +
+        '<td><a href="#" onclick="go(\'claim\',\'' + esc(x.docNo) + '\');return false"><b>' + esc(x.docNo) + '</b></a></td>' +
+        '<td>' + esc(x.jobNo) + '<div class="sub2">' + esc(x.jobName) + '</div></td>' +
+        '<td>' + esc(x.supplier) + '</td>' +
+        '<td>' + (x.sentAt ? esc(x.sentAt) : '<span class="dim">— ยังไม่ได้ปริ้นส่ง —</span>') + '</td>' +
+        '<td>' + esc(x.sentBy || '—') + '</td>' +
+        '<td>' + (x.cdn ? '<b>' + esc(x.cdn) + '</b><div class="sub2">' + esc(x.cdnDate) + '</div>' : '<span class="dim">—</span>') + '</td>' +
+        '<td>' + (x.reply ? esc(x.reply) : '<span class="dim">— ยังไม่ตอบ —</span>') + '</td>' +
+        '<td>' + esc(x.stageName || x.stage) + '</td></tr>';
+    }
+    t += '</tbody></table></div>';
+    t += '<div class="modtag">ระบบบันทึกให้เองทุกครั้งที่กดปริ้นฉบับส่ง Supplier · ' +
+         'ฉบับภายในไม่ถูกบันทึก เพราะไม่ได้ส่งออกไปหาใคร</div></div>';
+    $('view').innerHTML = t; busy(false);
+  }, function(m){ $('view').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; busy(false); });
+}
+
 function loadRepDocs(){
   busy(true, 'กำลังโหลดทะเบียนเอกสาร…');
   srv('reportDocs', [AUTH], function(rows){

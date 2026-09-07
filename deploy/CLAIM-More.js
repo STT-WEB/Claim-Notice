@@ -569,6 +569,35 @@ function reportAccounting(auth){
   return { rows:out, sum:{ goods:sg, labour:sl, bill:sb } };
 }
 
+/** 3.9 · ทะเบียนเอกสารที่ส่ง Supplier
+ *  เบียร์: "จ๊อบนี้เคยออกเอกสารอะไรไปให้ใครบ้าง ออกเมื่อไหร่ ใครออก"
+ *  ระบบบันทึกทุกครั้งที่กดปริ้นฉบับส่งออก (ฉบับภายในไม่นับ ไม่ได้ส่งใคร)
+ *  ⚠️ ต้องกวาดทุกปี — เอกสารที่ส่งไปเมื่อปีก่อนก็ยังต้องตามได้ */
+function reportSupplierDocs(auth){
+  requireLogin_(auth);
+  var out = [], jobs = {};
+  eachClaim_(function(o, stage, d){
+    var dn = o['เลขที่เอกสาร'];
+    var at = o['ปริ้นส่งออกแล้วเมื่อ'] || '';
+    var cdn = o['เลขที่ใบเรียกเก็บรวม'] || '';
+    if (!at && !cdn) return;                      // ยังไม่เคยส่งอะไรออกไป
+    var sup = mainSupplier_(d, dn);
+    var row = {
+      docNo:dn, date:o['วันที่'], jobNo:o['เลขที่ JOB'], jobName:o['ชื่อลูกค้า'],
+      supplier:sup, sentAt:at, sentBy:o['ปริ้นโดย'] || '',
+      cdn:cdn, cdnDate:o['วันที่ใบเรียกเก็บรวม'] || '',
+      stage:stage, stageName:stageDef_(stage).name,
+      reply:o['หมายเหตุจาก Supplier'] || '', result:o['ผลการเคลม'] || ''
+    };
+    out.push(row);
+    var j = row.jobNo || '(ไม่ระบุจ๊อบ)';
+    if (!jobs[j]) jobs[j] = 0;
+    jobs[j]++;
+  });
+  out.sort(function(a,b){ return a.docNo < b.docNo ? 1 : -1; });
+  return { rows:out, nJob:Object.keys(jobs).length };
+}
+
 /** 3.8 · LOG — เก็บคนละแท็บกับตัวเอกสาร ลบ LOG ทิ้ง ใบเคลมยังอยู่ครบ */
 function reportLog(limit, auth){
   requireAny_(auth, ['APPROVER']);

@@ -715,6 +715,32 @@ T('ใบตรวจ: ตีกลับแล้วลายเซ็นต้
   if(f.signs[0].text) throw new Error('ตีกลับแล้วลายเซ็นผู้ตรวจยังค้างอยู่ — เอกสารจะบอกว่ามีคนเซ็นทั้งที่ผลตรวจถูกแก้ใหม่');
   return 'ตีกลับแล้วล้างลายเซ็นครบ ' + f.signs.length + ' ช่อง'; });
 
+T('ทุกเมนูบนหน้าแรก ต้องมีหน้าจริงรองรับ ไม่มีเมนูตายเลย', ()=>{
+  /* ⚠️ v1.1.2 เมนู "ทะเบียนเอกสารที่ส่ง Supplier" อยู่บนหน้าแรก แต่ไม่มีหน้าจริง
+     กดแล้วขึ้น "ไม่รู้จักหน้า supdoc" ตัวแดง — พนักงานเจอเองก่อนเรา
+     ตัวนี้กันไม่ให้เกิดอีก: ทุกคีย์เมนูต้องมีทางไปจริง */
+  const fs=require('fs'), path=require('path');
+  const dir=path.join(__dirname,'..','deploy');
+  const core=fs.readFileSync(path.join(dir,'js-core.html'),'utf8');
+  const keys=[...core.matchAll(/\{\s*k:'([^']+)'/g)].map(m=>m[1]).filter(k=>!k.startsWith('w:'));
+  const bad=[];
+  keys.forEach(k=>{ if(core.indexOf("v === '"+k+"'")<0) bad.push(k); });
+  if(bad.length) throw new Error('เมนูที่กดแล้วไม่มีหน้ารองรับ: '+bad.join(', '));
+  return 'ตรวจ '+keys.length+' เมนู มีหน้าจริงครบทุกอัน'; });
+
+T('ทะเบียนเอกสารที่ส่ง Supplier — ขึ้นเฉพาะใบที่ส่งออกจริง', ()=>{
+  const n=mkClaim_();
+  let before=call('reportSupplierDocs',[AUTH]).rows.filter(x=>x.docNo===n).length;
+  if(before) throw new Error('ยังไม่ได้ปริ้นส่ง แต่โผล่ในทะเบียนแล้ว');
+  call('markPrinted',[n,'int',BUY]);                       // ฉบับภายใน ไม่ใช่การส่งออก
+  if(call('reportSupplierDocs',[AUTH]).rows.filter(x=>x.docNo===n).length)
+    throw new Error('ปริ้นฉบับภายใน ไม่ควรนับว่าส่งให้ Supplier');
+  call('markPrinted',[n,'notice',BUY]);                    // ฉบับส่งออกจริง
+  const row=call('reportSupplierDocs',[AUTH]).rows.filter(x=>x.docNo===n)[0];
+  if(!row) throw new Error('ปริ้นส่ง Supplier แล้ว แต่ไม่ขึ้นในทะเบียน');
+  if(!row.sentAt || !row.sentBy) throw new Error('ไม่ได้บันทึกว่าออกเมื่อไหร่ / ใครออก');
+  return row.docNo+' → '+row.supplier+' · '+row.sentBy+' · '+row.sentAt; });
+
 console.log('\n──────────────────────────────');
 console.log('ผ่าน '+pass+' · ไม่ผ่าน '+fail);
 console.log('เปิดไฟล์ '+G.STATS.openById+' ครั้ง · เขียนแคช '+G.STATS.cachePut+' ครั้ง · ไฟล์รูปใน Drive '+G.STATS.driveFiles);
