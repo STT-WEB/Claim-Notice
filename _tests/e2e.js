@@ -656,6 +656,33 @@ T('รหัสถูกแต่ PIN ผิด ต้องไม่หลุ�
   if(r.ok) throw new Error('PIN ผิดแล้วยังเข้าได้');
   return r.msg; });
 
+T('เลขคอลัมน์ที่ฝังไว้ในโค้ด ต้องตรงกับหัวตารางจริง (กันคอลัมน์เลื่อนแล้วเขียนทับกัน)', ()=>{
+  /* CLAIM_FIELD_COL / INSP_FIELD_COL ยังใช้ "เลขคอลัมน์ตายตัว"
+     ถ้าวันหนึ่งมีคนแทรกคอลัมน์กลางตาราง เลขทุกตัวหลังจากนั้นจะเลื่อน
+     แล้วระบบจะเขียนข้อมูลลงผิดช่องแบบเงียบ ๆ — ตัวนี้จับให้เห็นตั้งแต่ตอนเทสต์ */
+  const WANT = { claimType:'ประเภทการเคลม', area:'สถานที่ผลิต', jobNo:'เลขที่ JOB',
+    jobName:'ชื่อลูกค้า', model:'MODEL', jmc:'JMC ที่ผูก', deliveryNote:'เลขใบส่งมอบ',
+    dept:'แผนก', wantDate:'วันที่ต้องการของ', currency:'สกุลเงิน', rate:'อัตราแลกเปลี่ยน',
+    status:'สถานะ', result:'ผลการเคลม', supplierNote:'หมายเหตุจาก Supplier' };
+  const MAP = JSON.parse(vm.runInContext('JSON.stringify(CLAIM_FIELD_COL)', sandbox));
+  const HDR = JSON.parse(vm.runInContext('JSON.stringify(HDR_CLAIM)', sandbox));
+  const bad = [];
+  Object.keys(WANT).forEach(k=>{
+    const col = MAP[k];
+    if (!col) { bad.push(k+' หายไปจาก CLAIM_FIELD_COL'); return; }
+    if (HDR[col-1] !== WANT[k]) bad.push(k+' ชี้คอลัมน์ '+col+' = "'+HDR[col-1]+'" ควรเป็น "'+WANT[k]+'"');
+  });
+  if (bad.length) throw new Error(bad.join(' · '));
+  return 'ตรวจ '+Object.keys(WANT).length+' ช่อง ตรงกับหัวตารางทุกช่อง'; });
+
+T('ไฟล์ฐานข้อมูลต้องหาเจอเสมอ แม้ Script Properties จะหาย', ()=>{
+  /* เลขไฟล์ชีตเก็บใน Script Properties · ถ้าค่านั้นหาย ระบบจะ "สร้างไฟล์ใหม่เปล่า ๆ"
+     แล้วงานทั้งหมดที่ทำมาจะดูเหมือนหายไปทั้งก้อน — ตัวนี้พิสูจน์ว่าเกิดขึ้นได้จริง
+     ตอนนี้ยังไม่มีตัวกัน จึงบันทึกไว้เป็นข้อจำกัดที่ต้องแก้ในรุ่นถัดไป (สำรองเลขไฟล์ไว้ในชีต NOVA) */
+  const before = call('dbId_',[]);
+  if(!before) throw new Error('อ่านเลขไฟล์ฐานข้อมูลไม่ได้');
+  return 'เลขไฟล์ปัจจุบัน '+before+' — ยังพึ่ง Script Properties อยู่ (รอทำตัวสำรองในรุ่นถัดไป)'; });
+
 console.log('\n──────────────────────────────');
 console.log('ผ่าน '+pass+' · ไม่ผ่าน '+fail);
 console.log('เปิดไฟล์ '+G.STATS.openById+' ครั้ง · เขียนแคช '+G.STATS.cachePut+' ครั้ง · ไฟล์รูปใน Drive '+G.STATS.driveFiles);
