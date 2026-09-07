@@ -502,10 +502,14 @@ function drawQueue(k){
     t += '<div class="empty">ยังไม่มีใบค้างในขั้นนี้</div></div>';
     $('view').innerHTML = t; return;
   }
+  /* กล่อง "เอกสารถูกตีกลับ" ต้องเห็น **เหตุผล** ตั้งแต่ในตาราง
+     ไม่ใช่ต้องเปิดใบทีละใบถึงจะรู้ว่าโดนตีกลับเพราะอะไร */
+  var isRj = (k === 'reject');
   t += '<div class="tblwrap"><table class="grid"><thead><tr>' +
     '<th style="width:124px">เลขที่</th><th style="width:92px">วันที่</th>' +
     '<th style="width:116px">เลขที่ JOB</th><th>ชื่อลูกค้า</th>' +
-    '<th style="width:190px">ขั้นตอนตอนนี้</th><th style="width:150px">รอใครทำ</th>' +
+    (isRj ? '<th style="width:300px">ตีกลับเพราะอะไร</th><th style="width:170px">ตีกลับโดย · เมื่อไหร่</th>'
+          : '<th style="width:190px">ขั้นตอนตอนนี้</th><th style="width:150px">รอใครทำ</th>') +
     '<th style="width:74px">รูป</th><th style="width:120px">ผู้เปิดใบ</th></tr></thead><tbody>';
   for (var r = 0; r < cur.rows.length; r++){
     var x = cur.rows[r];
@@ -513,8 +517,13 @@ function drawQueue(k){
       '<td><b>' + esc(x.docNo) + '</b></td>' +
       '<td class="c" style="white-space:nowrap">' + esc(x.date) + '</td>' +
       '<td>' + esc(x.jobNo) + '</td><td>' + esc(x.jobName) + '</td>' +
-      '<td class="c"><span class="pill">' + esc(x.stageNo) + ' · ' + esc(x.stageName) + '</span></td>' +
-      '<td class="hint">' + esc(x.waitWho || '') + '</td>' +
+      (isRj
+        ? '<td><b style="color:var(--red,#C4161C)">' + esc(x.rejectNote || '(ไม่ได้ระบุเหตุผล)') + '</b>' +
+          '<div class="sub2">กลับไปขั้น ' + esc(x.stageNo) + ' · ' + esc(x.stageName) + '</div></td>' +
+          '<td class="hint">' + esc(x.rejectBy || '') +
+          (x.rejectAt ? '<div class="sub2">' + esc(x.rejectAt) + '</div>' : '') + '</td>'
+        : '<td class="c"><span class="pill">' + esc(x.stageNo) + ' · ' + esc(x.stageName) + '</span></td>' +
+          '<td class="hint">' + esc(x.waitWho || '') + '</td>') +
       '<td class="c">' + (x.nNoPhoto ? '<span class="pill red">ขาด ' + x.nNoPhoto + '</span>'
                                      : '<span class="pill green">ครบ</span>') + '</td>' +
       '<td>' + esc(x.by) + '</td></tr>';
