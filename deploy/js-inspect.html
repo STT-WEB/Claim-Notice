@@ -222,8 +222,14 @@ function inspCard(it, docNo){
   var s = String(it.seq);
   var t = '<div class="itemcard ins ' + (it.acc === 'UNACC' ? 'un' : it.acc === 'ACC' ? 'ok' : '') + '" id="inscard_' + s + '">' +
     '<div class="ihd"><span class="ino">' + esc(s) + '</span>' +
+    /* หมวด + หัวข้อ (EN) มาจากแม่แบบเช็คลิสต์ แก้ทับได้ — ไฟล์ "ช่องกรอกทั้งระบบ" ที่เบียร์เติมไว้ */
+    '<input class="icat" data-save="saveInspItemField" data-seq="' + s + '" data-f="cat" value="' +
+      esc(it.cat) + '" placeholder="หมวด" title="หมวด — มาจากแม่แบบ แก้ได้">' +
     '<input class="ititle" data-save="saveInspItemField" data-seq="' + s + '" data-f="title" value="' + esc(it.title) + '" placeholder="หัวข้อที่ตรวจ">' +
-    '</div>';
+    '</div>' +
+    (INSFOREIGN ? ('<div class="ihd2">' +
+      '<input class="ititle en" data-save="saveInspItemField" data-seq="' + s + '" data-f="titleEn" value="' +
+      esc(it.titleEn) + '" placeholder="หัวข้อ (EN) — มาจากแม่แบบ"></div>') : '');
 
   t += '<div class="accrow">' +
     '<button class="accbtn ok'   + (it.acc === 'ACC'   ? ' on' : '') + '" onclick="setAcc(\'' + s + '\',\'ACC\')">✓ ผ่าน (Acc)</button>' +

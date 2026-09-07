@@ -2,6 +2,12 @@
 /* ═══ ③ All Data and Report ═══
    3.1 รูปและวิดีโอ · 3.2 สรุปงานเคลมตามจ๊อบ · 3.3 ทะเบียนเอกสาร · 3.4 สรุปต้นทุน */
 
+/** ตัวเลขเงิน — คั่นหลักพัน ทศนิยม 2 ตำแหน่ง ให้อ่านง่ายในตาราง */
+function fmt(n){
+  var v = Number(String(n == null ? 0 : n).replace(/,/g, '')) || 0;
+  return v.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+
 function loadReportHome(){
   var t = '<div class="card"><div class="cardhd"><h3>All Data and Report</h3>' +
     '<button class="btn" onclick="go(\'home\')">← หน้าแรก</button></div>';
@@ -10,6 +16,10 @@ function loadReportHome(){
   t += rep('repjob','🚛','3.2 สรุปงานเคลมตามจ๊อบงาน','จ๊อบไหนมีใบตรวจ/ใบเคลมกี่ใบ ค้างกี่ใบ — เลขจ๊อบคือแกนหลักของทั้งระบบ');
   t += rep('repdocs','🗂️','3.3 ทะเบียนเอกสาร','ใบตรวจรับ + ใบเคลม อยู่ในตารางเดียว เรียงตามเลขที่');
   t += rep('repcost','💰','3.4 สรุปต้นทุนการเคลม','ยอดเงินรวมทุกใบ แยกบาท / สกุลต่างประเทศ — เห็นเฉพาะผู้บริหารและจัดซื้อ');
+  t += rep('repbill','🧾','3.5 รวมยอดเรียกเก็บ → ออกใบเดียว','รวมหลายใบเคลมของ Supplier เจ้าเดียวกัน ออกใบเรียกเก็บใบเดียว เลขชุด CDN ของตัวเอง');
+  t += rep('rephr','👥','3.6 รายงานส่ง HR','ใบที่ระบุว่าพนักงานทำเสียหาย — ส่งให้ HR ไปหักเงินตามระเบียบ');
+  t += rep('repacc','📒','3.7 ข้อมูลส่งบัญชี','ใบที่จบขั้นตอนแล้ว บัญชีรับข้อมูลอย่างเดียว ไม่ต้องกดติ๊กอะไร');
+  t += rep('replog','🕘','3.8 LOG ประวัติการใช้งาน','ใครทำอะไรกับใบไหน เมื่อไหร่ — เก็บคนละที่กับตัวเอกสาร');
   t += '</div></div>';
   $('view').innerHTML = t;
 }
@@ -20,6 +30,149 @@ function rep(v, ic, title, sub){
 function repHead(title, sub){
   return '<div class="cardhd"><h3>' + esc(title) + '</h3><span class="sub">' + esc(sub) + '</span>' +
          '<button class="btn" onclick="go(\'reports\')">← รายงานทั้งหมด</button></div>';
+}
+
+
+/* ─── 3.5 รวมยอดเรียกเก็บ → ออกใบเดียว ───
+   เบียร์: "ตอนเรียกเก็บเงิน สามารถรวมยอดจากใบเคลมสินค้าหลายใบ และออกใบรับเงินใบเดียวได้" */
+function loadRepBill(){
+  srv('reportBilling', [AUTH], function(d){
+    var t = '<div class="card">' + repHead('3.5 รวมยอดเรียกเก็บ → ออกใบเดียว',
+      'รวมได้เฉพาะใบของ Supplier เจ้าเดียวกัน และเฉพาะใบที่ผลการเคลมบอกว่าต้องเรียกเงิน');
+    t += '<div class="hint" style="margin-bottom:12px">📌 <b>ใบรวมมีเลขที่ของตัวเอง CDN-YY/NNNN</b> ' +
+         '(คนละชุดกับเลขใบส่งมอบ DN- ที่ใช้อยู่แล้ว) แต่ยังอ้างอิงเลขใบเคลมทุกใบที่รวมเข้ามา ตรวจย้อนได้</div>';
+    if (!d.groups.length){
+      t += '<div class="empty">ยังไม่มีใบเคลมที่ถึงขั้นเรียกเก็บเงิน</div></div>';
+      $('view').innerHTML = t; return;
+    }
+    for (var i = 0; i < d.groups.length; i++){
+      var g = d.groups[i];
+      t += '<div class="billgrp"><div class="cardhd"><h3>' + esc(g.supplier) + '</h3>' +
+        '<span class="sub">' + g.rows.length + ' ใบเคลม · รวม ' + fmt(g.sum) + ' บาท</span></div>';
+      t += '<div class="tblwrap"><table class="grid"><thead><tr>' +
+        '<th style="width:44px">รวม</th><th style="width:132px">เลขที่ใบเคลม</th>' +
+        '<th style="width:92px">วันที่</th><th style="width:128px">เลขที่ JOB</th>' +
+        '<th>ผลการเคลม</th><th style="width:118px">ยอดเรียกเก็บ</th>' +
+        '<th style="width:150px">สถานะ</th></tr></thead><tbody>';
+      for (var k = 0; k < g.rows.length; k++){
+        var r = g.rows[k], done = !!r.billNo;
+        t += '<tr><td class="c"><input type="checkbox" class="bchk" data-grp="' + i + '" ' +
+             'value="' + esc(r.docNo) + '"' + (done ? ' disabled' : ' checked') + '></td>' +
+          '<td><a class="lk" onclick="go(\'claim\',\'' + esc(r.docNo) + '\')">' + esc(r.docNo) + '</a></td>' +
+          '<td class="c">' + esc(r.date) + '</td><td>' + esc(r.jobNo) + '</td>' +
+          '<td>' + esc(r.result) + '</td><td class="r">' + fmt(r.amount) + '</td>' +
+          '<td class="c">' + (done ? '<span class="pill ok">ออกใบรวมแล้ว ' + esc(r.billNo) + '</span>'
+                                   : '<span class="pill warn">ยังไม่เรียกเก็บ</span>') + '</td></tr>';
+      }
+      t += '<tr class="sumrow"><td colspan="5" class="r">ยอดรวมของเจ้านี้ (ไม่มี VAT)</td>' +
+           '<td class="r b">' + fmt(g.sum) + '</td><td></td></tr>';
+      t += '</tbody></table></div>' +
+        '<div style="margin-top:8px"><button class="btn primary" onclick="makeBill(' + i + ')">' +
+        '🧾 ออกใบเรียกเก็บรวมของ ' + esc(g.supplier) + '</button> ' +
+        '<span class="hint">ระบบออกเลข CDN ใหม่ 1 เลข แล้วผูกกับใบเคลมทุกใบที่ติ๊กไว้</span></div></div>';
+    }
+    t += '</div>';
+    $('view').innerHTML = t;
+  });
+}
+function makeBill(gi){
+  var picked = [];
+  var els = document.querySelectorAll('.bchk[data-grp="' + gi + '"]');
+  for (var i = 0; i < els.length; i++) if (els[i].checked && !els[i].disabled) picked.push(els[i].value);
+  if (!picked.length){ alert('ยังไม่ได้ติ๊กใบที่จะรวม'); return; }
+  if (!confirm('ออกใบเรียกเก็บรวม ' + picked.length + ' ใบเคลม เป็นใบเดียว?')) return;
+  srv('makeConsolidatedBill', [picked, AUTH], function(r){
+    alert('🧾 ออกใบเรียกเก็บรวมแล้ว ' + r.billNo + '\n\n' +
+          'Supplier: ' + r.supplier + '\nรวม ' + r.rows.length + ' ใบเคลม · ' + r.total + ' บาท\n\n' +
+          'ใบเคลมที่รวมไปแล้วจะไม่ถูกดึงมารวมซ้ำอีก');
+    loadRepBill();
+  }, function(m){ alert(m); });
+}
+
+/* ─── 3.6 รายงานส่ง HR ─── */
+function loadRepHR(){
+  srv('reportHR', [AUTH], function(d){
+    var t = '<div class="card">' + repHead('3.6 รายงานส่ง HR — หักเงินพนักงาน',
+      'เฉพาะใบที่จัดซื้อระบุว่า "พนักงานทำเสียหาย" ตอนปิดจบ');
+    t += '<div class="hint" style="margin-bottom:12px">📌 HR ยังไม่มีหน้าจอในระบบนี้ — ระบบ<b>ออกเป็นรายงานให้ก่อน</b> · ' +
+         '<b>ระบบไม่หักเงินเอง</b> HR เป็นคนตัดสินใจตามระเบียบบริษัท</div>';
+    if (!d.rows.length){ t += '<div class="empty">ยังไม่มีใบที่ระบุว่าพนักงานทำเสียหาย</div></div>';
+      $('view').innerHTML = t; return; }
+    t += '<div class="tblwrap"><table class="grid"><thead><tr>' +
+      '<th style="width:36px">ที่</th><th style="width:132px">เลขที่ใบเคลม</th>' +
+      '<th style="width:92px">วันที่</th><th style="width:128px">เลขที่ JOB</th>' +
+      '<th style="width:150px">ผู้ทำเสียหาย</th><th style="width:118px">แผนก</th>' +
+      '<th>ลูกค้า / งาน</th><th style="width:130px">มูลค่าความเสียหาย</th></tr></thead><tbody>';
+    for (var i = 0; i < d.rows.length; i++){
+      var r = d.rows[i];
+      t += '<tr><td class="c">' + (i+1) + '</td>' +
+        '<td><a class="lk" onclick="go(\'claim\',\'' + esc(r.docNo) + '\')">' + esc(r.docNo) + '</a></td>' +
+        '<td class="c">' + esc(r.date) + '</td><td>' + esc(r.jobNo) + '</td>' +
+        '<td>' + esc(r.who || '—') + '</td><td>' + esc(r.dept || '—') + '</td>' +
+        '<td>' + esc(r.jobName) + '</td><td class="r">' + fmt(r.damage) + '</td></tr>';
+    }
+    t += '</tbody></table></div></div>';
+    $('view').innerHTML = t;
+  });
+}
+
+/* ─── 3.7 ข้อมูลส่งบัญชี ─── */
+function loadRepAcc(){
+  srv('reportAccounting', [AUTH], function(d){
+    var t = '<div class="card">' + repHead('3.7 ข้อมูลส่งบัญชี',
+      'ใบที่จบขั้นตอนแล้ว · บัญชีรับข้อมูลอย่างเดียว ไม่ต้องกดติ๊กอะไรในระบบเคลม');
+    if (!d.rows.length){ t += '<div class="empty">ยังไม่มีใบที่ถึงขั้นปิดจบ</div></div>';
+      $('view').innerHTML = t; return; }
+    t += '<div class="tblwrap"><table class="grid"><thead><tr>' +
+      '<th style="width:36px">ที่</th><th style="width:132px">เลขที่ใบเคลม</th>' +
+      '<th style="width:126px">เลขที่ JOB</th><th style="width:130px">JMC ที่ผูก</th>' +
+      '<th style="width:170px">Supplier</th>' +
+      '<th style="width:112px">ต้นทุนของ</th><th style="width:104px">ค่าแรง</th>' +
+      '<th style="width:118px">เรียกเก็บได้</th><th style="width:150px">ลงเป็นอะไร</th>' +
+      '<th style="width:132px">ใบเรียกเก็บรวม</th></tr></thead><tbody>';
+    for (var i = 0; i < d.rows.length; i++){
+      var r = d.rows[i];
+      t += '<tr><td class="c">' + (i+1) + '</td>' +
+        '<td><a class="lk" onclick="go(\'claim\',\'' + esc(r.docNo) + '\')">' + esc(r.docNo) + '</a></td>' +
+        '<td>' + esc(r.jobNo) + '</td><td>' + esc(r.jmc || '— ยังไม่ผูก —') + '</td>' +
+        '<td>' + esc(r.supplier) + '</td>' +
+        '<td class="r">' + fmt(r.goods) + '</td><td class="r">' + fmt(r.labour) + '</td>' +
+        '<td class="r">' + fmt(r.bill) + '</td>' +
+        '<td class="c">' + (r.blame === 'EMP' ? '<span class="pill warn">หักเงินพนักงาน</span>'
+                                              : '<span class="pill">ต้นทุนของแท็งค์</span>') + '</td>' +
+        '<td class="c">' + esc(r.cdn || '—') + '</td></tr>';
+    }
+    t += '<tr class="sumrow"><td colspan="5" class="r">รวมทั้งหมด</td>' +
+      '<td class="r b">' + fmt(d.sum.goods) + '</td><td class="r b">' + fmt(d.sum.labour) + '</td>' +
+      '<td class="r b">' + fmt(d.sum.bill) + '</td><td colspan="2"></td></tr>';
+    t += '</tbody></table></div></div>';
+    $('view').innerHTML = t;
+  });
+}
+
+/* ─── 3.8 LOG — ตอบคำถามเบียร์: ลบ LOG แล้วเอกสารไม่หาย ─── */
+function loadRepLog(){
+  srv('reportLog', [300, AUTH], function(d){
+    var t = '<div class="card">' + repHead('3.8 LOG ประวัติการใช้งาน',
+      'ใครทำอะไรกับใบไหน เมื่อไหร่ · ผู้บริหารเท่านั้นที่เปิดดูได้');
+    t += '<div class="phbar ok" style="margin-bottom:12px">✅ <b>ลบ LOG แล้วเอกสารไม่หาย</b> — ' +
+         'LOG เก็บอยู่<b>คนละแท็บ</b>กับตัวเอกสาร ลบ LOG ทิ้งทั้งหมด ใบเคลมและใบตรวจรับยังอยู่ครบ ' +
+         'แค่ไม่รู้ว่าใครเคยทำอะไรไว้เท่านั้น</div>';
+    t += '<div class="hint" style="margin-bottom:8px">แสดง ' + d.rows.length + ' รายการล่าสุด จากทั้งหมด ' + d.total + ' รายการ</div>';
+    t += '<div class="tblwrap"><table class="grid"><thead><tr>' +
+      '<th style="width:36px">ที่</th><th style="width:150px">เวลา</th>' +
+      '<th style="width:170px">ใคร</th><th style="width:170px">ทำอะไร</th>' +
+      '<th style="width:140px">กับใบไหน</th><th>รายละเอียด</th></tr></thead><tbody>';
+    for (var i = 0; i < d.rows.length; i++){
+      var r = d.rows[i];
+      t += '<tr><td class="c">' + (i+1) + '</td><td>' + esc(r.at) + '</td>' +
+        '<td>' + esc(r.user) + '</td><td>' + esc(r.act) + '</td>' +
+        '<td>' + (r.ref ? '<a class="lk" onclick="go(\'claim\',\'' + esc(r.ref) + '\')">' + esc(r.ref) + '</a>' : '—') + '</td>' +
+        '<td>' + esc(r.detail) + '</td></tr>';
+    }
+    t += '</tbody></table></div></div>';
+    $('view').innerHTML = t;
+  });
 }
 
 /* ─── 3.1 รูปและวิดีโอ ─── */

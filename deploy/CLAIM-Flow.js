@@ -50,18 +50,39 @@ var STAGES = [
   { key:'SUPPLIER', no:5, name:'ส่ง Supplier · รอคำตอบ',
     who:'จัดซื้อ (สโตร์ช่วยได้)',
     roles:['PURCHASE','STORE'],
-    todo:'ส่งเอกสารให้ Supplier · บันทึกคำตอบที่ได้ · ออกใบเรียกเก็บถ้า STT ต้องซื้อ/ซ่อมเอง',
-    next:'RETURN', nextLabel:'➜ ของกลับมาแล้ว ส่งให้ QC ตรวจรับ', lineKey:'QC' },
+    todo:'ส่งเอกสารให้ Supplier · เลือกผลการเคลม 1 ใน 4 กรณี · ใส่ต้นทุน ค่าแรง กำไร · ออกใบเรียกเก็บถ้าต้องเรียกเงิน',
+    next:'STORE_IN', nextLabel:'📝 บันทึกผลการเคลม', lineKey:'STORE' },
 
-  { key:'RETURN', no:6, name:'รับของกลับ + QC',
-    who:'QC / Production',
+  /* เบียร์ 7 ก.ย. 2569: "ของเข้ามาแล้ว ก็ต้องไปที่สโตร์ก่อน สโตร์มีการแจ้ง QC ให้มาตรวจรับสินค้า
+     และเบิกออก มีเลขที่เอกสารและวันที่ด้วย ... เหมือน Inspection สินค้าของงานนั้น ๆ เลย"
+     → ขั้นเดิม RETURN แตกเป็น 3 ขั้น สโตร์รับเข้า → QC ตรวจรับ → สโตร์เบิกออก */
+  { key:'STORE_IN', no:6, name:'ของกลับเข้าคลัง · สโตร์รับเข้า',
+    who:'สโตร์',
+    roles:['STORE'],
+    needReceive:true, receiveLabel:'📥 กดรับของเข้าคลัง',
+    todo:'ของจาก Supplier มาถึงคลัง — ใส่ที่เก็บ · จำนวนที่มาถึง · รูปตอนแกะกล่อง แล้วกดแจ้ง QC มาตรวจ',
+    next:'QC_RECV', nextLabel:'📥 รับของเข้าคลัง + แจ้ง QC มาตรวจ', lineKey:'QC' },
+
+  { key:'QC_RECV', no:7, name:'สโตร์แจ้งแล้ว · รอ QC มาตรวจรับ',
+    who:'Production / QC',
     roles:['QC','PRODUCTION'],
-    todo:'ถ่ายรูปของที่ได้กลับมา แล้วกด Accept / ไม่ Accept · แล้วให้ผู้บริหารกดปิดงาน',
-    next:'CLOSED', nextLabel:'✓ อนุมัติปิดงาน (ผู้บริหารเท่านั้น)',
-    nextRoles:['ADMIN','APPROVER'],       // เบียร์: ขั้นปิดจบ ผู้บริหารเป็นคนกด
-    lineKey:'' },
+    todo:'ไปตรวจที่คลัง ถ่ายรูปของที่ได้กลับมา ติ๊ก Accept / ไม่ Accept ทุกข้อ แล้วออกใบตรวจรับของกลับ',
+    next:'STORE_OUT', nextLabel:'✓ ตรวจเสร็จ + ออกใบตรวจรับของกลับ', lineKey:'STORE' },
 
-  { key:'CLOSED', no:7, name:'ปิดงานแล้ว',
+  { key:'STORE_OUT', no:8, name:'ตรวจผ่านแล้ว · รอสโตร์เบิกออก',
+    who:'สโตร์',
+    roles:['STORE'],
+    todo:'QC ตรวจผ่านแล้ว — ใส่ผู้รับของหน้างาน · แผนกที่เบิกไปใช้ แล้วจ่ายของออก',
+    next:'CLOSE_WAIT', nextLabel:'📤 เบิกออกให้หน้างาน', lineKey:'PURCHASE' },
+
+  { key:'CLOSE_WAIT', no:9, name:'รอผู้บริหารอนุมัติปิด',
+    who:'ผู้บริหาร (เบียร์ / คุณแบล็ค / คุณประดิษฐ์)',
+    roles:['ADMIN','APPROVER'],
+    todo:'ตรวจครั้งสุดท้ายแล้วกดปิดใบเคลม — ระบบส่งข้อมูลให้บัญชีและ HR ต่อให้เอง',
+    next:'CLOSED', nextLabel:'🏁 อนุมัติปิดใบเคลม',
+    nextRoles:['ADMIN','APPROVER'], lineKey:'' },
+
+  { key:'CLOSED', no:10, name:'ปิดงานแล้ว',
     who:'—', roles:[], todo:'งานนี้จบแล้ว', next:'', nextLabel:'', lineKey:'' },
 
   /* ยกเลิก — ไม่ใช่ขั้นตอนปกติ ไม่โชว์ในแถบขั้นตอน · เบียร์เท่านั้นที่กดได้ */
@@ -96,6 +117,11 @@ var FIELD_STAGE = {
   jmc:'ALWAYS:REQUEST',
 
   deliveryNote:'STORE',
+
+  /* ขั้นใหม่ 7 ก.ย. — ของกลับเข้าสโตร์ก่อน → QC ตรวจ → เบิกออก */
+  storeLoc:'STORE_IN', storeTrk:'STORE_IN',
+  issueTo:'STORE_OUT', issueDept:'STORE_OUT',
+  blame:'SUPPLIER', blameWho:'SUPPLIER', blameDept:'SUPPLIER',
 
   currency:'SUPPLIER', rate:'SUPPLIER', rateDate:'SUPPLIER', billCase:'SUPPLIER',
   result:'SUPPLIER', resultDetail:'SUPPLIER', supplierNote:'SUPPLIER',
@@ -167,10 +193,68 @@ var HDR_FLOW = ['ขั้นตอน','รอใครทำ','เหตุผ
   /* ลายเซ็น — เบียร์: "ลายเซ็นตั้งแต่ผู้เปิดใบ ผู้อนุมัติ ก็จะขึ้นมาเลย
      พอถึงสโตร์กด ก็จะมีลายเซ็นสโตร์คนนั้นได้เลย"
      เก็บเป็นข้อความ "ชื่อ · แผนก · วันเวลา" ช่องละคน ไม่ต้องเซ็นมือ */
-  'ลายเซ็น ผู้เปิดใบ','ลายเซ็น ผู้อนุมัติ','ลายเซ็น สโตร์','ลายเซ็น จัดซื้อ','ลายเซ็น ผู้ปิดงาน'];
+  'ลายเซ็น ผู้เปิดใบ','ลายเซ็น ผู้อนุมัติ','ลายเซ็น สโตร์','ลายเซ็น จัดซื้อ',
+  /* รอบ 2 — เบียร์เพิ่ม 7 ก.ย. 2569 (ของกลับเข้าสโตร์ก่อน → QC ตรวจ → เบิกออก) */
+  'ลายเซ็น จัดซื้อ ผลเคลม','ลายเซ็น สโตร์รับของเข้า','ลายเซ็น QC ตรวจรับ','ลายเซ็น สโตร์เบิกออก',
+  'ลายเซ็น ผู้ปิดงาน',
+  /* เลขเอกสารที่ระบบออกให้ในแต่ละขั้น พร้อมวันที่ */
+  'เลขที่รับของเข้าคลัง','วันที่รับของเข้าคลัง','ที่เก็บในคลัง','ขนส่ง/เลขพัสดุ',
+  'เลขที่ใบตรวจรับของกลับ','วันที่ตรวจรับของกลับ','ผู้ตรวจรับของกลับ',
+  'เลขที่ใบเบิกออก','วันที่เบิกออก','ผู้รับของหน้างาน','แผนกที่เบิกไปใช้',
+  /* ปิดจบ ต้นทุนไปทางไหน + ใบเรียกเก็บรวม */
+  'ความรับผิดชอบ','ชื่อผู้ทำเสียหาย','แผนกผู้ทำเสียหาย','รอบเคลม',
+  'เลขที่ใบเรียกเก็บรวม','วันที่ใบเรียกเก็บรวม'];
 
+/* ลายเซ็น 9 ช่อง 2 รอบ (สเปคข้อ 7 + ที่เบียร์เพิ่ม 7 ก.ย.)
+   รอบ 1 ครบ 4 ช่อง → ปุ่มพิมพ์ใบส่ง Supplier ถึงจะเปิดใช้ได้ */
 var SIGN_SLOT = { REQUEST:'ลายเซ็น ผู้เปิดใบ', APPROVAL:'ลายเซ็น ผู้อนุมัติ',
-                  STORE:'ลายเซ็น สโตร์', PURCHASE:'ลายเซ็น จัดซื้อ', RETURN:'ลายเซ็น ผู้ปิดงาน' };
+                  STORE:'ลายเซ็น สโตร์', PURCHASE:'ลายเซ็น จัดซื้อ',
+                  SUPPLIER:'ลายเซ็น จัดซื้อ ผลเคลม', STORE_IN:'ลายเซ็น สโตร์รับของเข้า',
+                  QC_RECV:'ลายเซ็น QC ตรวจรับ', STORE_OUT:'ลายเซ็น สโตร์เบิกออก',
+                  CLOSE_WAIT:'ลายเซ็น ผู้ปิดงาน' };
+var SIGN_R1 = ['ลายเซ็น ผู้เปิดใบ','ลายเซ็น ผู้อนุมัติ','ลายเซ็น สโตร์','ลายเซ็น จัดซื้อ'];
+var SIGN_R2 = ['ลายเซ็น จัดซื้อ ผลเคลม','ลายเซ็น สโตร์รับของเข้า','ลายเซ็น QC ตรวจรับ',
+               'ลายเซ็น สโตร์เบิกออก','ลายเซ็น ผู้ปิดงาน'];
+
+/** ครบลายเซ็นรอบ 1 ทั้ง 4 ช่องหรือยัง — ปุ่มพิมพ์ใบส่ง Supplier ใช้ตัวนี้ตัดสิน */
+function round1Done_(sh, row){
+  for (var i = 0; i < SIGN_R1.length; i++){
+    if (!norm_(sh.getRange(row, colOf_(SIGN_R1[i])).getDisplayValue())) return false;
+  }
+  return true;
+}
+
+/* ═══ คำตอบจาก Supplier 4 กรณี (สเปคข้อ 5) ═══════════════════
+ * คำตอบเป็นตัวตัดสินว่า ① ต้องออกใบเรียกเก็บไหม  ② มีของกลับมาให้ QC ตรวจไหม */
+var CLAIM_RESULTS = {
+  BUYSELF:{ t:'Supplier ไม่มีของส่งให้ → STT ซื้อเอง ติดตั้งเอง', goods:'เรียกเก็บ', labor:'เรียกเก็บ', bill:true,  back:false },
+  NEWPART:{ t:'Supplier ส่งของใหม่มาให้ → STT ติดตั้งเอง',        goods:'ไม่คิด',   labor:'เรียกเก็บ', bill:true,  back:true  },
+  SWAP:   { t:'อุปกรณ์เปลี่ยนกลับมาแล้วจบ',                        goods:'—',       labor:'—',        bill:false, back:true  },
+  REJECT: { t:'Supplier ไม่รับเคลม (เลยประกัน / เหตุผลอื่น)',       goods:'—',       labor:'—',        bill:false, back:false }
+};
+function resultList(){
+  return Object.keys(CLAIM_RESULTS).map(function(k){
+    var r = CLAIM_RESULTS[k];
+    return { key:k, text:r.t, goods:r.goods, labor:r.labor, bill:r.bill, back:r.back };
+  });
+}
+/** ขั้นถัดไปจริง — ขั้น SUPPLIER แยกทางตามคำตอบ ไม่มีของกลับก็ข้ามสโตร์/QC/เบิกออกไปเลย */
+function nextStage_(sh, row, key){
+  var st = stageDef_(key);
+  if (key !== 'SUPPLIER') return st.next;
+  var res = norm_(sh.getRange(row, colOf_('ผลการเคลม')).getDisplayValue());
+  var R = CLAIM_RESULTS[res];
+  return (R && R.back) ? 'STORE_IN' : 'CLOSE_WAIT';
+}
+/** ระบบออกเลขเอกสารให้เอง เรียงต่อกันรายปี ไม่ซ้ำ */
+function nextDocNo_(prefix){
+  var p = PropertiesService.getScriptProperties();
+  var yy = String(new Date().getFullYear() + 543).slice(-2);
+  var k = 'SEQ_' + prefix + '_' + yy;
+  var n = num_(p.getProperty(k)) + 1;
+  p.setProperty(k, String(n));
+  return prefix + '-' + yy + '/' + ('0000' + n).slice(-4);
+}
 
 /** เซ็นชื่อลงช่องของขั้นนั้น — ชื่อ · แผนก · วันเวลา · เซ็นแล้วไม่ทับซ้ำ */
 function signStage_(sh, row, stageKey, me){
@@ -186,10 +270,12 @@ function signStage_(sh, row, stageKey, me){
 
 /** ลายเซ็นทั้งใบ สำหรับหน้าเว็บและหน้าปริ้น */
 function signsOf_(sh, row){
-  var out = [], keys = ['ลายเซ็น ผู้เปิดใบ','ลายเซ็น ผู้อนุมัติ','ลายเซ็น สโตร์','ลายเซ็น จัดซื้อ','ลายเซ็น ผู้ปิดงาน'];
-  var lab = ['ผู้เปิดใบ','ผู้อนุมัติ','สโตร์','จัดซื้อ','ผู้ปิดงาน'];
+  var out = [], keys = SIGN_R1.concat(SIGN_R2);
+  var lab = ['ผู้เปิดใบ','ผู้อนุมัติ','สโตร์','จัดซื้อ',
+             'จัดซื้อ (ผลเคลม)','สโตร์รับของเข้า','QC ตรวจรับ','สโตร์เบิกออก','ผู้บริหาร'];
   for (var i = 0; i < keys.length; i++){
-    out.push({ role:lab[i], text:norm_(sh.getRange(row, colOf_(keys[i])).getDisplayValue()) });
+    out.push({ role:lab[i], text:norm_(sh.getRange(row, colOf_(keys[i])).getDisplayValue()),
+               round: i < SIGN_R1.length ? 1 : 2 });
   }
   return out;
 }
@@ -228,7 +314,8 @@ function claimStage_(sh, row){
 /** สถานะของใบ = ผลของขั้นตอน ไม่ใช่ของที่ใครมานั่งเลือกเอง
  *  เบียร์ถามว่า "สถานะคืออะไร ใครต้องเป็นคนเปลี่ยน" — คำตอบคือ ไม่มีใครเปลี่ยน ระบบเปลี่ยนให้ */
 var STAGE_STATUS = { REQUEST:'DRAFT', APPROVAL:'WAIT_APPROVE', STORE:'IN_STORE', PURCHASE:'IN_PURCHASE',
-                     SUPPLIER:'SENT', RETURN:'REPLIED', CLOSED:'CLOSED', CANCELLED:'CANCELLED' };
+                     SUPPLIER:'SENT', STORE_IN:'REPLIED', QC_RECV:'REPLIED', STORE_OUT:'REPLIED',
+                     CLOSE_WAIT:'BILLED', CLOSED:'CLOSED', CANCELLED:'CANCELLED' };
 function statusOfStage_(key){ return STAGE_STATUS[norm_(key)] || 'DRAFT'; }
 
 function setStage_(sh, row, key, me, note){
@@ -270,7 +357,19 @@ function claimFlow(docNo, auth){
     stage:key, no:st.no, name:st.name, who:st.who, todo:st.todo,
     next:st.next, nextLabel:st.nextLabel,
     isOwner:isOwner,
-    canReject: (key === 'APPROVAL' || key === 'STORE' || key === 'PURCHASE' || key === 'SUPPLIER') && isOwner,
+    canReject: (['APPROVAL','STORE','PURCHASE','SUPPLIER'].indexOf(key) >= 0) && isOwner,
+    canRejectReturn: (key === 'QC_RECV') && isOwner,
+    round1Done: round1Done_(d.claims, r),
+    results: resultList(),
+    docNos: { gr:norm_(d.claims.getRange(r, colOf_('เลขที่รับของเข้าคลัง')).getDisplayValue()),
+              grDate:norm_(d.claims.getRange(r, colOf_('วันที่รับของเข้าคลัง')).getDisplayValue()),
+              rcv:norm_(d.claims.getRange(r, colOf_('เลขที่ใบตรวจรับของกลับ')).getDisplayValue()),
+              rcvDate:norm_(d.claims.getRange(r, colOf_('วันที่ตรวจรับของกลับ')).getDisplayValue()),
+              rcvBy:norm_(d.claims.getRange(r, colOf_('ผู้ตรวจรับของกลับ')).getDisplayValue()),
+              is:norm_(d.claims.getRange(r, colOf_('เลขที่ใบเบิกออก')).getDisplayValue()),
+              isDate:norm_(d.claims.getRange(r, colOf_('วันที่เบิกออก')).getDisplayValue()),
+              cdn:norm_(d.claims.getRange(r, colOf_('เลขที่ใบเรียกเก็บรวม')).getDisplayValue()) },
+    round: num_(d.claims.getRange(r, colOf_('รอบเคลม')).getDisplayValue()) || 1,
     rejectNote: norm_(d.claims.getRange(r, colOf_('เหตุผลที่ตีกลับ')).getDisplayValue()),
     rejectBy:   norm_(d.claims.getRange(r, colOf_('ตีกลับโดย')).getDisplayValue()),
     rejectAt:   norm_(d.claims.getRange(r, colOf_('ตีกลับเมื่อ')).getDisplayValue()),
@@ -354,6 +453,49 @@ function cancelClaim(docNo, reason, auth){
   return { ok:true, stage:'CANCELLED' };
 }
 
+/* ═══ QC ไม่ Accept ของที่ Supplier ส่งกลับมา → วนกลับเป็นเคลมรอบใหม่ ═══
+ * สเปคข้อ 4.5 · เบียร์: "ไม่ Accept = ระบบเปิดใบเคลมรอบใหม่ให้"
+ * ใบเดิม เลขเดิม แต่ล้างลายเซ็นรอบ 2 และเลขเอกสาร GR/RCV/IS ทิ้ง แล้วกลับไปหาจัดซื้อ */
+function rejectReturn(docNo, reason, auth){
+  var me = requireLogin_(auth);
+  docNo = norm_(docNo); reason = norm_(reason);
+  if (!reason) throw new Error('ต้องบอกเหตุผลที่ไม่ Accept จะได้บอก Supplier ได้ว่าไม่ผ่านตรงไหน');
+
+  var d = db_(), r = findClaimRow_(d.claims, docNo);
+  if (r < 0) throw new Error('ไม่พบใบเคลม ' + docNo);
+  ensureCols_(d.claims, claimHdr_());
+
+  var key = claimStage_(d.claims, r);
+  if (key !== 'QC_RECV') throw new Error('ปุ่มนี้ใช้ได้เฉพาะตอนที่ใบอยู่ขั้น QC ตรวจรับของกลับ');
+  var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
+  var ok = mine.indexOf('ADMIN') >= 0;
+  for (var i = 0; i < mine.length; i++) if (['QC','PRODUCTION'].indexOf(mine[i]) >= 0) ok = true;
+  if (!ok) throw new Error('ตรวจรับของกลับได้เฉพาะ QC และ Production');
+
+  for (var j = 0; j < SIGN_R2.length; j++) d.claims.getRange(r, colOf_(SIGN_R2[j])).setValue('');
+  ['เลขที่รับของเข้าคลัง','วันที่รับของเข้าคลัง','เลขที่ใบตรวจรับของกลับ','วันที่ตรวจรับของกลับ',
+   'ผู้ตรวจรับของกลับ','เลขที่ใบเบิกออก','วันที่เบิกออก']
+    .forEach(function(c){ d.claims.getRange(r, colOf_(c)).setValue(''); });
+  d.claims.getRange(r, colOf_('ผลการเคลม')).setValue('');
+
+  var rnd = num_(d.claims.getRange(r, colOf_('รอบเคลม')).getDisplayValue()) || 1;
+  d.claims.getRange(r, colOf_('รอบเคลม')).setValue(rnd + 1);
+  setStage_(d.claims, r, 'PURCHASE', me, 'QC ไม่ Accept ของที่ส่งกลับมา — รอบที่ ' + (rnd + 1));
+  d.claims.getRange(r, colOf_('เหตุผลที่ตีกลับ'))
+   .setValue('QC ไม่ Accept ของที่ Supplier ส่งกลับมา — ' + reason);
+  d.claims.getRange(r, colOf_('ตีกลับโดย')).setValue(me.name);
+  d.claims.getRange(r, colOf_('ตีกลับเมื่อ')).setValue(nowStamp_());
+
+  lineToStage_('PURCHASE',
+    '↩ ของที่ส่งกลับมา QC ไม่ Accept\n' +
+    'เลขที่ ' + docNo + ' · รอบที่ ' + (rnd + 1) + '\n' +
+    'เหตุผล: ' + reason + '\n' +
+    'กลับไปคุยกับ Supplier ใหม่ — โดย ' + me.name);
+  log_('rejectReturn', docNo, reason);
+  try { CacheService.getScriptCache().remove('CLAIM_HOME'); } catch(e){}
+  return { ok:true, stage:'PURCHASE', round:rnd + 1 };
+}
+
 /** ส่งงานต่อขั้นถัดไป — ตรวจให้ครบก่อน ไม่ให้ส่งของที่ยังขาด */
 function advanceClaim(docNo, auth){
   var me = requireLogin_(auth);
@@ -379,11 +521,31 @@ function advanceClaim(docNo, auth){
   var miss = claimMissing_(d, docNo, key);
   if (miss.length) throw new Error('ยังส่งต่อไม่ได้ — ' + miss.join(' · '));
 
+  /* ระบบออกเลขเอกสาร + วันที่ให้ตรงขั้นที่เพิ่งทำเสร็จ (เบียร์สั่ง 7 ก.ย.) */
+  var today = nowStamp_().split(' ')[0], emit = '';
+  if (key === 'STORE_IN' && !norm_(d.claims.getRange(r, colOf_('เลขที่รับของเข้าคลัง')).getDisplayValue())){
+    emit = nextDocNo_('GR');
+    d.claims.getRange(r, colOf_('เลขที่รับของเข้าคลัง')).setValue(emit);
+    d.claims.getRange(r, colOf_('วันที่รับของเข้าคลัง')).setValue(today);
+  }
+  if (key === 'QC_RECV' && !norm_(d.claims.getRange(r, colOf_('เลขที่ใบตรวจรับของกลับ')).getDisplayValue())){
+    emit = nextDocNo_('RCV');
+    d.claims.getRange(r, colOf_('เลขที่ใบตรวจรับของกลับ')).setValue(emit);
+    d.claims.getRange(r, colOf_('วันที่ตรวจรับของกลับ')).setValue(today);
+    d.claims.getRange(r, colOf_('ผู้ตรวจรับของกลับ')).setValue(me.name + (me.dept ? ' · ' + me.dept : ''));
+  }
+  if (key === 'STORE_OUT' && !norm_(d.claims.getRange(r, colOf_('เลขที่ใบเบิกออก')).getDisplayValue())){
+    emit = nextDocNo_('IS');
+    d.claims.getRange(r, colOf_('เลขที่ใบเบิกออก')).setValue(emit);
+    d.claims.getRange(r, colOf_('วันที่เบิกออก')).setValue(today);
+  }
+
+  var goTo = nextStage_(d.claims, r, key);   // ขั้น SUPPLIER แยกทางตามคำตอบ Supplier
   signStage_(d.claims, r, key, me);          // เซ็นชื่อขั้นที่เพิ่งทำเสร็จ
-  setStage_(d.claims, r, st.next, me, '');
+  setStage_(d.claims, r, goTo, me, emit ? ('ออกเลขที่ ' + emit) : '');
   d.claims.getRange(r, colOf_('เหตุผลที่ตีกลับ')).setValue('');    // ส่งต่อได้ = เคลียร์เหตุผลเดิม
 
-  var nx = stageDef_(st.next);
+  var nx = stageDef_(goTo);
   if (st.lineKey){
     var head = claimRowObj_(d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0],
                             d.claims.getRange(r,1,1,HDR_CLAIM.length).getDisplayValues()[0]);
@@ -395,9 +557,9 @@ function advanceClaim(docNo, auth){
       'สิ่งที่ต้องทำ: ' + nx.todo + '\n' +
       'ส่งต่อโดย ' + me.name);
   }
-  log_('advanceClaim', docNo, key + ' → ' + st.next);
+  log_('advanceClaim', docNo, key + ' → ' + goTo + (emit ? ' · ' + emit : ''));
   try { CacheService.getScriptCache().remove('CLAIM_HOME'); } catch(e){}
-  return { ok:true, stage:st.next };
+  return { ok:true, stage:goTo, docNo:emit };
 }
 
 /** ตีกลับ — จัดซื้อเลือกได้ว่าจะส่งกลับหาใคร พร้อมเหตุผล (บังคับ) */
@@ -472,6 +634,39 @@ function claimMissing_(d, docNo, stageKey){
     }
     if (noPo.length)  miss.push('รายการที่ ' + noPo.join(', ') + ' ยังไม่มี PO');
     if (noSup.length) miss.push('รายการที่ ' + noSup.join(', ') + ' ยังไม่มี Supplier');
+  }
+
+  /* ขั้นจัดซื้อบันทึกผล — ต้องเลือกคำตอบ Supplier ก่อน ไม่งั้นระบบไม่รู้ว่าจะเดินทางไหนต่อ */
+  if (stageKey === 'SUPPLIER'){
+    var res = norm_(h['ผลการเคลม']);
+    if (!CLAIM_RESULTS[res]) miss.push('ยังไม่ได้เลือกผลการเคลมจาก Supplier (4 กรณี)');
+    var noCost = [];
+    for (var c = 0; c < items.length; c++) if (!norm_(items[c][11])) noCost.push(norm_(items[c][1]));
+    if (CLAIM_RESULTS[res] && CLAIM_RESULTS[res].bill && noCost.length)
+      miss.push('รายการที่ ' + noCost.join(', ') + ' ยังไม่ได้ใส่ต้นทุน');
+  }
+
+  if (stageKey === 'STORE_IN'){
+    if (!norm_(d.claims.getRange(r, colOf_('ที่เก็บในคลัง')).getDisplayValue()))
+      miss.push('ยังไม่ได้ระบุที่เก็บในคลัง (Location)');
+  }
+
+  if (stageKey === 'QC_RECV'){
+    var noAcc = [], notOk = [];
+    for (var q = 0; q < items.length; q++){
+      var a = norm_(items[q][14]);                       // ผลตรวจ (Accept ของที่ได้กลับมา)
+      if (!a) noAcc.push(norm_(items[q][1]));
+      else if (a === 'NO' || a === 'ไม่ Accept') notOk.push(norm_(items[q][1]));
+    }
+    if (noAcc.length) miss.push('ของที่ได้กลับมา รายการที่ ' + noAcc.join(', ') + ' ยังไม่ได้ตรวจรับ');
+    if (notOk.length) miss.push('รายการที่ ' + notOk.join(', ') + ' ไม่ Accept — ต้องกดปุ่ม "วนกลับเป็นเคลมรอบใหม่"');
+  }
+
+  if (stageKey === 'STORE_OUT'){
+    if (!norm_(d.claims.getRange(r, colOf_('ผู้รับของหน้างาน')).getDisplayValue()))
+      miss.push('ยังไม่ได้ระบุผู้รับของหน้างาน');
+    if (!norm_(d.claims.getRange(r, colOf_('แผนกที่เบิกไปใช้')).getDisplayValue()))
+      miss.push('ยังไม่ได้ระบุแผนกที่เบิกไปใช้');
   }
 
   return miss;

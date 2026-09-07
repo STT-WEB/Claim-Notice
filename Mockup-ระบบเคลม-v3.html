@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STT CLAIM — Mockup v3 (ตามสเปคที่เบียร์เคาะ)</title>
+<style>
+*{box-sizing:border-box}
+:root{--red:#E2231A;--line:#e3e6ea;--ink:#111;--dim:#6b7280;
+      --s1:#1f7fd8;--s2:#d97706;--s3:#15803d;--sa:#64748b}
+body{margin:0;background:#eef0f3;color:var(--ink);
+     font-family:"Noto Sans Thai","Sarabun",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:13.5px}
+.bar{background:#fff;border-bottom:3px solid var(--red);padding:0 18px;height:58px;
+     display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:60}
+.lg{font-weight:800;font-style:italic;color:var(--red);font-size:16px}
+.lg span{display:block;font-style:normal;font-weight:400;color:var(--dim);font-size:10px}
+.nav{display:flex;gap:5px;margin-left:16px}
+.nav button{border:1px solid transparent;background:none;padding:7px 13px;border-radius:8px;
+            font-family:inherit;font-size:13.5px;cursor:pointer;color:#374151}
+.nav button:hover{background:#f4f5f7}
+.nav button.on{background:#fff1f0;border-color:#f3c5c2;color:var(--red);font-weight:700}
+.sp{flex:1}
+select,input,textarea{font-family:inherit;font-size:13px;border:1px solid var(--line);
+     border-radius:7px;padding:7px 9px;background:#fff;color:var(--ink);width:100%}
+.wrap{max-width:1260px;margin:0 auto;padding:14px 14px 60px}
+.tip{font-size:11.5px;color:#374151;background:#fffbe9;border:1px solid #ece0a8;
+     border-radius:8px;padding:8px 11px;margin-bottom:12px;line-height:1.65}
+.tip b{color:#000}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:13px}
+.hd{display:flex;align-items:center;gap:9px;flex-wrap:wrap;border-bottom:1px solid var(--line);
+    padding-bottom:9px;margin-bottom:11px}
+.hd h3{margin:0;font-size:15px}
+.hd .sub{font-size:12px;color:var(--dim)}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 13px;font-size:13px;
+     cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn:hover{border-color:#aab2bb}
+.btn.p{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+.btn.dk{background:#1f2937;border-color:#1f2937;color:#fff}
+.btn.dg{color:#c02a2a;border-color:#e8bcbc}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid var(--line);padding:7px 9px;font-size:12.5px;vertical-align:middle}
+thead th{background:#f7f8fa;color:#111;font-weight:700;font-size:13px;text-align:center}
+tbody tr.k{cursor:pointer}
+tbody tr.k:hover{background:#fffaf9}
+.c{text-align:center}.r{text-align:right}
+.pill{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:20px;padding:2px 9px;white-space:nowrap}
+.pill.ins{border-color:#bcd9f0;color:#175a91;background:#f2f9ff}
+.pill.clm{border-color:#f3c5c2;color:#a3231b;background:#fff5f4}
+.pill.g{border-color:#b6e0c2;color:#1f7a3d;background:#f2fbf5}
+.pill.r{border-color:#f0c2c2;color:#b3261e;background:#fff5f5}
+.pill.y{border-color:#f0dfae;color:#8a6b12;background:#fffaef}
+.empty{text-align:center;color:var(--dim);padding:24px;border:1px dashed var(--line);border-radius:10px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 16px}
+.f label{display:block;font-size:12px;font-weight:700;margin-bottom:3px}
+.f.o1 label{color:var(--s1)}.f.o2 label{color:var(--s2)}.f.o3 label{color:var(--s3)}
+.f.oa label{color:var(--sa)}
+.f .rq{color:var(--red)}
+.locked{background:#f4f5f7;color:#8b929a}
+.key{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--dim);padding:0 0 10px;align-items:center}
+.key i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:4px}
+.d1{background:var(--s1)}.d2{background:var(--s2)}.d3{background:var(--s3)}.da{background:var(--sa)}
+
+/* งานตามจ๊อบ */
+.jt{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.jt button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 18px;
+           font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:#374151}
+.jt button.on{border-color:var(--red);color:var(--red);background:#fff6f5}
+.jt button small{display:block;font-weight:400;font-size:11px;color:var(--dim)}
+
+/* กล่องงาน 5 แท็บ */
+.tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:11px}
+.tb{flex:1 1 175px;display:flex;align-items:center;gap:7px;cursor:pointer;background:#fff;
+    border:1px solid var(--line);border-radius:11px;padding:10px 12px;text-align:left;font-family:inherit}
+.tb.on{border-color:var(--red);box-shadow:0 0 0 2px rgba(226,35,26,.10)}
+.tb .n{font-size:15px;color:#9aa3ad}.tb.on .n{color:var(--red)}
+.tb .t{flex:1;font-size:12.5px;font-weight:700;color:#374151}.tb.on .t{color:#111}
+.tb .c2{min-width:23px;text-align:center;font-size:12px;font-weight:700;color:#9aa3ad;
+        background:#f2f4f6;border-radius:20px;padding:2px 7px}
+.tb .c2.has{background:var(--red);color:#fff}
+.tb.mine{background:#fffdf6}.tb.mine .t:after{content:' ✋'}
+.note{font-size:12px;background:#f6fbff;border:1px solid #cfe4f5;border-radius:8px;padding:8px 11px;
+      margin-bottom:10px;line-height:1.6}
+.note.no{background:#fafbfc;border-color:var(--line);color:var(--dim)}
+
+/* ขั้นตอน */
+.flow{border:1px solid var(--line);border-radius:11px;padding:11px;margin-bottom:11px;background:#fcfcfd}
+.steps{display:flex;align-items:center;gap:3px;flex-wrap:wrap;margin-bottom:9px}
+.st{display:flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:20px;
+    padding:4px 10px;font-size:11px;color:#9aa3ad;background:#fff;white-space:nowrap}
+.st b{display:inline-flex;width:17px;height:17px;border-radius:50%;background:#eceff2;color:#7b838c;
+      align-items:center;justify-content:center;font-size:10px}
+.st.done{color:#1f7a3d;border-color:#b6e0c2}.st.done b{background:#2fbf5f;color:#fff}
+.st.now{color:var(--red);border-color:var(--red);font-weight:700}.st.now b{background:var(--red);color:#fff}
+.arw{color:#c9ced4;font-size:11px}
+.todo{font-size:12px;color:var(--dim);margin-top:3px;line-height:1.6}
+.miss{margin-top:8px;font-size:12px;background:#fffaef;border:1px solid #f0dfae;color:#8a6b12;border-radius:8px;padding:7px 10px}
+.acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;align-items:center}
+.vw{font-size:12px;color:var(--dim)}
+
+/* ลายเซ็น 2 รอบ */
+.sgh{font-size:12.5px;font-weight:700;margin:12px 0 6px}
+.sgh span{font-weight:400;color:var(--dim);font-size:11.5px}
+.sign{display:flex;gap:8px;flex-wrap:wrap}
+.sg{flex:1 1 155px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;min-height:62px}
+.sg i{display:block;font-style:normal;font-size:10px;color:#8b929a;margin-bottom:3px}
+.sg b{display:block;font-size:11.5px;font-weight:600;line-height:1.5}
+.sg small{display:block;color:var(--dim);font-weight:400;font-size:10.5px}
+.sg.wait{background:#fbfcfd}.sg.wait b{color:#c3c8ce;font-weight:400}
+.sg.next{border-color:var(--red);background:#fff8f7}
+.gate{margin-top:9px;font-size:12px;background:#f4f5f7;border:1px solid var(--line);
+      border-radius:8px;padding:7px 10px;color:#4b5563}
+.gate.ok{background:#f2fbf5;border-color:#b6e0c2;color:#1f7a3d}
+
+.ph{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.thumb{width:50px;height:38px;border-radius:6px;background:linear-gradient(135deg,#c9d3dc,#96a3af);
+       display:flex;align-items:center;justify-content:center;font-size:14px}
+.addph{width:50px;height:38px;border:1px dashed #c3c8ce;border-radius:6px;display:flex;
+       align-items:center;justify-content:center;color:#9aa3ad;font-size:15px}
+.needph{font-size:10px;color:#b3261e;border:1px solid #f0c2c2;border-radius:5px;padding:1px 5px;background:#fff5f5}
+.pick{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pk{border:1px solid var(--line);border-radius:12px;padding:18px;cursor:pointer;background:#fff}
+.pk:hover{border-color:var(--red);background:#fffaf9}
+.pk h4{margin:0 0 5px;font-size:15px}
+.pk p{margin:0;font-size:12px;color:var(--dim);line-height:1.7}
+.pk .ic{font-size:26px;margin-bottom:6px}
+/* แถบส่งงาน */
+.hoff{border:1px solid #cfe4f5;background:#f8fcff;border-radius:10px;padding:10px 12px;margin-top:9px}
+.hoff.done{border-color:#b6e0c2;background:#f2fbf5;color:#1f7a3d;font-size:12.5px}
+.hh{font-size:11.5px;color:#175a91;font-weight:700;margin-bottom:7px}
+.hrow{display:flex;align-items:stretch;gap:9px;flex-wrap:wrap}
+.hbox{flex:0 1 190px;border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 10px}
+.hbox.now{border-color:var(--red);background:#fff8f7}
+.hbox.ok{border-color:#b6e0c2;background:#f2fbf5}
+.hbox i{display:block;font-style:normal;font-size:10px;color:#8b929a}
+.hbox b{display:block;font-size:12.5px;margin-top:2px}
+.hbox small{display:block;font-size:11px;color:var(--dim)}
+.hln{display:block;font-size:10.5px;color:#175a91;margin-top:4px}
+.harw{display:flex;flex-direction:column;justify-content:center;align-items:center;
+      color:#9aa3ad;font-size:15px;min-width:150px}
+.harw span{font-size:10px;color:#8b929a;margin-bottom:3px}
+.hbtn{border:1px dashed #c3c8ce;border-radius:7px;padding:4px 10px;font-size:11.5px;
+      color:#6b7280;background:#fff;white-space:nowrap;margin-bottom:2px}
+.hbtn.live{border-style:solid;border-color:var(--red);color:var(--red);font-weight:700;background:#fff6f5}
+.hrow.rj{margin-top:8px;align-items:center;font-size:11.5px;color:var(--dim)}
+.hlbl{font-size:11.5px;color:var(--dim)}
+@media(max-width:860px){.grid{grid-template-columns:1fr}.tb{flex:1 1 100%}.pick{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="lg">STT CLAIM <span>งานเคลม · ตรวจรับสินค้า — Mockup v3</span></div>
+  <div class="nav">
+    <button id="n_job"  onclick="go('jobs')">🚛 งานตามจ๊อบ</button>
+    <button id="n_box"  onclick="go('box')">📋 กล่องงานของฉัน</button>
+    <button id="n_reg"  onclick="go('reg')">🗂️ ทะเบียนเอกสาร</button>
+    <button id="n_map"  onclick="go('map')">🔄 การส่งงาน</button>
+  </div>
+  <div class="sp"></div>
+  <span style="font-size:12px;color:#6b7280">ทดลองเป็น:</span>
+  <select style="width:auto" id="role" onchange="setRole(this.value)">
+    <option value="TEAM">คุณสมชาย · QC (ผู้แจ้ง)</option>
+    <option value="APPROVER">คุณวิชัย · ผจก.ผลิต (ผู้อนุมัติ)</option>
+    <option value="STORE">คุณนภา · สโตร์</option>
+    <option value="PURCHASE">คุณเอ · จัดซื้อ</option>
+    <option value="ADMIN">เบียร์ · ผู้บริหาร</option>
+  </select>
+  <button class="btn" onclick="reset()">↺ เริ่มใหม่</button>
+</div>
+
+<div class="wrap">
+  <div class="tip" id="tip"></div>
+  <div id="view"></div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   Mockup v3 — แก้ตามสเปคที่เบียร์ตรวจแล้ว (สเปคงานเคลม ข้อ 7 และ ข้อ 10)
+   สิ่งที่ v2 ผิด และแก้ในนี้:
+     1. v2 ไม่มี Inspection เลย — ทั้งที่เอกสารในระบบมี 2 อย่าง
+     2. v2 เอา 5 แท็บมาแทนหน้าแรก — แต่สเปคข้อ 10 บอกว่าแกนหลักคือ "เลขจ๊อบ"
+        (เลือกประเภทงาน JT|JM|JMC|JMS → เลือกจ๊อบ → เอกสารของจ๊อบนั้น)
+        5 แท็บเป็น "กล่องงานของฉัน" อยู่ข้าง ๆ ไม่ใช่มาแทน
+     3. v2 ทำลายเซ็น 5 ช่อง — สเปคข้อ 7 คือ 7 ช่อง 2 รอบ
+     4. v2 ไม่มีกฎ "ครบ 4 ช่องแรกก่อน ปุ่มพิมพ์ใบส่ง Supplier ถึงเปิด"
+   ════════════════════════════════════════════════════════════════ */
+
+var ME={TEAM:{n:'คุณสมชาย',p:'QC',r:['QC']},APPROVER:{n:'คุณวิชัย',p:'ผจก.ผลิต',r:['APPROVER']},
+        STORE:{n:'คุณนภา',p:'สโตร์',r:['STORE']},PURCHASE:{n:'คุณเอ',p:'จัดซื้อ',r:['PURCHASE']},
+        ADMIN:{n:'เบียร์',p:'ผู้บริหาร',r:['ADMIN']}};
+var ROLE='TEAM', VIEW='jobs', JTYPE='JT', TAB='open', CURJOB=null, CURDOC=null;
+function me(){return ME[ROLE];}
+function $(i){return document.getElementById(i);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function now(){var d=new Date(),p=function(n){return String(n).padStart(2,'0');};
+  return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+(d.getFullYear()+543)+' '+p(d.getHours())+':'+p(d.getMinutes());}
+function tip(h){$('tip').innerHTML=h;}
+
+/* ─── ลายเซ็น 7 ช่อง 2 รอบ · ตามสเปคข้อ 7 ─── */
+var SIGN1=[{k:'req', t:'1. ผู้แจ้ง',   who:'PD / QC / Design', act:'บันทึก + ส่งอนุมัติ'},
+           {k:'appr',t:'2. ผู้อนุมัติ', who:'ผจก.แผนกขึ้นไป',   act:'อนุมัติใบเคลม'},
+           {k:'store',t:'3. สโตร์',     who:'สโตร์',            act:'รับทราบ'},
+           {k:'buy', t:'4. จัดซื้อ',    who:'จัดซื้อ',          act:'รับทราบและดำเนินการ'}];
+var SIGN2=[{k:'res', t:'5. จัดซื้อ',    who:'จัดซื้อ',          act:'บันทึกผลการเคลม'},
+           {k:'qc',  t:'6. QC',        who:'QC',              act:'ยืนยันของที่ได้เปลี่ยน'},
+           {k:'close',t:'7. ผู้บริหาร', who:'เบียร์ / คุณแบล็ค / คุณประดิษฐ์', act:'อนุมัติปิดใบเคลม'}];
+var ROLE_OF={req:['QC','PRODUCTION','DESIGN','SALES'],appr:['APPROVER'],store:['STORE'],
+             buy:['PURCHASE'],res:['PURCHASE'],qc:['QC','PRODUCTION'],close:['ADMIN']};
+
+/* ─── 5 กล่องงาน ─── */
+var TABS=[['open','①','เปิดใบขอเคลม','req',['QC','PRODUCTION','DESIGN','SALES']],
+          ['appr','②','อนุมัติ','appr',['APPROVER']],
+          ['store','③','งานสโตร์','store',['STORE','PURCHASE']],
+          ['buy','④','งานจัดซื้อ','buy',['PURCHASE','STORE']],
+          ['close','⑤','อนุมัติ ปิดจบ','close',['ADMIN']]];
+
+function seed(){return {
+ jobs:[{no:'JT-69/0009',type:'JT',cust:'โชคชัยพัฒนาออยล์',model:'SEMI-TRAILER 32,000 L',
+        cstt:'STT-6900123',cmk:'LJRT4820XN1234567',area:'for'},
+       {no:'JT-69/0014',type:'JT',cust:'บจก. ขนส่งไทยเจริญ',model:'SEMI-TRAILER 28,000 L',
+        cstt:'STT-6900140',cmk:'',area:'dom'},
+       {no:'JM-69/0021',type:'JM',cust:'บจก. ปิโตรเลียมสยาม',model:'TANK BODY 20,000 L',
+        cstt:'STT-6900155',cmk:'',area:'dom'},
+       {no:'JMC-69/0032',type:'JMC',cust:'โชคชัยพัฒนาออยล์',model:'ซ่อมหลังส่งมอบ',
+        cstt:'STT-6900123',cmk:'',area:'dom'}],
+ docs:[
+  {no:'INS-69/0001',kind:'INS',job:'JT-69/0009',date:'28/08/2569',by:'คุณสมชาย',
+   tpl:'แท็งค์นำเข้า (Tankers)',sign:{req:'คุณสมชาย · QC · 28/08/2569 09:20'},
+   items:[{t:'สภาพผิวนอกตัวถัง — รอยบุบ รอยขีด สนิม',acc:'ACC',found:'',ph:1},
+          {t:'สภาพผิวในตัวถัง — ความสะอาด รอยเชื่อม',acc:'UNACC',found:'รอยเชื่อมไม่เต็มแนวยาว 30 ซม. ด้านซ้ายใกล้แมนโฮล',ph:2},
+          {t:'แมนโฮล ปิดสนิท บานพับปกติ',acc:'ACC',found:'',ph:1},
+          {t:'วาล์วจ่าย / API valve ไม่รั่วซึม',acc:'UNACC',found:'ทดสอบ 0.5 บาร์ พบน้ำซึมที่หน้าแปลน',ph:2},
+          {t:'ทดสอบแรงดัน (Pressure test) ผ่าน',acc:'',found:'',ph:0}],
+   claimNo:'CLM-69/0001'},
+
+  {no:'CLM-69/0001',kind:'CLM',job:'JT-69/0009',date:'02/09/2569',by:'คุณสมชาย',dept:'QC',
+   ctype:'after',area:'for',from:'INS-69/0001',dn:'',want:'30/09/2569',jmc:'',
+   sign:{req:'คุณสมชาย · QC · 02/09/2569 09:10',appr:'คุณวิชัย · ผจก.ผลิต · 02/09/2569 14:02'},
+   items:[{code:'VLV-3040',nm:'API VALVE 4"',th:'วาล์วรั่วซึมบริเวณหน้าแปลน ตรวจพบตอนทดสอบแรงดัน',
+           en:'API valve leaking at flange during pressure test',qty:'2',unit:'PCS',po:'',sup:'',ph:2},
+          {code:'',nm:'งานเชื่อมผิวในตัวถัง',th:'รอยเชื่อมไม่เต็มแนว ต้องเชื่อมซ่อมใหม่',
+           en:'Incomplete weld, needs rework',qty:'1',unit:'จุด',po:'',sup:'',ph:2}]},
+
+  {no:'INS-69/0002',kind:'INS',job:'JM-69/0021',date:'04/09/2569',by:'คุณสมชาย',
+   tpl:'สินค้าในประเทศที่ต้องตรวจเฉพาะ',sign:{},
+   items:[{t:'สภาพบรรจุภัณฑ์ ไม่ฉีกขาด',acc:'ACC',found:'',ph:1},
+          {t:'จำนวนตรงกับใบส่งของ',acc:'',found:'',ph:0},
+          {t:'ไม่มีรอยแตกร้าว / รั่วซึม',acc:'UNACC',found:'ประเก็นฉีกขาดตั้งแต่แกะกล่อง 4 ชิ้น',ph:0}],
+   claimNo:''},
+
+  {no:'CLM-69/0002',kind:'CLM',job:'JM-69/0021',date:'04/09/2569',by:'คุณสมชาย',dept:'QC',
+   ctype:'pre',area:'dom',from:'',dn:'',want:'',jmc:'',
+   sign:{req:''},
+   items:[{code:'GSK-08',nm:'',th:'',en:'',qty:'4',unit:'',po:'',sup:'',ph:0}]},
+
+  {no:'CLM-69/0003',kind:'CLM',job:'JT-69/0014',date:'03/09/2569',by:'คุณสมชาย',dept:'QC',
+   ctype:'pre',area:'dom',from:'',dn:'DN-69/0501',want:'25/09/2569',jmc:'JMC-69/0032',
+   sign:{req:'คุณสมชาย · QC · 03/09/2569 10:20',appr:'คุณวิชัย · ผจก.ผลิต · 03/09/2569 11:05',
+         store:'คุณนภา · สโตร์ · 03/09/2569 15:30'},
+   items:[{code:'GSK-08',nm:'GASKET NBR 8"',th:'ประเก็นฉีกขาดตั้งแต่แกะกล่อง',en:'',qty:'4',unit:'PCS',
+           po:'PO-69/0501',sup:'บจก. ไทยพัฒนาวาล์ว',ph:3}]}
+ ]};}
+var DB=seed();
+function reset(){DB=seed();CURJOB=null;CURDOC=null;VIEW='jobs';go('jobs');}
+function setRole(r){ROLE=r; if(CURDOC) openDoc(CURDOC); else go(VIEW);}
+function doc(no){for(var i=0;i<DB.docs.length;i++) if(DB.docs[i].no===no) return DB.docs[i]; return null;}
+function job(no){for(var i=0;i<DB.jobs.length;i++) if(DB.jobs[i].no===no) return DB.jobs[i]; return null;}
+function docsOfJob(j){var o=[];for(var i=0;i<DB.docs.length;i++) if(DB.docs[i].job===j) o.push(DB.docs[i]);return o;}
+
+/* ช่องลายเซ็นถัดไปที่รอ = สถานะของเอกสาร */
+function nextSlot(d){
+  var all=SIGN1.concat(SIGN2);
+  for(var i=0;i<all.length;i++) if(!d.sign[all[i].k]) return all[i];
+  return null;
+}
+function slotNo(d){var s=nextSlot(d);return s?SIGN1.concat(SIGN2).indexOf(s)+1:8;}
+function isDraft(d){return !d.sign.req;}          /* ยังไม่ส่งอนุมัติ = ร่าง */
+function canSign(d,slot){
+  if(!slot) return false;
+  var r=me().r;
+  if(r.indexOf('ADMIN')>=0 && slot.k==='close') return true;
+  for(var i=0;i<r.length;i++) if((ROLE_OF[slot.k]||[]).indexOf(r[i])>=0) return true;
+  return false;
+}
+/* ร่างของทีมงาน สโตร์กับจัดซื้อไม่เห็น */
+function canSee(d){
+  if(d.kind==='INS') return d.sign.req || me().n===d.by || me().r.indexOf('ADMIN')>=0 || me().r.indexOf('APPROVER')>=0;
+  if(!isDraft(d)) return true;
+  var r=me().r;
+  return r.indexOf('ADMIN')>=0||r.indexOf('APPROVER')>=0||me().n===d.by||me().p===d.dept;
+}
+function missing(d){
+  var m=[];
+  if(d.kind==='INS'){
+    var todo=[],np=[];
+    for(var i=0;i<d.items.length;i++){
+      if(!d.items[i].acc) todo.push(i+1);
+      else if(d.items[i].acc==='UNACC'&&!d.items[i].ph) np.push(i+1);
+    }
+    if(todo.length) m.push('ข้อ '+todo.join(', ')+' ยังไม่ได้ติ๊กผลตรวจ');
+    if(np.length)   m.push('ข้อ '+np.join(', ')+' ไม่ผ่านแต่ยังไม่มีรูป');
+    return m;
+  }
+  var s=nextSlot(d); if(!s) return m;
+  if(s.k==='req'){
+    var bad=[],nop=[];
+    for(var k=0;k<d.items.length;k++){ if(!d.items[k].nm||!d.items[k].th) bad.push(k+1);
+                                       if(!d.items[k].ph) nop.push(k+1); }
+    if(!d.want) m.push('ยังไม่ใส่วันที่ต้องการของ');
+    if(bad.length) m.push('รายการที่ '+bad.join(', ')+' ยังไม่ใส่ชื่อสินค้า/รายละเอียด');
+    if(nop.length) m.push('รายการที่ '+nop.join(', ')+' ยังไม่มีรูป');
+  }
+  if(s.k==='store'){
+    if(!d.dn) m.push('ยังไม่ใส่เลขใบส่งมอบ');
+    var np2=[],ns=[];
+    for(var q=0;q<d.items.length;q++){ if(!d.items[q].po) np2.push(q+1); if(!d.items[q].sup) ns.push(q+1); }
+    if(np2.length) m.push('รายการที่ '+np2.join(', ')+' ยังไม่มี PO');
+    if(ns.length)  m.push('รายการที่ '+ns.join(', ')+' ยังไม่มี Supplier');
+  }
+  return m;
+}
+function round1Done(d){ return SIGN1.every(function(s){return !!d.sign[s.k];}); }
+
+/* ═════════ Router ═════════ */
+function go(v,arg){
+  VIEW=v; CURDOC=null;
+  ['n_job','n_box','n_reg','n_map'].forEach(function(i){$(i).className='';});
+  if(v==='jobs'||v==='job') $('n_job').className='on';
+  if(v==='box') $('n_box').className='on';
+  if(v==='reg') $('n_reg').className='on';
+  if(v==='map') $('n_map').className='on';
+  if(v==='jobs') return jobsPage();
+  if(v==='job')  return jobPage(arg||CURJOB);
+  if(v==='box')  return boxPage();
+  if(v==='reg')  return regPage();
+  if(v==='pick') return pickPage();
+  if(v==='map')  return mapPage();
+}
+
+/* ═════════ ① งานตามจ๊อบ (แกนหลักตามสเปคข้อ 10) ═════════ */
+function jobsPage(){
+  var t='<div class="card"><div class="hd"><h3>งานตามจ๊อบ</h3>'+
+    '<span class="sub">เลขจ๊อบคือแกนหลักของทั้งระบบ — ทุกใบต้องผูกจ๊อบเสมอ</span>'+
+    '<span class="sp" style="flex:1"></span>'+
+    '<button class="btn p" onclick="go(\'pick\')">+ เปิดเอกสารใหม่</button></div>';
+  t+='<div class="jt">';
+  ['JT','JM','JMC','JMS'].forEach(function(k){
+    var n=DB.jobs.filter(function(j){return j.type===k;}).length;
+    t+='<button class="'+(JTYPE===k?'on':'')+'" onclick="JTYPE=\''+k+'\';jobsPage()">'+k+
+       '<small>'+n+' จ๊อบ</small></button>';
+  });
+  t+='</div>';
+  var list=DB.jobs.filter(function(j){return j.type===JTYPE;});
+  if(!list.length) t+='<div class="empty">ยังไม่มีจ๊อบประเภท '+JTYPE+'</div>';
+  else{
+    t+='<table><thead><tr><th style="width:130px">เลขที่ JOB</th><th>ชื่อลูกค้า</th>'+
+      '<th style="width:190px">รุ่น</th><th style="width:120px">ในประเทศ/ตปท.</th>'+
+      '<th style="width:230px">เอกสารในจ๊อบนี้</th></tr></thead><tbody>';
+    list.forEach(function(j){
+      var ds=docsOfJob(j.no).filter(canSee);
+      t+='<tr class="k" onclick="CURJOB=\''+j.no+'\';go(\'job\',\''+j.no+'\')">'+
+        '<td><b>'+esc(j.no)+'</b></td><td>'+esc(j.cust)+'</td><td>'+esc(j.model)+'</td>'+
+        '<td class="c">'+(j.area==='for'?'ต่างประเทศ':'ในประเทศ')+'</td><td>'+
+        (ds.length?ds.map(function(d){return '<span class="pill '+(d.kind==='INS'?'ins':'clm')+'">'+d.no+'</span>';}).join(' ')
+                  :'<span class="sub" style="color:#9aa3ad">— ยังไม่มีเอกสาร —</span>')+'</td></tr>';
+    });
+    t+='</tbody></table>';
+  }
+  t+='</div>';
+  $('view').innerHTML=t;
+  tip('<b>หน้าแรก = งานตามจ๊อบ</b> (สเปคข้อ 10) — เลือกประเภทงาน <b>JT | JM | JMC | JMS</b> → เลือกจ๊อบ → '+
+      'เห็นเอกสารทุกใบของจ๊อบนั้น <span class="pill ins">ใบตรวจรับ</span> <span class="pill clm">ใบเคลม</span> ในที่เดียว');
+}
+
+function jobPage(no){
+  var j=job(no); if(!j) return jobsPage();
+  CURJOB=no;
+  var ds=docsOfJob(no).filter(canSee);
+  var t='<div class="card"><div class="hd"><h3>'+esc(j.no)+' · '+esc(j.cust)+'</h3>'+
+    '<span class="sub">'+(j.area==='for'?'ต่างประเทศ':'ในประเทศ')+'</span>'+
+    '<span style="flex:1"></span><button class="btn" onclick="go(\'jobs\')">← จ๊อบทั้งหมด</button>'+
+    '<button class="btn p" onclick="go(\'pick\')">+ เปิดเอกสารใหม่ในจ๊อบนี้</button></div>';
+  t+='<div class="grid">'+
+    fld('oa','เลขที่ JOB',j.no,1)+fld('oa','ชื่อลูกค้า',j.cust,1)+fld('oa','MODEL',j.model,1)+
+    fld('oa','CHASSIS NO. (STT)',j.cstt,1)+fld('oa','CHASSIS NO. (ผู้ผลิต)',j.cmk,1)+
+    fld('oa','ประเภทงาน',j.type,1)+'</div></div>';
+
+  t+='<div class="card"><div class="hd"><h3>เอกสารของจ๊อบนี้</h3>'+
+    '<span class="sub">มี 2 ชนิด — ใบตรวจรับสินค้า (Inspection) และ ใบเคลมสินค้า</span></div>';
+  if(!ds.length) t+='<div class="empty">ยังไม่มีเอกสารในจ๊อบนี้<br>กด “+ เปิดเอกสารใหม่ในจ๊อบนี้”</div>';
+  else{
+    t+='<table><thead><tr><th style="width:110px">ชนิด</th><th style="width:120px">เลขที่</th>'+
+      '<th style="width:88px">วันที่</th><th>สถานะตอนนี้ (รอใครเซ็น)</th>'+
+      '<th style="width:120px">ผู้เปิด</th><th style="width:130px">มาจาก / ออกเป็น</th></tr></thead><tbody>';
+    ds.forEach(function(d){
+      var s=nextSlot(d);
+      t+='<tr class="k" onclick="openDoc(\''+d.no+'\')">'+
+        '<td class="c"><span class="pill '+(d.kind==='INS'?'ins':'clm')+'">'+
+          (d.kind==='INS'?'ใบตรวจรับ':'ใบเคลม')+'</span></td>'+
+        '<td><b>'+esc(d.no)+'</b></td><td class="c">'+esc(d.date)+'</td>'+
+        '<td>'+(d.kind==='INS'
+                ? (d.sign.req?'ตรวจแล้ว · '+(d.claimNo?'ออกใบเคลม '+d.claimNo:'ยังไม่ออกใบเคลม'):'<span class="pill y">ร่าง · ยังตรวจไม่จบ</span>')
+                : (s?'<span class="pill">รอ '+esc(s.t)+' — '+esc(s.act)+'</span>':'<span class="pill g">ปิดจบแล้ว</span>'))+'</td>'+
+        '<td>'+esc(d.by)+'</td>'+
+        '<td>'+(d.from?'จาก '+esc(d.from):(d.claimNo?'→ '+esc(d.claimNo):'—'))+'</td></tr>';
+    });
+    t+='</tbody></table>';
+  }
+  t+='</div>';
+
+  t+='<div class="card"><div class="hd"><h3>ต้นทุนเคลมรวมของรถคันนี้</h3>'+
+    '<span class="sub">ต้นทุนของ (จาก JMC) + ค่าแรงคน (จาก HR) — เห็นเฉพาะผู้บริหาร/จัดซื้อ</span></div>'+
+    '<table><thead><tr><th>เลขที่</th><th class="r" style="width:130px">ค่าของ</th>'+
+    '<th class="r" style="width:130px">ค่าแรง</th><th class="r" style="width:140px">รวม (บาท)</th></tr></thead>'+
+    '<tbody><tr><td>CLM-69/0001</td><td class="r">32,050.00</td><td class="r">6,500.00</td>'+
+    '<td class="r"><b>38,550.00</b></td></tr></tbody>'+
+    '<tfoot><tr><th class="r">รวมทั้งคัน</th><th class="r">32,050.00</th><th class="r">6,500.00</th>'+
+    '<th class="r">38,550.00</th></tr></tfoot></table></div>';
+  $('view').innerHTML=t;
+  tip('<b>หน้าจ๊อบ</b> — ใบตรวจรับกับใบเคลมของจ๊อบนี้อยู่ตารางเดียวกัน · คอลัมน์ขวาสุดบอกว่า '+
+      '<b>ใบเคลมใบนี้มาจากใบตรวจใบไหน</b> (ข้อที่ Un-Acc ดึงมาเป็นเคลม ไม่ต้องพิมพ์ใหม่)');
+}
+
+/* ═════════ เลือกชนิดเอกสาร — สิ่งที่ v2 ขาดไป ═════════ */
+function pickPage(){
+  var t='<div class="card"><div class="hd"><h3>เปิดเอกสารใหม่'+(CURJOB?' — จ๊อบ '+esc(CURJOB):'')+'</h3>'+
+    '<span class="sub">ในระบบนี้เปิดได้ 2 ชนิดเท่านั้น</span><span style="flex:1"></span>'+
+    '<button class="btn" onclick="go(CURJOB?\'job\':\'jobs\')">← กลับ</button></div>'+
+    '<div class="pick">'+
+    '<div class="pk" onclick="demoNew(\'INS\')"><div class="ic">🔍</div>'+
+      '<h4>① ใบตรวจรับสินค้า (Inspection)</h4>'+
+      '<p>ใช้ตอน<b>ของมาถึง</b> — แท็งค์นำเข้า หรือสินค้าในประเทศที่ต้องตรวจโดยเฉพาะ<br>'+
+      'เลือกแม่แบบเช็คลิสต์ → ตรวจทีละหัวข้อ ติ๊ก Acc / Un-Acc ถ่ายรูปทุกข้อ<br>'+
+      '<b>ข้อที่ Un-Acc กดดึงไปเปิดใบเคลมได้เลย ไม่ต้องพิมพ์ใหม่</b></p></div>'+
+    '<div class="pk" onclick="demoNew(\'CLM\')"><div class="ic">📋</div>'+
+      '<h4>② ใบเคลมสินค้า</h4>'+
+      '<p>ใช้ตอน<b>เจอปัญหาแล้วต้องเคลมกับ Supplier</b><br>'+
+      'เปิดตรงได้เลย (เคลมหลังส่งมอบ / อุปกรณ์ในประเทศ) หรือมาจากใบตรวจรับก็ได้<br>'+
+      '<b>บันทึกร่างไว้ก่อนได้</b> · ครบแล้วกดส่งอนุมัติ</p></div>'+
+    '</div></div>';
+  $('view').innerHTML=t;
+  tip('<b>เอกสารในระบบมี 2 ชนิด</b> — ตรงนี้คือจุดที่ v2 หายไปทั้งก้อน · '+
+      'ใบตรวจรับ = ตรวจของตอนมาถึง · ใบเคลม = เรียกร้องกับ Supplier · '+
+      'ทั้งสองชนิดผูกกับเลขจ๊อบ และเดินผ่านกล่องงาน 5 ขั้นเหมือนกัน');
+}
+function demoNew(k){
+  alert(k==='INS'
+    ? 'เปิดใบตรวจรับสินค้า (ตัวอย่าง)\n\n1) เลือกจ๊อบ\n2) เลือกแม่แบบเช็คลิสต์ (แท็งค์นำเข้า / อุปกรณ์ / สินค้าในประเทศ / ใบเปล่า)\n3) ตรวจทีละข้อ ติ๊ก Acc หรือ Un-Acc + ถ่ายรูป\n4) ข้อที่ Un-Acc กด "ดึงไปเปิดใบเคลม" ได้เลย'
+    : 'เปิดใบเคลมสินค้า (ตัวอย่าง)\n\n1) เลือกจ๊อบ (ชื่อลูกค้า MODEL CHASSIS เด้งเอง)\n2) กรอกรายการที่เคลม + แนบรูปทุกรายการ\n3) กด "บันทึกร่าง" ไว้ก่อนได้ — สโตร์กับจัดซื้อยังไม่เห็น\n4) ครบแล้วกด "บันทึก + ส่งอนุมัติ"');
+}
+
+/* ═════════ ② กล่องงานของฉัน — 5 แท็บ ═════════ */
+function boxPage(){
+  var t='<div class="card"><div class="hd"><h3>กล่องงานของฉัน</h3>'+
+    '<span class="sub">'+esc(me().n)+' · '+esc(me().p)+' — ใบที่รอลายเซ็นในแต่ละขั้น (มีทั้งใบตรวจรับและใบเคลม)</span>'+
+    '<span style="flex:1"></span><button class="btn p" onclick="go(\'pick\')">+ เปิดเอกสารใหม่</button></div>';
+  t+='<div class="tabs">';
+  TABS.forEach(function(tb){
+    var n=inTab(tb).length, mine=me().r.indexOf('ADMIN')>=0;
+    tb[4].forEach(function(r){ if(me().r.indexOf(r)>=0) mine=true; });
+    t+='<button class="tb'+(TAB===tb[0]?' on':'')+(mine?' mine':'')+'" onclick="TAB=\''+tb[0]+'\';boxPage()">'+
+      '<span class="n">'+tb[1]+'</span><span class="t">'+esc(tb[2])+'</span>'+
+      '<span class="c2'+(n?' has':'')+'">'+n+'</span></button>';
+  });
+  t+='</div>';
+  var cur=null; TABS.forEach(function(x){if(x[0]===TAB)cur=x;});
+  var mineTab=me().r.indexOf('ADMIN')>=0;
+  cur[4].forEach(function(r){ if(me().r.indexOf(r)>=0) mineTab=true; });
+  t+='<div class="note'+(mineTab?'':' no')+'">'+
+    (mineTab?'✋ <b>แท็บนี้เป็นงานของคุณ</b>':'👁 <b>แท็บนี้ไม่ใช่หน้าที่คุณ</b> — ดูได้ แต่เซ็นแทนไม่ได้')+
+    ' · รอลายเซ็นช่อง <b>'+esc(cur[2])+'</b></div>';
+
+  var rows=inTab(cur);
+  if(!rows.length) t+='<div class="empty">ยังไม่มีใบค้างในขั้นนี้</div>';
+  else{
+    t+='<table><thead><tr><th style="width:104px">ชนิด</th><th style="width:118px">เลขที่</th>'+
+      '<th style="width:82px">วันที่</th><th style="width:120px">เลขที่ JOB</th><th>ชื่อลูกค้า</th>'+
+      '<th style="width:190px">รอใครเซ็น</th><th style="width:70px">รูป</th></tr></thead><tbody>';
+    rows.forEach(function(d){
+      var s=nextSlot(d), j=job(d.job)||{}, np=0;
+      d.items.forEach(function(o){ if(!o.ph) np++; });
+      t+='<tr class="k" onclick="openDoc(\''+d.no+'\')">'+
+        '<td class="c"><span class="pill '+(d.kind==='INS'?'ins':'clm')+'">'+
+          (d.kind==='INS'?'ใบตรวจรับ':'ใบเคลม')+'</span></td>'+
+        '<td><b>'+esc(d.no)+'</b></td><td class="c">'+esc(d.date)+'</td>'+
+        '<td>'+esc(d.job)+'</td><td>'+esc(j.cust||'')+'</td>'+
+        '<td>'+(s?esc(s.t)+' — '+esc(s.act):'ปิดจบแล้ว')+'</td>'+
+        '<td class="c">'+(np?'<span class="pill r">ขาด '+np+'</span>':'<span class="pill g">ครบ</span>')+'</td></tr>';
+    });
+    t+='</tbody></table>';
+  }
+  t+='</div>';
+  $('view').innerHTML=t;
+  tip('<b>กล่องงาน 5 ขั้น</b> — ตรงกับลายเซ็น 7 ช่องในสเปคข้อ 7 · แต่ละแท็บมี<b>ทั้งใบตรวจรับและใบเคลม</b> '+
+      'ปนกันได้ เพราะทั้งคู่เดินสายอนุมัติเดียวกัน · ลองสลับบทบาทมุมขวาบนดูว่าตัวเลขเปลี่ยน');
+}
+function inTab(tb){
+  return DB.docs.filter(function(d){
+    if(!canSee(d)) return false;
+    var s=nextSlot(d);
+    if(d.kind==='INS') return tb[0]==='open' ? !d.sign.req : false;
+    return s ? s.k===tb[3] : false;
+  });
+}
+
+/* ═════════ ③ ทะเบียนเอกสารทั้งหมด ═════════ */
+function regPage(){
+  var t='<div class="card"><div class="hd"><h3>ทะเบียนเอกสารทั้งหมด</h3>'+
+    '<span class="sub">ทุกใบทุกจ๊อบ · ใบตรวจรับ + ใบเคลม อยู่ตารางเดียว</span></div>'+
+    '<table><thead><tr><th style="width:104px">ชนิด</th><th style="width:118px">เลขที่</th>'+
+    '<th style="width:82px">วันที่</th><th style="width:120px">เลขที่ JOB</th><th>ชื่อลูกค้า</th>'+
+    '<th style="width:200px">สถานะ</th><th style="width:110px">ผู้เปิด</th></tr></thead><tbody>';
+  DB.docs.filter(canSee).forEach(function(d){
+    var s=nextSlot(d), j=job(d.job)||{};
+    t+='<tr class="k" onclick="openDoc(\''+d.no+'\')">'+
+      '<td class="c"><span class="pill '+(d.kind==='INS'?'ins':'clm')+'">'+
+        (d.kind==='INS'?'ใบตรวจรับ':'ใบเคลม')+'</span></td>'+
+      '<td><b>'+esc(d.no)+'</b></td><td class="c">'+esc(d.date)+'</td><td>'+esc(d.job)+'</td>'+
+      '<td>'+esc(j.cust||'')+'</td>'+
+      '<td>'+(d.kind==='INS'?(d.sign.req?'ตรวจแล้ว':'<span class="pill y">ร่าง</span>')
+                            :(s?'รอ '+esc(s.t):'<span class="pill g">ปิดจบ</span>'))+'</td>'+
+      '<td>'+esc(d.by)+'</td></tr>';
+  });
+  t+='</tbody></table></div>';
+  $('view').innerHTML=t;
+  tip('<b>ทะเบียนเอกสารทั้งหมด</b> (สเปคข้อ 10) — รวมทุกใบทุกจ๊อบไว้ที่เดียว ไว้ค้นย้อนหลัง');
+}
+
+/* ═════════ เปิดเอกสาร ═════════ */
+function openDoc(no){
+  var d=doc(no); if(!d) return;
+  CURDOC=no;
+  if(d.kind==='INS') return insView(d);
+  return clmView(d);
+}
+function fld(cls,label,val,locked,req){
+  return '<div class="f '+cls+'"><label>'+label+(req?' <span class="rq">*</span>':'')+'</label>'+
+    '<input value="'+esc(val||'')+'" '+(locked?'class="locked" readonly':'')+'></div>';
+}
+function keyRow(){
+  return '<div class="key">'+
+   '<span><b class="rq">*</b> ต้องกรอกก่อนส่งต่อ</span>'+
+   '<span><i class="d1"></i><b style="color:var(--s1)">สีฟ้า</b> ผู้แจ้ง (PD/QC/Design) กรอก</span>'+
+   '<span><i class="d2"></i><b style="color:var(--s2)">สีส้ม</b> สโตร์กรอก</span>'+
+   '<span><i class="d3"></i><b style="color:var(--s3)">สีเขียว</b> จัดซื้อกรอก</span>'+
+   '<span><i class="da"></i><b style="color:var(--sa)">สีเทา</b> ระบบเติมให้เอง</span></div>';
+}
+function ph(n){
+  var t=''; for(var i=0;i<n;i++) t+='<div class="thumb">🖼️</div>';
+  t+='<div class="addph">+</div>';
+  if(!n) t+='<span class="needph">ต้องมีรูป</span>';
+  return t;
+}
+
+/* ─── ใบตรวจรับ ─── */
+function insView(d){
+  var j=job(d.job)||{}, miss=missing(d), un=d.items.filter(function(o){return o.acc==='UNACC';});
+  var own=me().r.some(function(r){return ['QC','PRODUCTION','DESIGN','ADMIN'].indexOf(r)>=0;});
+  var t='<div class="card"><div class="hd">'+
+    '<span class="pill ins">ใบตรวจรับสินค้า</span><h3>'+esc(d.no)+'</h3>'+
+    '<span class="sub">'+esc(d.job)+' · '+esc(j.cust||'')+' · '+esc(d.tpl)+'</span>'+
+    '<span style="flex:1"></span><button class="btn" onclick="go(\'job\',\''+d.job+'\')">← กลับจ๊อบ</button>'+
+    '<button class="btn dk">🖨️ ปริ้นใบตรวจรับ</button></div>';
+  t+='<div class="grid">'+
+    fld('oa','เลขที่ JOB',d.job,1)+fld('oa','ชื่อลูกค้า',j.cust,1)+fld('oa','MODEL',j.model,1)+
+    fld('o1','แม่แบบเช็คลิสต์',d.tpl,1)+fld('o1','ผู้ตรวจ',d.by,1)+fld('oa','วันที่',d.date,1)+
+    '</div></div>';
+
+  t+='<div class="card"><div class="hd"><h3>รายการตรวจ ('+d.items.length+' ข้อ)</h3>'+
+    '<span class="sub">ติ๊ก Acc / Un-Acc ทุกข้อ · ข้อที่ไม่ผ่านต้องมีรูป</span></div>'+
+    '<table><thead><tr><th style="width:34px">#</th><th>หัวข้อตรวจ</th>'+
+    '<th style="width:96px">ผลตรวจ</th><th style="width:240px">สิ่งที่พบ</th>'+
+    '<th style="width:130px">รูป</th></tr></thead><tbody>';
+  d.items.forEach(function(o,i){
+    t+='<tr><td class="c">'+(i+1)+'</td><td>'+esc(o.t)+'</td>'+
+      '<td class="c">'+(o.acc==='ACC'?'<span class="pill g">Acc</span>'
+                      :o.acc==='UNACC'?'<span class="pill r">Un-Acc</span>'
+                      :'<span class="pill y">ยังไม่ตรวจ</span>')+'</td>'+
+      '<td>'+esc(o.found)+'</td><td><div class="ph">'+ph(o.ph)+'</div></td></tr>';
+  });
+  t+='</tbody></table>';
+  if(miss.length) t+='<div class="miss">ยังตรวจไม่จบ — '+esc(miss.join(' · '))+'</div>';
+  t+='<div class="acts">'+
+    '<button class="btn p" '+(miss.length||!own?'disabled':'')+' onclick="alert(\'ตัวอย่าง: ปิดใบตรวจ แล้วเซ็นช่องผู้ตรวจ\')">✓ ตรวจครบแล้ว</button>'+
+    '<button class="btn" '+(un.length&&!miss.length?'':'disabled')+' onclick="mkClaim(\''+d.no+'\')">'+
+      '➜ ดึงข้อที่ Un-Acc ('+un.length+' ข้อ) ไปเปิดใบเคลม</button>'+
+    (d.claimNo?'<span class="vw">ออกใบเคลมแล้ว: <b>'+esc(d.claimNo)+'</b> — กดที่หน้าจ๊อบเพื่อเปิด</span>':'')+
+    '</div></div>';
+  $('view').innerHTML=t;
+  tip('<b>ใบตรวจรับ (Inspection)</b> — ตรวจของตอนมาถึง · ข้อที่ <b>Un-Acc</b> กดปุ่มดึงไปเปิดใบเคลมได้เลย '+
+      'รายละเอียดและรูปตามไปด้วย <b>ไม่ต้องพิมพ์ใหม่</b> (สเปคข้อ 4)');
+}
+function mkClaim(no){
+  var d=doc(no);
+  alert('ดึงข้อที่ Un-Acc ไปเปิดใบเคลม (ตัวอย่าง)\n\nได้ใบเคลม '+ (d.claimNo||'CLM-69/0005') +
+    '\nรายละเอียดและรูปของข้อที่ไม่ผ่าน ถูกก๊อปไปให้แล้ว ไม่ต้องพิมพ์ใหม่');
+  if(d.claimNo) openDoc(d.claimNo);
+}
+
+/* ─── ใบเคลม ─── */
+function clmView(d){
+  var j=job(d.job)||{}, s=nextSlot(d), miss=missing(d), can=canSign(d,s), r1=round1Done(d);
+  var lockTeam=!(s&&s.k==='req'&&can), lockStore=!(s&&s.k==='store'&&can), lockBuy=!(s&&(s.k==='buy'||s.k==='res')&&can);
+
+  var t='<div class="card"><div class="hd">'+
+    '<span class="pill clm">ใบเคลมสินค้า</span><h3>'+esc(d.no)+'</h3>'+
+    '<span class="sub">'+esc(d.job)+' · '+esc(j.cust||'')+' · '+
+      (d.ctype==='after'?'หลังส่งมอบ':'ก่อนส่งมอบ')+' · '+(d.area==='for'?'ต่างประเทศ':'ในประเทศ')+
+      (d.from?' · มาจากใบตรวจ '+esc(d.from):'')+'</span>'+
+    '<span style="flex:1"></span><button class="btn" onclick="go(\'job\',\''+d.job+'\')">← กลับจ๊อบ</button>'+
+    '<button class="btn dk" '+(r1?'':'disabled title="ต้องเซ็นครบ 4 ช่องแรกก่อน"')+
+      ' onclick="alert(\'ปริ้นใบแจ้งเคลมส่ง Supplier\')">🖨️ พิมพ์ใบส่ง Supplier</button></div>';
+
+  /* ขั้นตอน = ช่องลายเซ็น */
+  t+='<div class="flow"><div class="steps">';
+  SIGN1.concat(SIGN2).forEach(function(x,i){
+    var done=!!d.sign[x.k], now=s&&s.k===x.k;
+    t+='<div class="st '+(done?'done':(now?'now':''))+'"><b>'+(done?'✓':(i+1))+'</b>'+esc(x.t.split('. ')[1])+'</div>';
+    if(i<6) t+='<span class="arw">›</span>';
+  });
+  t+='</div>';
+  if(s) t+='<div><b>รอ '+esc(s.t)+' ('+esc(s.who)+') กด “'+esc(s.act)+'”</b>'+
+    '<div class="todo">'+(isDraft(d)?'ใบนี้ยังเป็น <b>ร่าง</b> — สโตร์กับจัดซื้อยังไม่เห็น · บันทึกค้างไว้ก่อนได้':
+      'ช่องของขั้นนี้เปิดให้กรอก · ช่องของขั้นอื่นเป็นสีเทา')+'</div></div>';
+  else t+='<div><b>ปิดใบเคลมเรียบร้อยแล้ว</b></div>';
+  t+=handoff(d,s,can,miss);
+  if(can&&miss.length) t+='<div class="miss">ยังเซ็นส่งต่อไม่ได้ — '+esc(miss.join(' · '))+'</div>';
+  t+='<div class="acts">';
+  if(s&&can) t+='<button class="btn p" '+(miss.length?'disabled':'')+' onclick="sign(\''+d.no+'\')">'+
+      (s.k==='req'?'📤 บันทึก + ส่งอนุมัติ':'✍️ '+esc(s.act))+'</button>';
+  if(s&&s.k==='req'&&can) t+='<button class="btn" onclick="alert(\'บันทึกร่างแล้ว — กลับมาแก้ได้เรื่อย ๆ\')">💾 บันทึกร่าง</button>';
+  if(s&&!can) t+='<span class="vw">👁 ดูได้ทุกอย่าง แต่ช่องนี้เป็นของ <b>'+esc(s.who)+'</b></span>';
+  if(me().r.indexOf('ADMIN')>=0&&s) t+='<button class="btn dg" onclick="alert(\'ยกเลิกใบเคลม — ผู้บริหารเท่านั้น\')">🚫 ยกเลิกใบ</button>';
+  t+='</div></div>';
+
+  /* ลายเซ็น 2 รอบ */
+  t+='<div class="sgh">การลงนาม รอบที่ 1 — เปิดและส่งเคลม <span>ครบ 4 ช่องนี้ ปุ่มพิมพ์ใบส่ง Supplier ถึงเปิดใช้ได้</span></div>';
+  t+='<div class="sign">'+SIGN1.map(function(x){return sgBox(d,x,s);}).join('')+'</div>';
+  t+='<div class="gate'+(r1?' ok':'')+'">'+(r1
+      ? '✓ ครบ 4 ช่องแล้ว — <b>ปุ่มพิมพ์ใบส่ง Supplier เปิดใช้ได้</b>'
+      : '🔒 ยังไม่ครบ 4 ช่อง — <b>ปุ่มพิมพ์ใบส่ง Supplier ยังกดไม่ได้</b> (สเปคข้อ 7)')+'</div>';
+  t+='<div class="sgh">การลงนาม รอบที่ 2 — หลังได้ผลจาก Supplier</div>';
+  t+='<div class="sign">'+SIGN2.map(function(x){return sgBox(d,x,s);}).join('')+'</div>';
+  t+='</div>';
+
+  /* ข้อมูลงาน */
+  t+='<div class="card"><div class="hd"><h3>ข้อมูลงาน</h3>'+
+    '<span class="sub">ชื่อลูกค้า MODEL CHASSIS ดึงจากจ๊อบให้เอง</span></div>'+keyRow()+
+    '<div class="grid">'+
+    fld('o1','ประเภทการเคลม',d.ctype==='after'?'หลังส่งมอบ (After-Sales)':'ก่อนส่งมอบ (Pre-Delivery)',lockTeam,1)+
+    fld('o1','เลขที่ JOB',d.job,lockTeam,1)+fld('oa','ชื่อลูกค้า',j.cust,1)+
+    fld('oa','MODEL',j.model,1)+fld('oa','CHASSIS NO. (STT)',j.cstt,1)+
+    fld('oa','CHASSIS NO. (ผู้ผลิต)',j.cmk,1)+
+    fld('o1','JMC ที่ผูก',d.jmc,lockTeam)+fld('o2','เลขใบส่งมอบ',d.dn,lockStore,1)+
+    fld('o1','วันที่ต้องการของ',d.want,lockTeam,1)+
+    fld('oa','ผู้ขอเคลม',d.by,1)+fld('oa','แผนก',d.dept,1)+
+    fld('oa','สถานะ',s?('รอ '+s.t):'ปิดจบแล้ว',1)+
+    '</div></div>';
+
+  /* รายการ */
+  t+='<div class="card"><div class="hd"><h3>รายการที่เคลม ('+d.items.length+')</h3>'+
+    '<span class="sub">ก๊อปจาก Google Sheets มาวางได้ · ทุกแถวต้องมีรูป'+
+    (d.area==='for'?' · งานต่างประเทศมีคอลัมน์ EN':'')+'</span></div>'+
+    '<div style="overflow-x:auto"><table><thead><tr><th style="width:32px">#</th>'+
+    '<th style="width:92px">รหัสสินค้า</th><th style="width:140px">ชื่อสินค้า</th>'+
+    '<th>รายละเอียดการเคลม (ไทย)</th>'+(d.area==='for'?'<th>Claim description (EN)</th>':'')+
+    '<th style="width:52px">จน.</th><th style="width:52px">หน่วย</th>'+
+    '<th style="width:96px">PO</th><th style="width:126px">Supplier</th>'+
+    '<th style="width:126px">รูป</th></tr></thead><tbody>';
+  d.items.forEach(function(o,i){
+    t+='<tr><td class="c">'+(i+1)+'</td>'+
+      td(o.code,lockTeam)+td(o.nm,lockTeam)+td(o.th,lockTeam)+
+      (d.area==='for'?td(o.en,lockTeam):'')+td(o.qty,lockTeam)+td(o.unit,lockTeam)+
+      td(o.po,lockStore)+td(o.sup,lockStore)+
+      '<td><div class="ph">'+ph(o.ph)+'</div></td></tr>';
+  });
+  t+='</tbody></table></div></div>';
+
+  /* คำตอบ Supplier + เรียกเก็บ */
+  t+='<div class="card"><div class="hd"><h3>คำตอบจาก Supplier · การเรียกเก็บ</h3>'+
+    '<span class="sub">กรอกในรอบที่ 2 · ราคาไม่มีในใบแจ้งเคลม</span></div>'+
+    '<div class="grid">'+
+    fld('o3','ผลการเคลม','— ยังไม่ตอบ —',lockBuy)+
+    fld('o3','สกุลเงิน','USD',lockBuy)+fld('o3','เรทแลกเปลี่ยน (ล็อกถาวร)','34.85',lockBuy)+
+    '</div>'+
+    '<div class="f o3" style="margin-top:10px"><label>รายละเอียดผลการเคลม / ข้อความจาก Supplier</label>'+
+    '<textarea rows="2" '+(lockBuy?'class="locked" readonly':'')+
+      ' placeholder="พิมพ์ได้ + แนบรูปแชท/อีเมลที่คุยกับ Supplier"></textarea></div>'+
+    '<div style="margin-top:8px" class="ph">'+ph(0)+'<span class="sub">รูปแชทกับ Supplier (ไม่บังคับ)</span></div>'+
+    '</div>';
+  $('view').innerHTML=t;
+
+  var h;
+  if(!s) h='<b>ใบนี้ปิดจบแล้ว</b> — ลายเซ็นครบ 7 ช่อง';
+  else if(!can) h='<b>ตอนนี้คุณเป็น '+esc(me().n)+'</b> — ช่องนี้เป็นของ <b>'+esc(s.who)+'</b> · '+
+       'ช่องกรอกเลยเป็นสีเทาหมด · สลับบทบาทมุมขวาบนแล้วลองใหม่';
+  else if(miss.length) h='<b>ระบบบอกก่อนว่าขาดอะไร</b> — ไม่ใช่ให้กดแล้วค่อยรู้ · เติมให้ครบแล้วปุ่มจะกดได้';
+  else h='<b>ครบแล้ว</b> — กด “'+esc(s.act)+'” ลายเซ็นของคุณจะประทับทันที แล้วใบวิ่งไปกล่องงานถัดไป';
+  tip(h);
+}
+function td(v,lock){ return '<td'+(lock?' class="locked"':'')+'>'+esc(v||'')+'</td>'; }
+
+/* ── ใครถือใบอยู่ · กดอะไร · แล้ววิ่งไปหาใคร ──
+   เบียร์: "แล้วมัน Pass งานไปส่วนต่างๆยังไง ดูแล้วยังงงอยู่เลย"
+   → ทำให้เห็นเป็นแผนภาพบนหัวใบเลย ไม่ต้องเดา                       */
+var PERSON={req:'คุณสมชาย · QC',appr:'คุณวิชัย · ผจก.ผลิต',store:'คุณนภา · สโตร์',
+            buy:'คุณเอ · จัดซื้อ',res:'คุณเอ · จัดซื้อ',qc:'คุณสมชาย · QC',close:'เบียร์ · ผู้บริหาร'};
+var LINEG={appr:'กลุ่มไลน์ ผู้อนุมัติ',store:'กลุ่มไลน์ สโตร์',buy:'กลุ่มไลน์ จัดซื้อ',
+           res:'กลุ่มไลน์ จัดซื้อ',qc:'กลุ่มไลน์ QC',close:'กลุ่มไลน์ ผู้บริหาร',req:'กลุ่มไลน์ ผู้แจ้ง'};
+function nextOf(k){
+  var all=SIGN1.concat(SIGN2);
+  for(var i=0;i<all.length-1;i++) if(all[i].k===k) return all[i+1];
+  return null;
+}
+function handoff(d,s,can,miss){
+  if(!s) return '<div class="hoff done">✓ <b>ครบ 7 ลายเซ็น — ใบนี้ปิดจบแล้ว</b> ไม่ต้องส่งต่อใคร</div>';
+  var nx=nextOf(s.k);
+  var t='<div class="hoff"><div class="hh">ใบนี้อยู่ที่ใคร แล้วจะไปไหนต่อ</div><div class="hrow">';
+  t+='<div class="hbox now"><i>ตอนนี้อยู่ที่</i><b>'+esc(s.t.split('. ')[1])+'</b>'+
+     '<small>'+esc(PERSON[s.k]||s.who)+'</small></div>';
+  t+='<div class="harw"><span>'+(can?'คุณกดได้':'รอคนนี้กด')+'</span>'+
+     '<div class="hbtn'+(can&&!miss.length?' live':'')+'">'+esc(s.act)+'</div>▶</div>';
+  if(nx){
+    t+='<div class="hbox"><i>แล้ววิ่งไปหา</i><b>'+esc(nx.t.split('. ')[1])+'</b>'+
+       '<small>'+esc(PERSON[nx.k]||nx.who)+'</small>'+
+       '<span class="hln">🔔 เด้ง '+esc(LINEG[nx.k]||'')+'</span></div>';
+  } else {
+    t+='<div class="hbox ok"><i>แล้ว</i><b>ปิดจบ</b><small>ไม่ต้องส่งต่อใคร</small></div>';
+  }
+  t+='</div>';
+  if(s.k!=='req'){
+    t+='<div class="hrow rj"><span class="hlbl">ถ้าข้อมูลไม่ครบ</span>'+
+       '<div class="hbtn">↩ ตีกลับ</div>◀ <span class="hlbl">กลับไปหา '+
+       esc(PERSON.req)+' ให้แก้ แล้วเดินใหม่ตั้งแต่ต้น</span></div>';
+  }
+  t+='</div>';
+  return t;
+}
+
+/* ── หน้าแผนภาพการส่งงานทั้งระบบ ── */
+function mapPage(){
+  var all=SIGN1.concat(SIGN2);
+  var t='<div class="card"><div class="hd"><h3>การส่งงาน — ใบเคลมวิ่งจากใครไปใคร</h3>'+
+    '<span class="sub">ทุกครั้งที่มีคนกดปุ่ม = เซ็นชื่อ 1 ช่อง + ใบวิ่งไปกล่องงานของคนถัดไป + เด้ง LINE</span></div>';
+  t+='<table><thead><tr><th style="width:38px">#</th><th style="width:150px">ใบอยู่ที่ใคร</th>'+
+    '<th style="width:210px">เขากดปุ่มอะไร</th><th style="width:150px">แล้ววิ่งไปหาใคร</th>'+
+    '<th style="width:150px">โผล่ในกล่องงาน</th><th>เขาต้องทำอะไร</th></tr></thead><tbody>';
+  var TODO={req:'กรอกข้อมูลรถ + รายการที่เคลม + แนบรูปทุกรายการ (บันทึกร่างไว้ก่อนได้)',
+            appr:'ตรวจว่าเคลมนี้สมควรออกไหม · ไม่โอเคกดตีกลับ',
+            store:'ดูว่ามีของในสโตร์ไหม เบิกไปติดตั้งให้ลูกค้าก่อน · เติมเลขใบส่งมอบ · PO · Supplier',
+            buy:'รับเรื่องไปเคลมกับ Supplier · เอารูปและข้อมูลส่งให้เขา',
+            res:'Supplier ตอบมาว่ายังไง · บันทึกผล · ใส่ราคาถ้าต้องเรียกเก็บ',
+            qc:'ของกลับมาแล้ว ถ่ายรูป · ติ๊ก Accept / ไม่ Accept (ไม่ Accept = วนเคลมรอบใหม่)',
+            close:'อนุมัติปิดใบเคลม · ตัดสินว่าต้นทุนลงที่ไหน (หัก HR หรือเป็นต้นทุนรถ)'};
+  all.forEach(function(x,i){
+    var nx=nextOf(x.k);
+    t+='<tr><td class="c">'+(i+1)+'</td>'+
+      '<td><b>'+esc(x.t.split('. ')[1])+'</b><br><span class="sub">'+esc(PERSON[x.k])+'</span></td>'+
+      '<td><span class="hbtn live" style="display:inline-block">'+esc(x.act)+'</span></td>'+
+      '<td>'+(nx?'<b>'+esc(nx.t.split('. ')[1])+'</b><br><span class="sub">'+esc(PERSON[nx.k])+'</span>'
+                :'<span class="pill g">ปิดจบ</span>')+'</td>'+
+      '<td>'+(nx?esc(tabOf(nx.k))+'<br><span class="sub">🔔 '+esc(LINEG[nx.k]||'')+'</span>':'—')+'</td>'+
+      '<td class="sub">'+esc(TODO[x.k]||'')+'</td></tr>';
+  });
+  t+='</tbody></table>';
+  t+='<div class="note" style="margin-top:12px">🔁 <b>ตีกลับได้ทุกขั้นหลังขั้นที่ 1</b> — '+
+    'ผู้อนุมัติ / สโตร์ / จัดซื้อ กด "ตีกลับ" พร้อมเหตุผล → ใบวิ่งกลับไปหา<b>ผู้แจ้ง</b> ให้แก้ '+
+    'แล้วเดินใหม่ตั้งแต่ต้น · ทุกครั้งที่ตีกลับ ระบบจดไว้ในประวัติว่าใครตีกลับ เพราะอะไร</div>';
+  t+='<div class="note">🖨️ <b>ประตูที่ต้องผ่านก่อนพิมพ์</b> — ลายเซ็นช่อง 1-4 ครบเมื่อไหร่ '+
+    'ปุ่ม "พิมพ์ใบส่ง Supplier" ถึงเปิดใช้ได้ (สเปคข้อ 7) · ก่อนหน้านั้นกดไม่ได้</div>';
+  t+='</div>';
+
+  t+='<div class="card"><div class="hd"><h3>ใบตรวจรับ (Inspection) ส่งงานยังไง</h3>'+
+    '<span class="sub">สั้นกว่าใบเคลม เพราะจบที่การตรวจ แล้วค่อยแตกเป็นใบเคลม</span></div>'+
+    '<table><thead><tr><th style="width:38px">#</th><th style="width:160px">ใบอยู่ที่ใคร</th>'+
+    '<th style="width:230px">กดปุ่มอะไร</th><th>เกิดอะไรขึ้น</th></tr></thead><tbody>'+
+    '<tr><td class="c">1</td><td><b>ผู้ตรวจ</b><br><span class="sub">PD / QC / Design ตรวจร่วมกัน</span></td>'+
+    '<td><span class="hbtn live" style="display:inline-block">✓ ตรวจครบแล้ว</span></td>'+
+    '<td class="sub">ติ๊ก Acc / Un-Acc ทุกข้อ + ถ่ายรูปข้อที่ไม่ผ่าน · ครบแล้วปิดใบตรวจ</td></tr>'+
+    '<tr><td class="c">2</td><td><b>ผู้ตรวจ</b></td>'+
+    '<td><span class="hbtn live" style="display:inline-block">➜ ดึงข้อที่ Un-Acc ไปเปิดใบเคลม</span></td>'+
+    '<td class="sub"><b>ระบบสร้างใบเคลมให้เลย</b> รายละเอียดและรูปของข้อที่ไม่ผ่านตามไปด้วย '+
+    'ไม่ต้องพิมพ์ใหม่ → จากนั้นใบเคลมเดินตามตาราง 7 ขั้นข้างบน</td></tr>'+
+    '<tr><td class="c">3</td><td><b>ผ่านหมด</b></td><td>—</td>'+
+    '<td class="sub">ไม่มีข้อไหน Un-Acc = จบที่ใบตรวจ ไม่ต้องเปิดใบเคลม</td></tr>'+
+    '</tbody></table></div>';
+  $('view').innerHTML=t;
+  tip('<b>อ่านตารางนี้จากซ้ายไปขวา</b> — ใบอยู่ที่ใคร → เขากดปุ่มอะไร → ใบวิ่งไปหาใคร → '+
+      'โผล่ในกล่องงานแท็บไหน · <b>ไม่มีอะไรวิ่งเอง ทุกการส่งต่อต้องมีคนกดปุ่มเสมอ</b> '+
+      'และการกดปุ่ม = เซ็นชื่อลงเอกสารด้วยในตัว');
+}
+function sgBox(d,x,next){
+  var v=d.sign[x.k]||'', p=v.split(' · '), isNext=next&&next.k===x.k;
+  return '<div class="sg'+(v?'':(isNext?' next':' wait'))+'"><i>'+esc(x.t)+' · '+esc(x.act)+'</i>'+
+    (v?'<b>'+esc(p[0])+'<small>'+esc(p[1]||'')+'</small><small>'+esc(p[2]||'')+'</small></b>'
+      :'<b>'+(isNext?'⏳ รอคนนี้กด':'— ยังไม่ถึงคิว —')+'<small>'+esc(x.who)+'</small></b>')+'</div>';
+}
+function sign(no){
+  var d=doc(no), s=nextSlot(d);
+  var m=missing(d);
+  if(m.length){ alert('ยังเซ็นไม่ได้\n\n· '+m.join('\n· ')); return; }
+  d.sign[s.k]=me().n+' · '+me().p+' · '+now();
+  openDoc(no);
+  var nx=nextSlot(d);
+  setTimeout(function(){
+    alert('เซ็นเรียบร้อย — '+s.t+'\n\n'+
+      (nx?('ใบนี้ไปอยู่กล่องงาน "'+tabOf(nx.k)+'" แล้ว\nระบบเด้ง LINE แจ้ง '+nx.who+' ให้เอง')
+         :'ครบ 7 ช่อง — ปิดใบเคลมเรียบร้อย')+
+      (round1Done(d)&&s.k==='buy'?'\n\n✓ ครบ 4 ช่องแรกแล้ว — ปุ่มพิมพ์ใบส่ง Supplier เปิดใช้ได้':''));
+  },60);
+}
+function tabOf(k){ var o=''; TABS.forEach(function(t){ if(t[3]===k) o=t[2]; }); return o||'—'; }
+
+go('jobs');
+</script>
+</body>
+</html>

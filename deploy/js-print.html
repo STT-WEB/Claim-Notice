@@ -44,6 +44,7 @@ function drawPrint(){
     prBtn('int',   '📋 ภายใน', 'ข้อมูลครบ มีชื่อลูกค้า ต้นทุน กำไร') +
     prBtn('notice','📤 แจ้งเคลม (ส่ง Supplier)', 'ไม่มีราคา ไม่มีชื่อลูกค้า') +
     prBtn('debit', '🧾 เรียกเก็บ (ส่ง Supplier)', 'มีราคาเรียกเก็บ ไม่มีต้นทุน/เรท') +
+    prBtn('rcv',   '🔍 ใบตรวจรับของกลับ', 'QC ตรวจของที่ Supplier ส่งกลับมา — มีเลขที่ วันที่ ผู้ตรวจ และรูป') +
     '</div>';
 
   if (sups.length > 1){
@@ -56,11 +57,24 @@ function drawPrint(){
   }
   t += '</div>';
 
-  if (PR.kind === 'int'){
+  if (PR.kind === 'rcv'){
+    var dn = (FLOW && FLOW.docNos) || {};
+    t += dn.rcv
+      ? '<div class="prnote">🔍 <b>ใบตรวจรับของกลับ ' + esc(dn.rcv) + '</b> · ' + esc(dn.rcvDate) +
+        ' · ผู้ตรวจ ' + esc(dn.rcvBy) + ' — ยืนยันว่าตรวจสอบเสร็จแล้ว ใช้เป็นหลักฐานให้สโตร์เบิกออก</div>'
+      : '<div class="prnote ext">⚠️ <b>ยังออกใบตรวจรับของกลับไม่ได้</b> — QC ต้องกด "ตรวจเสร็จ" ก่อน ' +
+        'ระบบถึงจะออกเลขที่และวันที่ให้</div>';
+  } else if (PR.kind === 'int'){
     t += '<div class="prnote">📋 <b>ฉบับภายใน</b> — เก็บไว้ในบริษัท มีชื่อลูกค้า ต้นทุน กำไร และเรทครบ <b>ห้ามส่งออกนอกบริษัท</b></div>';
   } else {
     t += '<div class="prnote ext">📤 <b>ฉบับส่ง Supplier</b> — ตัดชื่อลูกค้า ผู้ขอเคลม แผนก และ JMC ออกแล้ว ' +
          'เหลือแต่เลขจ๊อบไว้อ้างอิง' + (PR.kind === 'debit' ? ' · โชว์เฉพาะราคาเรียกเก็บ ไม่โชว์ต้นทุนกับเรท' : ' · ไม่มีราคาใด ๆ') + '</div>';
+    /* สเปคข้อ 7 — ครบลายเซ็นรอบ 1 ทั้ง 4 ช่อง ปุ่มพิมพ์ฉบับส่ง Supplier ถึงจะเปิด */
+    if (FLOW && FLOW.round1Done === false){
+      t += '<div class="prnote ext" style="border-color:#c0392b;color:#8e2b21">🔒 <b>ยังพิมพ์ส่ง Supplier ไม่ได้</b> — ' +
+           'ต้องครบลายเซ็นรอบที่ 1 ทั้ง 4 ช่องก่อน (ผู้เปิดใบ · ผู้อนุมัติ · สโตร์ · จัดซื้อ) ' +
+           'ตอนนี้ยังไม่ครบ · ดูตัวอย่างได้ แต่ปุ่มปริ้นยังล็อกอยู่</div>';
+    }
   }
   t += '</div>';
 
@@ -71,7 +85,12 @@ function drawPrint(){
 /** ปริ้นฉบับที่ส่งออกไปข้างนอก = บันทึกว่าใบนี้ออกไปแล้ว → เพิ่มรายการไม่ได้อีก
  *  เบียร์: "ปริ้นเอกสารแล้ว จะไม่สามารถเพิ่มรายการสินค้าได้ ต้องเปิดใบใหม่เท่านั้น" */
 function doPrint(){
-  if (PR.kind === 'int'){ window.print(); return; }        // ฉบับภายใน ปริ้นดูได้ไม่จำกัด
+  if (PR.kind === 'int' || PR.kind === 'rcv'){ window.print(); return; }   // ภายใน + ใบตรวจรับ ปริ้นได้ไม่จำกัด
+  if (FLOW && FLOW.round1Done === false){
+    alert('ยังพิมพ์ฉบับส่ง Supplier ไม่ได้\n\n' +
+          'ต้องครบลายเซ็นรอบที่ 1 ทั้ง 4 ช่องก่อน — ผู้เปิดใบ · ผู้อนุมัติ · สโตร์ · จัดซื้อ');
+    return;
+  }
   var already = FLOW && FLOW.printedAt;
   if (!already && !confirm('ปริ้นฉบับที่ส่งให้ Supplier แล้ว จะ "เพิ่มรายการสินค้าไม่ได้อีก"\n' +
       'ถ้ามีของเพิ่มทีหลัง ต้องเปิดใบเคลมใบใหม่\n\nยืนยันปริ้นเลยไหม?')) return;
@@ -100,18 +119,20 @@ function norm2(v){ return String(v == null ? '' : v).trim(); }
    pv = print value — กฎ "อะไรส่งออกได้บ้าง" อยู่ที่นี่ที่เดียว
    ถ้าวันหลังต้องซ่อนเพิ่ม แก้ตรงนี้จุดเดียว ทุกฉบับเปลี่ยนตาม ไม่มีหลุด */
 function isInternal(){ return PR.kind === 'int'; }
-function showMoney(){ return PR.kind !== 'notice'; }
+function isRcv(){ return PR.kind === 'rcv'; }
+function showMoney(){ return PR.kind !== 'notice' && PR.kind !== 'rcv'; }
 function showCost(){  return PR.kind === 'int'; }      // ต้นทุน/กำไร/เรท = ภายในเท่านั้น
 
 function docTitle(){
   if (PR.kind === 'int')    return ['ใบสรุปงานเคลม (ภายใน)', 'INTERNAL CLAIM SUMMARY'];
   if (PR.kind === 'notice') return ['ใบแจ้งเคลมสินค้า', 'CLAIM NOTICE'];
+  if (PR.kind === 'rcv')    return ['ใบตรวจรับของกลับ', 'GOODS RETURN INSPECTION'];
   return ['ใบเรียกเก็บค่าเคลม', 'CLAIM DEBIT NOTE'];
 }
 
 /* ─────────── ประกอบเอกสาร ─────────── */
 function buildPages(sups){
-  var targets = PR.sup ? [PR.sup] : (isInternal() ? [null] : sups);
+  var targets = PR.sup ? [PR.sup] : ((isInternal() || isRcv()) ? [null] : sups);
   var html = '';
   for (var i = 0; i < targets.length; i++) html += buildOneDoc(targets[i]);
   $('prPages').innerHTML = html;
@@ -129,6 +150,7 @@ function buildOneDoc(sup){
 
   var blocks = [];
   blocks.push(blkJob(h, sup));
+  if (isRcv()) blocks.push(blkRcvHead(h));
   blocks.push(blkItems(items, h));
   if (showMoney()) blocks.push(blkTotals(items, h, sup));
   if (isInternal() && h['หมายเหตุจาก Supplier']) blocks.push(blkReply(h));
@@ -138,6 +160,21 @@ function buildOneDoc(sup){
   blocks = blocks.concat(blkPhotos(items));
 
   return '<div class="docset" data-sup="' + esc(sup || '') + '">' + blocks.join('') + '</div>';
+}
+
+/** หัวใบตรวจรับของกลับ — เลขที่ วันที่ ผู้ตรวจ อ้างอิงใบรับเข้าคลัง (เบียร์สั่ง 7 ก.ย.) */
+function blkRcvHead(h){
+  var dn = (FLOW && FLOW.docNos) || {};
+  var t = '<div class="blk"><div class="sec"><div class="sech">การตรวจรับของกลับ' +
+          '<span>GOODS RETURN INSPECTION</span></div><div class="box"><table class="f">';
+  t += row2('เลขที่ใบตรวจรับ', '<b>' + esc(dn.rcv || '—') + '</b>',
+            'วันที่ตรวจ', esc(dn.rcvDate || '—'));
+  t += row2('ผู้ตรวจ (QC / Production)', esc(dn.rcvBy || '—'),
+            'อ้างอิงใบรับเข้าคลัง', esc(dn.gr ? (dn.gr + ' · ' + dn.grDate) : '—'));
+  t += row2('ที่เก็บในคลัง', esc(h['ที่เก็บในคลัง'] || '—'),
+            'ใบเบิกออก', esc(dn.is ? (dn.is + ' · ' + dn.isDate) : '— ยังไม่เบิก —'));
+  t += '</table></div></div></div>';
+  return t;
 }
 
 function blkJob(h, sup){

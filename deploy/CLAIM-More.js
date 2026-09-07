@@ -33,13 +33,25 @@ var CLAIM_FIELD_COL = {
   status:22, result:23, resultDetail:24, supplierNote:25
 };
 
+/* ช่องที่เพิ่มทีหลัง อยู่ในกลุ่มคอลัมน์ท้ายตาราง (HDR_FLOW)
+   ห้ามใส่เลขคอลัมน์ตายตัว เพราะพอเพิ่มคอลัมน์ใหม่ตัวเลขจะเลื่อนไปทับกัน — ใช้ชื่อหัวตารางแทน */
+var CLAIM_FIELD_HDR = {
+  storeLoc:'ที่เก็บในคลัง', storeTrk:'ขนส่ง/เลขพัสดุ',
+  issueTo:'ผู้รับของหน้างาน', issueDept:'แผนกที่เบิกไปใช้',
+  blame:'ความรับผิดชอบ', blameWho:'ชื่อผู้ทำเสียหาย', blameDept:'แผนกผู้ทำเสียหาย'
+};
+
 function saveClaimField(docNo, field, value, auth){
   var me = requireAny_(auth, ['PRODUCTION','QC','DESIGN','STORE','PURCHASE','APPROVER']);
-  var col = CLAIM_FIELD_COL[field];
-  if (!col) throw new Error('ไม่รู้จักช่อง ' + field);
-
   var d = db_(), r = findClaimRow_(d.claims, norm_(docNo));
   if (r < 0) throw new Error('ไม่พบใบเคลม ' + docNo);
+
+  var col = CLAIM_FIELD_COL[field];
+  if (!col && CLAIM_FIELD_HDR[field]){
+    ensureCols_(d.claims, claimHdr_());
+    col = colOf_(CLAIM_FIELD_HDR[field]);
+  }
+  if (!col || col < 0) throw new Error('ไม่รู้จักช่อง ' + field);
 
   /* v0.5.0 — "ทำงานแทนกันไม่ได้" ตามที่เบียร์สั่ง
      เช็คที่หลังบ้านด้วย ไม่ใช่แค่ทำช่องเป็นสีเทาบนหน้าจอ
@@ -414,6 +426,185 @@ function reportCost(auth){
       status:o['สถานะ'] });
   }
   return { rows:out, grand:money_(grand), canSee:true, who:me.name };
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   รายงานที่เบียร์สั่งไว้ (7 ก.ย. 2569)
+   · 3.5 รวมยอดเรียกเก็บหลายใบ → ออกใบเดียวต่อ Supplier เลขชุด CDN
+   · 3.6 รายงานส่ง HR หักเงินพนักงาน   (สเปคข้อ 3.7)
+   · 3.7 ข้อมูลส่งบัญชี                 (สเปคข้อ 3.8)
+   · 3.8 LOG ประวัติการใช้งาน — แยกจากตัวเอกสาร ลบ LOG แล้วเอกสารไม่หาย
+   ═══════════════════════════════════════════════════════════════ */
+
+/** ยอดเรียกเก็บของใบหนึ่ง — คิดตามกรณีคำตอบ Supplier (บางกรณีไม่คิดค่าของ) */
+function billOfClaim_(d, docNo, head){
+  var R = CLAIM_RESULTS[norm_(head['ผลการเคลม'])] || {};
+  var goods = 0, lab = 0, lrI = d.items.getLastRow();
+  if (lrI > 1){
+    var vi = d.items.getRange(2,1,lrI-1,HDR_ITEM.length).getDisplayValues();
+    for (var i = 0; i < vi.length; i++){
+      if (norm_(vi[i][0]) !== docNo) continue;
+      goods += num_(vi[i][6]) * num_(vi[i][13]);           // จำนวน × ราคาเรียกเก็บ/หน่วย
+    }
+  }
+  var lrL = d.labour.getLastRow(), supLab = {};
+  if (lrL > 1){
+    var vl = d.labour.getRange(2,1,lrL-1,HDR_LAB.length).getDisplayValues();
+    for (var k = 0; k < vl.length; k++){
+      if (norm_(vl[k][0]) !== docNo) continue;
+      lab += num_(vl[k][6]);
+      var sp = norm_(vl[k][5]); if (sp) supLab[sp] = (supLab[sp] || 0) + num_(vl[k][6]);
+    }
+  }
+  var chargeGoods = (R.goods === 'เรียกเก็บ');
+  var total = (chargeGoods ? goods : 0) + (R.labor === 'เรียกเก็บ' ? lab : 0);
+  return { goods:money_(goods), labour:money_(lab), chargeGoods:chargeGoods,
+           total:money_(total), bill:!!R.bill, resultText:R.t || '', supLab:supLab };
+}
+
+/** Supplier หลักของใบ — เอาจากรายการแรกที่ระบุไว้ */
+function mainSupplier_(d, docNo){
+  var lrI = d.items.getLastRow();
+  if (lrI > 1){
+    var vi = d.items.getRange(2,1,lrI-1,HDR_ITEM.length).getDisplayValues();
+    for (var i = 0; i < vi.length; i++){
+      if (norm_(vi[i][0]) === docNo && norm_(vi[i][9])) return norm_(vi[i][9]);
+    }
+  }
+  return '(ยังไม่ระบุ Supplier)';
+}
+
+/** 3.5 · ใบที่ถึงคิวเรียกเก็บเงินแล้ว จัดกลุ่มตาม Supplier */
+function reportBilling(auth){
+  requireAny_(auth, ['APPROVER','PURCHASE']);
+  var d = db_(), lr = d.claims.getLastRow();
+  if (lr < 2) return { groups:[] };
+  ensureCols_(d.claims, claimHdr_());
+  var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
+  var rows = d.claims.getRange(2,1,lr-1,HDR_CLAIM.length).getDisplayValues();
+  var OKST = ['STORE_IN','QC_RECV','STORE_OUT','CLOSE_WAIT','CLOSED'];
+  var g = {}, order = [];
+
+  for (var r = 0; r < rows.length; r++){
+    var o = {};
+    for (var c = 0; c < hdr.length; c++) o[hdr[c]] = norm_(rows[r][c]);
+    var dn = o['เลขที่เอกสาร']; if (!dn) continue;
+    var stage = norm_(d.claims.getRange(r + 2, colOf_('ขั้นตอน')).getDisplayValue()) || 'REQUEST';
+    if (stage === 'CANCELLED') continue;
+    if (OKST.indexOf(stage) < 0) continue;
+    var B = billOfClaim_(d, dn, o);
+    if (!B.bill) continue;                                  // เคสที่ไม่ต้องเรียกเงิน ไม่ต้องขึ้น
+    var sup = mainSupplier_(d, dn);
+    if (!g[sup]){ g[sup] = { supplier:sup, rows:[], sum:0 }; order.push(sup); }
+    g[sup].rows.push({ docNo:dn, date:o['วันที่'], jobNo:o['เลขที่ JOB'], jobName:o['ชื่อลูกค้า'],
+      result:B.resultText, amount:B.total,
+      billNo:norm_(d.claims.getRange(r + 2, colOf_('เลขที่ใบเรียกเก็บรวม')).getDisplayValue()),
+      billDate:norm_(d.claims.getRange(r + 2, colOf_('วันที่ใบเรียกเก็บรวม')).getDisplayValue()) });
+    g[sup].sum = money_(g[sup].sum + B.total);
+  }
+  return { groups: order.map(function(k){ return g[k]; }) };
+}
+
+/** ออกใบเรียกเก็บรวม 1 ใบต่อ Supplier — เลขชุดของตัวเอง CDN (เบียร์เคาะ 7 ก.ย.: "แยกก็ได้")
+ *  ไม่ใช้ DN- เพราะชนกับเลขใบส่งมอบที่ระบบใช้อยู่แล้ว */
+function makeConsolidatedBill(docNos, auth){
+  var me = requireAny_(auth, ['APPROVER','PURCHASE']);
+  if (!docNos || !docNos.length) throw new Error('ยังไม่ได้เลือกใบเคลมที่จะรวม');
+  var d = db_(); ensureCols_(d.claims, claimHdr_());
+
+  var sup = '', total = 0, list = [];
+  for (var i = 0; i < docNos.length; i++){
+    var dn = norm_(docNos[i]);
+    var r = findClaimRow_(d.claims, dn);
+    if (r < 0) throw new Error('ไม่พบใบเคลม ' + dn);
+    if (norm_(d.claims.getRange(r, colOf_('เลขที่ใบเรียกเก็บรวม')).getDisplayValue()))
+      throw new Error(dn + ' ออกใบเรียกเก็บรวมไปแล้ว จะรวมซ้ำไม่ได้');
+    var s2 = mainSupplier_(d, dn);
+    if (!sup) sup = s2;
+    else if (sup !== s2) throw new Error('รวมได้เฉพาะใบของ Supplier เจ้าเดียวกัน — ' + sup + ' กับ ' + s2 + ' คนละเจ้า');
+    var head = claimRowObj_(d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0],
+                            d.claims.getRange(r,1,1,HDR_CLAIM.length).getDisplayValues()[0]);
+    var B = billOfClaim_(d, dn, head);
+    total = money_(total + B.total);
+    list.push({ docNo:dn, jobNo:head['เลขที่ JOB'], date:head['วันที่'], amount:B.total, row:r });
+  }
+
+  var no = nextDocNo_('CDN'), today = nowStamp_().split(' ')[0];
+  for (var k = 0; k < list.length; k++){
+    d.claims.getRange(list[k].row, colOf_('เลขที่ใบเรียกเก็บรวม')).setValue(no);
+    d.claims.getRange(list[k].row, colOf_('วันที่ใบเรียกเก็บรวม')).setValue(today);
+  }
+  log_('makeConsolidatedBill', no, sup + ' · ' + list.length + ' ใบ · ' + total + ' บาท');
+  try { CacheService.getScriptCache().remove('CLAIM_HOME'); } catch(e){}
+  return { ok:true, billNo:no, date:today, supplier:sup, total:money_(total),
+           rows:list.map(function(x){ return { docNo:x.docNo, jobNo:x.jobNo, date:x.date, amount:x.amount }; }),
+           by:me.name };
+}
+
+/** 3.6 · รายงานส่ง HR — เฉพาะใบที่ระบุว่าพนักงานทำเสียหาย */
+function reportHR(auth){
+  requireAny_(auth, ['APPROVER','PURCHASE']);
+  var d = db_(), lr = d.claims.getLastRow();
+  if (lr < 2) return { rows:[] };
+  ensureCols_(d.claims, claimHdr_());
+  var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
+  var rows = d.claims.getRange(2,1,lr-1,HDR_CLAIM.length).getDisplayValues();
+  var out = [];
+  for (var r = 0; r < rows.length; r++){
+    if (norm_(d.claims.getRange(r + 2, colOf_('ความรับผิดชอบ')).getDisplayValue()) !== 'EMP') continue;
+    if (norm_(d.claims.getRange(r + 2, colOf_('ขั้นตอน')).getDisplayValue()) === 'CANCELLED') continue;
+    var o = {};
+    for (var c = 0; c < hdr.length; c++) o[hdr[c]] = norm_(rows[r][c]);
+    var B = billOfClaim_(d, o['เลขที่เอกสาร'], o);
+    out.push({ docNo:o['เลขที่เอกสาร'], date:o['วันที่'], jobNo:o['เลขที่ JOB'], jobName:o['ชื่อลูกค้า'],
+      who:norm_(d.claims.getRange(r + 2, colOf_('ชื่อผู้ทำเสียหาย')).getDisplayValue()),
+      dept:norm_(d.claims.getRange(r + 2, colOf_('แผนกผู้ทำเสียหาย')).getDisplayValue()),
+      damage:B.goods, status:o['สถานะ'] });
+  }
+  return { rows:out };
+}
+
+/** 3.7 · ข้อมูลส่งบัญชี — ใบที่จบขั้นตอนแล้ว บัญชีรับอย่างเดียว ไม่ต้องกดอะไร */
+function reportAccounting(auth){
+  requireAny_(auth, ['APPROVER','PURCHASE']);
+  var d = db_(), lr = d.claims.getLastRow();
+  if (lr < 2) return { rows:[], sum:{ goods:0, labour:0, bill:0 } };
+  ensureCols_(d.claims, claimHdr_());
+  var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
+  var rows = d.claims.getRange(2,1,lr-1,HDR_CLAIM.length).getDisplayValues();
+  var out = [], sg = 0, sl = 0, sb = 0;
+  for (var r = 0; r < rows.length; r++){
+    var stage = norm_(d.claims.getRange(r + 2, colOf_('ขั้นตอน')).getDisplayValue());
+    if (['CLOSE_WAIT','CLOSED'].indexOf(stage) < 0) continue;
+    var o = {};
+    for (var c = 0; c < hdr.length; c++) o[hdr[c]] = norm_(rows[r][c]);
+    var B = billOfClaim_(d, o['เลขที่เอกสาร'], o);
+    sg = money_(sg + num_(B.goods)); sl = money_(sl + num_(B.labour)); sb = money_(sb + num_(B.total));
+    out.push({ docNo:o['เลขที่เอกสาร'], jobNo:o['เลขที่ JOB'], jmc:o['JMC ที่ผูก'],
+      supplier:mainSupplier_(d, o['เลขที่เอกสาร']),
+      goods:B.goods, labour:B.labour, bill:B.total,
+      blame:norm_(d.claims.getRange(r + 2, colOf_('ความรับผิดชอบ')).getDisplayValue()),
+      cdn:norm_(d.claims.getRange(r + 2, colOf_('เลขที่ใบเรียกเก็บรวม')).getDisplayValue()),
+      status:o['สถานะ'] });
+  }
+  return { rows:out, sum:{ goods:sg, labour:sl, bill:sb } };
+}
+
+/** 3.8 · LOG — เก็บคนละแท็บกับตัวเอกสาร ลบ LOG ทิ้ง ใบเคลมยังอยู่ครบ */
+function reportLog(limit, auth){
+  requireAny_(auth, ['APPROVER']);
+  var sh = ensureTab_(ss_(), 'LOG', HDR_LOG);
+  var lr = sh.getLastRow();
+  if (lr < 2) return { rows:[], total:0 };
+  var n = Math.min(num_(limit) || 300, lr - 1);
+  var v = sh.getRange(lr - n + 1, 1, n, HDR_LOG.length).getDisplayValues();
+  var out = [];
+  for (var i = v.length - 1; i >= 0; i--){
+    out.push({ at:norm_(v[i][0]), user:norm_(v[i][1]), act:norm_(v[i][2]),
+               ref:norm_(v[i][3]), detail:norm_(v[i][4]) });
+  }
+  return { rows:out, total:lr - 1 };
 }
 
 /** 3.1 รูปและวิดีโอทั้งระบบ — จัดกลุ่มตามจ๊อบ → เอกสาร */

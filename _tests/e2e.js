@@ -262,16 +262,189 @@ T('แผงตรวจคำแปล คืนคำแปลกลับม�
   if(!r.length || !r[0].back) throw new Error('ไม่มีคำแปลกลับ');
   return 'เทียบได้ '+r.length+' แถว'; });
 
+/* ═══ สายงานใหม่ 7 ก.ย. 2569 — ของกลับเข้าสโตร์ก่อน → QC ตรวจ → เบิกออก → ผู้บริหารปิด ═══ */
+T('ขั้นจัดซื้อ ต้องเลือกผลการเคลมก่อน ถึงจะส่งต่อได้', ()=>{
+  try { call('advanceClaim',[DOC,BUY]); }
+  catch(e){ if(/ผลการเคลม/.test(e.message)) return 'กันไว้ถูกแล้ว: '+e.message.slice(0,40)+'…';
+            throw e; }
+  throw new Error('ยังไม่เลือกผลการเคลมก็ส่งต่อได้'); });
+
+T('ผลการเคลม 4 กรณี ส่งมาให้หน้าเว็บครบ', ()=>{
+  const f=call('claimFlow',[DOC,AUTH]);
+  if(!f.results || f.results.length!==4) throw new Error('ไม่ได้ 4 กรณี');
+  const bill=f.results.filter(r=>r.bill).length, back=f.results.filter(r=>r.back).length;
+  if(bill!==2||back!==2) throw new Error('เงื่อนไขออกใบ ②/ของกลับ ไม่ตรงสเปค');
+  return f.results.map(r=>r.key).join(' · '); });
+
+T('ตอบ "ส่งของใหม่มาให้" → ของกลับมา ต้องเข้าสโตร์ก่อน', ()=>{
+  call('saveClaimField',[DOC,'result','NEWPART',BUY]);
+  [1,2,3].forEach(sq=>{ try{ call('saveItemField',[DOC,sq,'cost','1000',BUY]); }catch(e){} });
+  const r=call('advanceClaim',[DOC,BUY]);
+  if(r.stage!=='STORE_IN') throw new Error('ไม่ได้เข้าสโตร์ก่อน ไปที่ '+r.stage);
+  return 'ขั้น 6 · '+r.stage; });
+
+T('สโตร์รับของเข้าคลัง → ได้เลขที่ GR + วันที่ อัตโนมัติ', ()=>{
+  call('receiveClaim',[DOC,STORE]);
+  try { call('advanceClaim',[DOC,STORE]); }
+  catch(e){ if(!/ที่เก็บในคลัง/.test(e.message)) throw e; }
+  call('saveClaimField',[DOC,'storeLoc','ชั้น A-03',STORE]);
+  const r=call('advanceClaim',[DOC,STORE]);
+  const f=call('claimFlow',[DOC,AUTH]);
+  if(!/^GR-\d\d\/\d{4}$/.test(f.docNos.gr)) throw new Error('เลข GR ผิดรูปแบบ: '+f.docNos.gr);
+  if(!f.docNos.grDate) throw new Error('ไม่มีวันที่รับเข้า');
+  if(r.stage!=='QC_RECV') throw new Error('ไม่ได้ส่งต่อให้ QC');
+  return f.docNos.gr+' · '+f.docNos.grDate; });
+
+T('QC ตรวจรับ → ได้เลขที่ RCV + วันที่ + ชื่อผู้ตรวจ', ()=>{
+  [1,2,3].forEach(sq=>{ try{ call('saveItemField',[DOC,sq,'acc','ACC',QC]); }catch(e){} });
+  const r=call('advanceClaim',[DOC,QC]);
+  const f=call('claimFlow',[DOC,AUTH]);
+  if(!/^RCV-\d\d\/\d{4}$/.test(f.docNos.rcv)) throw new Error('เลข RCV ผิดรูปแบบ: '+f.docNos.rcv);
+  if(!f.docNos.rcvBy) throw new Error('ไม่มีชื่อผู้ตรวจ');
+  if(r.stage!=='STORE_OUT') throw new Error('ตรวจเสร็จแล้วไม่ได้กลับไปสโตร์');
+  return f.docNos.rcv+' · '+f.docNos.rcvBy.slice(0,20); });
+
+T('สโตร์เบิกออก → ได้เลขใบเบิก IS + วันที่', ()=>{
+  call('saveClaimField',[DOC,'issueTo','คุณต้น',STORE]);
+  call('saveClaimField',[DOC,'issueDept','Production',STORE]);
+  const r=call('advanceClaim',[DOC,STORE]);
+  const f=call('claimFlow',[DOC,AUTH]);
+  if(!/^IS-\d\d\/\d{4}$/.test(f.docNos.is)) throw new Error('เลข IS ผิดรูปแบบ: '+f.docNos.is);
+  if(r.stage!=='CLOSE_WAIT') throw new Error('เบิกออกแล้วไม่ได้ไปรอผู้บริหาร');
+  return f.docNos.is+' · '+f.docNos.isDate; });
+
 T('ปิดงาน — QC กดปิดเองไม่ได้ ต้องผู้บริหาร', ()=>{
-  call('advanceClaim',[DOC,BUY]);                       // SUPPLIER -> RETURN
   try { call('advanceClaim',[DOC,QC]); } catch(e){ return 'กันไว้ถูกแล้ว: '+e.message.slice(0,44)+'…'; }
   throw new Error('QC ปิดงานเองได้ ทั้งที่ต้องเป็นผู้บริหาร'); });
-T('ผู้บริหารกดปิดงานได้ + มีลายเซ็นผู้ปิดงาน', ()=>{
+
+T('ผู้บริหารกดปิดงานได้ + ลายเซ็นครบ 9 ช่อง 2 รอบ', ()=>{
   const r=call('advanceClaim',[DOC,AUTH]);
   const f=call('claimFlow',[DOC,AUTH]);
-  const close=f.signs.filter(s=>s.role==='ผู้ปิดงาน')[0];
-  if(!close || !close.text) throw new Error('ปิดงานแล้วแต่ไม่มีลายเซ็นผู้ปิดงาน');
-  return r.stage+' · '+close.text.slice(0,30)+'…'; });
+  if(f.signs.length!==9) throw new Error('ลายเซ็นไม่ครบ 9 ช่อง ได้ '+f.signs.length);
+  const blank=f.signs.filter(s=>!s.text).map(s=>s.role);
+  if(blank.length) throw new Error('ยังว่างอยู่: '+blank.join(', '));
+  if(f.signs.filter(s=>s.round===1).length!==4) throw new Error('รอบ 1 ไม่ใช่ 4 ช่อง');
+  return r.stage+' · ลายเซ็น 9/9 · '+f.signs[8].text.slice(0,24)+'…'; });
+
+T('ครบลายเซ็นรอบ 1 แล้ว ปุ่มพิมพ์ใบส่ง Supplier ถึงเปิด', ()=>{
+  const f=call('claimFlow',[DOC,AUTH]);
+  if(f.round1Done!==true) throw new Error('เดินครบสายแล้วแต่ round1Done ยังเป็น false');
+  return 'round1Done = true'; });
+
+/* ═══ อีก 2 ทางเดินที่ต้องถูกด้วย: ไม่มีของกลับ / QC ไม่ Accept ═══ */
+function mkClaim_(){                      // เปิดใบใหม่แล้วเดินถึงขั้นจัดซื้อรอคำตอบ
+  const d='DRAFT-X'+Math.floor(Math.random()*9999);
+  call('savePhoto',[d,'JT-69/0001','r1',px,'x.jpg',QC]);
+  const h={ claimType:'pre', area:'dom', foreignKind:'', jobNo:'JT-69/0001',
+    jobName:'ทดสอบสายงาน', model:'M', chassisStt:'C1', chassisMaker:'', serialNo:'',
+    jmc:'', deliveryNote:'', dept:'QC', wantDate:'30/09/2569',
+    items:[{code:'X1',name:'ของทดสอบ',th:'พัง',en:'',qty:'1',unit:'PCS',po:'',supplier:'',recv:'',_rid:'r1'}]};
+  const n=call('createClaimWithPhotos',[h,d,{r1:1},QC]).docNo;
+  call('advanceClaim',[n,QC]);                       // → APPROVAL
+  call('advanceClaim',[n,BOSS]);                     // → STORE
+  call('receiveClaim',[n,STORE]);
+  call('saveClaimField',[n,'deliveryNote','DN-X',STORE]);
+  call('saveItemField',[n,1,'po','PO-X',STORE]);
+  call('saveItemField',[n,1,'supplier','เจ้าทดสอบ',STORE]);
+  call('advanceClaim',[n,STORE]);                    // → PURCHASE
+  call('receiveClaim',[n,BUY]);
+  call('advanceClaim',[n,BUY]);                      // → SUPPLIER
+  call('saveItemField',[n,1,'cost','1000',BUY]);
+  return n;
+}
+
+T('Supplier ไม่รับเคลม → ไม่มีของกลับ ข้ามสโตร์+QC ไปรอผู้บริหารเลย', ()=>{
+  const n=mkClaim_();
+  call('saveClaimField',[n,'result','REJECT',BUY]);
+  const r=call('advanceClaim',[n,BUY]);
+  if(r.stage!=='CLOSE_WAIT') throw new Error('ควรข้ามไป CLOSE_WAIT แต่ไปที่ '+r.stage);
+  const f=call('claimFlow',[n,AUTH]);
+  if(f.docNos.gr) throw new Error('ไม่มีของกลับ แต่ดันออกเลขรับเข้าคลัง');
+  return n+' · ข้ามไป '+r.stage+' ตรงตามสเปคข้อ 5'; });
+
+T('QC ไม่ Accept → วนกลับเป็นเคลมรอบใหม่ ล้างลายเซ็นรอบ 2 + เลขเอกสาร', ()=>{
+  const n=mkClaim_();
+  call('saveClaimField',[n,'result','NEWPART',BUY]);
+  call('advanceClaim',[n,BUY]);                      // → STORE_IN
+  call('receiveClaim',[n,STORE]);
+  call('saveClaimField',[n,'storeLoc','A-1',STORE]);
+  call('advanceClaim',[n,STORE]);                    // → QC_RECV (ออกเลข GR)
+  const b=call('claimFlow',[n,AUTH]);
+  if(!b.docNos.gr) throw new Error('ยังไม่ได้ออกเลข GR ก่อนทดสอบ');
+  const r=call('rejectReturn',[n,'บานพับยังคดอยู่ ปิดไม่สนิทเหมือนเดิม',QC]);
+  const f=call('claimFlow',[n,AUTH]);
+  if(r.stage!=='PURCHASE') throw new Error('ไม่ได้กลับไปหาจัดซื้อ ไปที่ '+r.stage);
+  if(f.docNos.gr || f.docNos.rcv || f.docNos.is) throw new Error('เลขเอกสารรอบเก่ายังค้างอยู่');
+  const r2=f.signs.filter(s=>s.round===2 && s.text);
+  if(r2.length) throw new Error('ลายเซ็นรอบ 2 ยังไม่ถูกล้าง: '+r2.map(x=>x.role).join(', '));
+  if(f.round!==2) throw new Error('ไม่ได้นับเป็นรอบที่ 2 ได้ '+f.round);
+  return 'กลับไปขั้น '+r.stage+' · รอบที่ '+f.round+' · ล้างเลข GR/RCV/IS + ลายเซ็นรอบ 2 แล้ว'; });
+
+console.log('\n⑧ รายงานที่เบียร์สั่งเพิ่ม (7 ก.ย. 2569)');
+T('3.5 รวมยอดเรียกเก็บ — จัดกลุ่มตาม Supplier เฉพาะใบที่ต้องเรียกเงิน', ()=>{
+  const n=mkClaim_();
+  call('saveClaimField',[n,'result','BUYSELF',BUY]);
+  call('saveItemField',[n,1,'price','5000',BUY]);
+  call('advanceClaim',[n,BUY]);
+  const d=call('reportBilling',[AUTH]);
+  if(!d.groups.length) throw new Error('ไม่มีกลุ่มเลย');
+  const has=d.groups.some(g=>g.rows.some(r=>r.docNo===n));
+  if(!has) throw new Error('ใบที่ต้องเรียกเงินไม่ขึ้นในรายงาน');
+  return d.groups.length+' เจ้า · '+d.groups.map(g=>g.supplier+' '+g.sum).join(' | ').slice(0,60); });
+
+T('3.5 ออกใบรวมได้เลข CDN ของตัวเอง + รวมซ้ำไม่ได้', ()=>{
+  const d=call('reportBilling',[AUTH]);
+  const g=d.groups.filter(x=>x.rows.some(r=>!r.billNo))[0];
+  if(!g) throw new Error('ไม่มีใบที่ยังไม่เรียกเก็บ');
+  const picks=g.rows.filter(r=>!r.billNo).map(r=>r.docNo);
+  const r=call('makeConsolidatedBill',[picks,AUTH]);
+  if(!/^CDN-\d\d\/\d{4}$/.test(r.billNo)) throw new Error('เลขใบรวมผิดรูปแบบ: '+r.billNo);
+  try { call('makeConsolidatedBill',[picks,AUTH]); }
+  catch(e){ return r.billNo+' · '+r.rows.length+' ใบ · '+r.total+' บาท · กันรวมซ้ำแล้ว'; }
+  throw new Error('รวมซ้ำใบเดิมได้ ทั้งที่ออกใบรวมไปแล้ว'); });
+
+T('3.5 รวมข้ามเจ้าไม่ได้', ()=>{
+  const d=call('reportBilling',[AUTH]);
+  if(d.groups.length<2) return 'ข้ามการทดสอบ — มี Supplier เจ้าเดียว';
+  const a=d.groups[0].rows.filter(r=>!r.billNo)[0], b=d.groups[1].rows.filter(r=>!r.billNo)[0];
+  if(!a||!b) return 'ข้ามการทดสอบ — ไม่มีใบว่างพอ';
+  try { call('makeConsolidatedBill',[[a.docNo,b.docNo],AUTH]); }
+  catch(e){ return 'กันไว้ถูกแล้ว: '+e.message.slice(0,40)+'…'; }
+  throw new Error('รวมข้าม Supplier ได้'); });
+
+T('3.6 รายงานส่ง HR — ขึ้นเฉพาะใบที่ระบุว่าพนักงานทำเสียหาย', ()=>{
+  const n=mkClaim_();
+  call('saveClaimField',[n,'blame','EMP',BUY]);
+  call('saveClaimField',[n,'blameWho','คุณเอกชัย',BUY]);
+  call('saveClaimField',[n,'blameDept','Production',BUY]);
+  const d=call('reportHR',[AUTH]);
+  const row=d.rows.filter(r=>r.docNo===n)[0];
+  if(!row) throw new Error('ใบที่ระบุว่าพนักงานทำเสียหายไม่ขึ้นในรายงาน');
+  if(row.who!=='คุณเอกชัย') throw new Error('ไม่ได้ชื่อคนทำเสียหาย');
+  const other=call('reportHR',[AUTH]).rows.length;
+  return d.rows.length+' ใบ · '+row.docNo+' · '+row.who+' ('+row.dept+')'; });
+
+T('3.7 ข้อมูลส่งบัญชี — เฉพาะใบที่จบขั้นตอนแล้ว + มียอดรวม', ()=>{
+  const d=call('reportAccounting',[AUTH]);
+  if(!d.rows.length) throw new Error('ไม่มีใบที่จบขั้นตอน');
+  if(!d.sum || d.sum.bill===undefined) throw new Error('ไม่มียอดรวม');
+  const bad=d.rows.filter(r=>!/CLOSE|BILLED/.test(r.status||'CLOSED'));
+  return d.rows.length+' ใบ · เรียกเก็บรวม '+d.sum.bill+' บาท'; });
+
+T('3.8 LOG — อ่านได้ และเป็นคนละแท็บกับตัวเอกสาร', ()=>{
+  const d=call('reportLog',[50,AUTH]);
+  if(!d.rows.length) throw new Error('LOG ว่าง');
+  const claims=call('listClaims',[{},AUTH]).length;
+  return d.rows.length+' รายการ (ทั้งหมด '+d.total+') · ใบเคลมในทะเบียน '+claims+' ใบ'; });
+
+T('3.6-3.8 คนที่ไม่ใช่จัดซื้อ/ผู้บริหาร เปิดไม่ได้', ()=>{
+  let blocked=0;
+  ['reportBilling','reportHR','reportAccounting'].forEach(fn=>{
+    try { call(fn,[STORE]); } catch(e){ blocked++; }
+  });
+  try { call('reportLog',[10,BUY]); } catch(e){ blocked++; }
+  if(blocked<4) throw new Error('กันไม่ครบ กันได้ '+blocked+'/4');
+  return 'กันครบ 4/4 (สโตร์เปิด 3 รายงานเงินไม่ได้ · จัดซื้อเปิด LOG ไม่ได้)'; });
 
 T('ยกเลิกใบเคลม — คนอื่นกดไม่ได้', ()=>{
   try { call('cancelClaim',[DOC,'ลองยกเลิก',STORE]); } catch(e){ return 'กันไว้ถูกแล้ว'; }

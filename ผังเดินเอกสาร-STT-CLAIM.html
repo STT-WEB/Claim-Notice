@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ผังเดินเอกสาร STT CLAIM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+:root{
+  --paper:#FAF8F5; --card:#FFFFFF; --ink:#181A1C; --dim:#6E6862; --faint:#9A938B;
+  --rule:#E4DFD8; --rule2:#EFEBE5;
+  --stt:#C41F17; --stt-bg:#FDF2F1;
+  --b1:#C41F17; --b1bg:#FDF2F1;
+  --b2:#1B5FA8; --b2bg:#EFF5FC;
+  --b3:#A56A05; --b3bg:#FBF4E7;
+  --b4:#3D4650; --b4bg:#F1F3F5;
+  --ok:#1F7A3D; --okbg:#F1FAF4;
+  --warn:#A56A05;
+}
+:root:not([data-theme="light"]){}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#131417; --card:#1B1D21; --ink:#EAE7E2; --dim:#A29B93; --faint:#7C766F;
+    --rule:#2C2F35; --rule2:#24272C;
+    --stt:#F2695F; --stt-bg:#2A1B1A;
+    --b1:#F2695F; --b1bg:#2A1B1A;
+    --b2:#71AEEC; --b2bg:#17222E;
+    --b3:#E0A73E; --b3bg:#28210F;
+    --b4:#A9B4BF; --b4bg:#22262B;
+    --ok:#63C48A; --okbg:#152318;
+    --warn:#E0A73E;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#131417; --card:#1B1D21; --ink:#EAE7E2; --dim:#A29B93; --faint:#7C766F;
+  --rule:#2C2F35; --rule2:#24272C;
+  --stt:#F2695F; --stt-bg:#2A1B1A;
+  --b1:#F2695F; --b1bg:#2A1B1A;
+  --b2:#71AEEC; --b2bg:#17222E;
+  --b3:#E0A73E; --b3bg:#28210F;
+  --b4:#A9B4BF; --b4bg:#22262B;
+  --ok:#63C48A; --okbg:#152318;
+  --warn:#E0A73E;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"IBM Plex Sans Thai","Noto Sans Thai",system-ui,sans-serif;
+  font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:44px 22px 90px}
+
+/* ── หัวเรื่อง ── */
+.mast{border-bottom:3px solid var(--stt);padding-bottom:20px;margin-bottom:34px}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--stt);font-weight:600}
+h1{font-family:"Chakra Petch",system-ui,sans-serif;font-weight:700;font-size:clamp(30px,5vw,44px);
+  line-height:1.15;margin:8px 0 6px;text-wrap:balance;letter-spacing:.01em}
+.lede{color:var(--dim);font-size:15.5px;max-width:62ch;margin:0}
+.mastmeta{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--faint)}
+.mastmeta span{border:1px solid var(--rule);border-radius:20px;padding:3px 11px}
+
+/* ── หัวข้อระบบ ── */
+.sys{margin-top:52px}
+.syshd{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  border-bottom:1px solid var(--rule);padding-bottom:12px;margin-bottom:6px}
+.sysno{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;
+  color:var(--paper);background:var(--ink);border-radius:4px;padding:3px 9px;letter-spacing:.06em}
+h2{font-family:"Chakra Petch",system-ui,sans-serif;font-weight:700;font-size:26px;margin:0;
+  letter-spacing:.01em}
+.syssub{color:var(--dim);font-size:14px;margin:0 0 26px}
+
+/* ── บันไดขั้นตอน ── */
+.ladder{position:relative;padding-left:0}
+.step{display:grid;grid-template-columns:58px 1fr;gap:0 20px;position:relative}
+.spine{position:relative;display:flex;flex-direction:column;align-items:center}
+.spine::before{content:"";position:absolute;top:0;bottom:0;width:2px;background:var(--rule);}
+.step:first-child .spine::before{top:20px}
+.step:last-child .spine::before{bottom:calc(100% - 20px)}
+.node{position:relative;z-index:1;width:40px;height:40px;border-radius:50%;flex:none;
+  display:flex;align-items:center;justify-content:center;margin-top:2px;
+  font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:15px;
+  border:2px solid var(--n);background:var(--nbg);color:var(--n)}
+.node.done{background:var(--n);color:var(--card)}
+.body{padding:0 0 30px}
+.step:last-child .body{padding-bottom:6px}
+.sttl{font-family:"Chakra Petch",system-ui,sans-serif;font-weight:600;font-size:19px;
+  margin:6px 0 8px;line-height:1.3;text-wrap:balance}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.chip{font-size:11.5px;font-weight:600;border-radius:5px;padding:3px 9px;
+  border:1px solid var(--n);color:var(--n);background:var(--nbg)}
+.chip.plain{border-color:var(--rule);color:var(--dim);background:transparent;font-weight:400}
+.rows{border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:var(--card)}
+.row{display:grid;grid-template-columns:118px 1fr;gap:0;border-top:1px solid var(--rule2)}
+.row:first-child{border-top:0}
+.row dt{padding:9px 13px;font-size:12.5px;font-weight:600;color:var(--dim);
+  background:var(--rule2);display:flex;align-items:flex-start}
+.row dd{margin:0;padding:9px 14px;font-size:14px}
+.row dd b{font-weight:600}
+code{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:600;
+  background:var(--b4bg);border:1px solid var(--rule);border-radius:4px;padding:1px 6px;
+  white-space:nowrap}
+.btn-say{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13.5px;
+  border:1.5px solid var(--n);color:var(--n);background:var(--nbg);border-radius:7px;padding:4px 11px}
+.emit{color:var(--ok);font-weight:600}
+
+/* ── กล่องแทรก ── */
+.note{border-left:3px solid var(--n);background:var(--nbg);border-radius:0 8px 8px 0;
+  padding:11px 15px;margin-top:12px;font-size:13.5px;line-height:1.6}
+.note b{font-weight:600}
+.junction{border:2px dashed var(--stt);border-radius:12px;background:var(--stt-bg);
+  padding:20px 22px;margin:34px 0 0}
+.junction h3{font-family:"Chakra Petch",system-ui,sans-serif;font-size:19px;margin:0 0 8px;color:var(--stt)}
+.junction p{margin:0 0 10px;font-size:14.5px}
+.junction p:last-child{margin-bottom:0}
+
+/* ── ตารางอ้างอิง ── */
+.ref{margin-top:52px}
+h3.refh{font-family:"Chakra Petch",system-ui,sans-serif;font-weight:600;font-size:20px;
+  margin:0 0 4px}
+.refsub{color:var(--dim);font-size:13.5px;margin:0 0 14px}
+.tw{overflow-x:auto;border:1px solid var(--rule);border-radius:10px;background:var(--card)}
+table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:600px}
+th,td{padding:9px 13px;text-align:left;border-bottom:1px solid var(--rule2);vertical-align:top}
+thead th{background:var(--rule2);font-weight:600;font-size:12.5px;color:var(--dim);
+  letter-spacing:.02em;white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+td.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+.yes{color:var(--ok);font-weight:600}
+.no{color:var(--stt);font-weight:600}
+.dash{color:var(--faint)}
+
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px;margin-top:14px}
+.rule-c{border:1px solid var(--rule);border-left:3px solid var(--stt);border-radius:0 10px 10px 0;
+  background:var(--card);padding:14px 16px}
+.rule-c h4{font-family:"Chakra Petch",system-ui,sans-serif;font-size:15px;margin:0 0 5px;font-weight:600}
+.rule-c p{margin:0;font-size:13.5px;color:var(--dim);line-height:1.6}
+
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--rule);
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--faint);
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+
+@media(max-width:620px){
+  .step{grid-template-columns:44px 1fr;gap:0 14px}
+  .node{width:34px;height:34px;font-size:13px}
+  .row{grid-template-columns:1fr}
+  .row dt{background:transparent;padding-bottom:0;font-size:11.5px}
+  .row dd{padding-top:2px}
+}
+@media print{
+  body{background:#fff}
+  .wrap{max-width:none;padding:0}
+  .sys,.ref{break-inside:avoid}
+  .step{break-inside:avoid}
+}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <div class="eyebrow">Sutee Tankers &amp; Special Truck · STT CLAIM</div>
+  <h1>ผังเดินเอกสาร งานเคลม และ งานตรวจรับสินค้า</h1>
+  <p class="lede">ใครทำอะไร ตอนไหน กดปุ่มอะไร แล้วเอกสารวิ่งไปไหนต่อ —
+     ไล่ทีละขั้นตามที่ระบบบังคับจริง ข้ามขั้นไม่ได้</p>
+  <div class="mastmeta">
+    <span>อ้างอิง Mockup v9</span>
+    <span>ปรับปรุง 07/09/2569</span>
+    <span>FM-WH-03 · Rev.00</span>
+  </div>
+</header>
+
+<!-- ══════════ ระบบที่ 1 ══════════ -->
+<section class="sys">
+  <div class="syshd">
+    <span class="sysno">ระบบที่ 1</span>
+    <h2>ใบ Inspection — ตรวจรับสินค้า</h2>
+  </div>
+  <p class="syssub">ใช้ตอนของมาถึง · มี 2 ชนิด — <b>Tankers</b> (มีรูป STD ประจำรุ่นให้เทียบ) และ
+     <b>สินค้า</b> (ไม่มี STD ถ่ายรูปของที่ได้มา) · เปิดได้ทั้งงานในประเทศและต่างประเทศ</p>
+
+  <div class="ladder">
+
+    <div class="step" style="--n:var(--b1);--nbg:var(--b1bg)">
+      <div class="spine"><div class="node">1</div></div>
+      <div class="body">
+        <div class="sttl">ผู้ตรวจเปิดใบ Inspection แล้วลงผลตรวจ</div>
+        <div class="chips">
+          <span class="chip">กล่องงานที่ 1</span>
+          <span class="chip plain">Production · QC · Design</span>
+          <span class="chip plain">สถานะ: ร่าง</span>
+        </div>
+        <dl class="rows">
+          <div class="row"><dt>กรอกหัวเอกสาร</dt><dd>ชนิด Inspection · ประเภทงาน · เลขที่ JOB
+            (ใส่แล้วชื่อลูกค้า + MODEL ขึ้นเอง) · สถานที่ผลิต · CHASSIS STT · CHASSIS ผู้ผลิต ·
+            SERIAL NO. · แม่แบบเช็คลิสต์ · PO · Supplier · วันรับสินค้า · หมายเหตุ</dd></div>
+          <div class="row"><dt>กรอกในตาราง</dt><dd>หมวด · หัวข้อตรวจ · หัวข้อ (EN) ·
+            <b>ผลตรวจ Acc / Un-Acc</b> · สิ่งที่พบ (ไทย/EN) · จำนวน · หน่วย ·
+            <b>รูปของจริง 1–5 รูป</b></dd></div>
+          <div class="row"><dt>ข้อที่ไม่ผ่าน</dt><dd><b>ติ๊กช่อง "ส่งไปสร้างใบเคลม"</b>
+            เฉพาะข้อที่อยากเคลมกับ Supplier</dd></div>
+          <div class="row"><dt>กดปุ่ม</dt><dd><span class="btn-say">📤 ส่งขออนุมัติผลตรวจ</span></dd></div>
+          <div class="row"><dt>ระบบทำต่อ</dt><dd>ประทับ<b>ลายเซ็นผู้ตรวจ</b> (ชื่อ + แผนก + วันเวลา) แล้วส่งไปหาผู้บังคับบัญชา</dd></div>
+        </dl>
+        <div class="note"><b>ถ่ายรูปหน้างานก่อนได้เลย</b> แล้วค่อยกลับมากรอกข้อมูลทีหลัง —
+          กด "บันทึกร่าง" เก็บไว้ก่อน · ใบร่างคนอื่นยังไม่เห็น</div>
+      </div>
+    </div>
+
+    <div class="step" style="--n:var(--b1);--nbg:var(--b1bg)">
+      <div class="spine"><div class="node">2</div></div>
+      <div class="body">
+        <div class="sttl">ผู้บังคับบัญชาอนุมัติผลตรวจ</div>
+        <div class="chips">
+          <span class="chip">กล่องงานที่ 1</span>
+          <span class="chip plain">ผจก.แผนกขึ้นไป</span>
+          <span class="chip plain">สถานะ: ส่งแล้ว</span>
+        </div>
+        <dl class="rows">
+          <div class="row"><dt>กดปุ่ม</dt><dd><span class="btn-say">✅ อนุมัติผลตรวจ + สร้างใบเคลมจากข้อที่ติ๊ก</span></dd></div>
+          <div class="row"><dt>ไม่โอเค</dt><dd>กด <b>↩ ตีกลับให้แก้</b> ต้องพิมพ์เหตุผล — ใบวิ่งกลับไปหาผู้ตรวจ พร้อมเด้ง LINE</dd></div>
+          <div class="row"><dt>ระบบทำต่อ</dt><dd>ประทับ<b>ลายเซ็นผู้อนุมัติ</b> แล้ว
+            <span class="emit">สร้างใบเคลมจากข้อที่ติ๊กไว้ให้อัตโนมัติ</span> —
+            รายละเอียดและรูปตามไปด้วย ไม่ต้องพิมพ์ใหม่</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="step" style="--n:var(--b4);--nbg:var(--b4bg)">
+      <div class="spine"><div class="node done">3</div></div>
+      <div class="body">
+        <div class="sttl">ใบ Inspection ปิด</div>
+        <div class="chips"><span class="chip plain">สถานะ: ปิด</span></div>
+        <dl class="rows">
+          <div class="row"><dt>เอกสารที่ได้</dt><dd><code>INS-YY/NNNN</code>
+            ④ ใบตรวจรับแท็งค์ · INSPECTION REPORT — ไม่มีเงิน พิมพ์ส่ง Supplier ได้</dd></div>
+          <div class="row"><dt>ผ่านหมด</dt><dd>จบตรงนี้ ไม่ต้องเคลม</dd></div>
+          <div class="row"><dt>มีข้อ Un-Acc ที่ติ๊กไว้</dt><dd>ไหลต่อเป็นระบบที่ 2 ทันที ↓</dd></div>
+        </dl>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="junction">
+    <h3>จุดเชื่อม 2 ระบบ</h3>
+    <p>ข้อที่ <b>Un-Acc</b> และถูกติ๊กว่า "ส่งไปสร้างใบเคลม" จะกลายเป็น
+       <b>ใบเคลมใบใหม่</b> โดยอัตโนมัติเมื่อผู้บังคับบัญชาอนุมัติผลตรวจ —
+       ยกรายละเอียดและรูปไปให้ครบ แล้วเข้าระบบที่ 2 ตั้งแต่ขั้นที่ 1</p>
+    <p>ใบเคลมนั้นจะมีคอลัมน์ <b>"มาจาก"</b> บอกว่าแตกมาจากใบตรวจใบไหน ตรวจย้อนได้เสมอ</p>
+    <p><b>เคลมหลังส่งมอบ (After-Sales) ไม่ต้องผ่านใบตรวจ</b> — เปิดใบเคลมตรงได้เลย เริ่มที่ระบบที่ 2 ขั้นที่ 1</p>
+  </div>
+</section>
+
+<!-- ══════════ ระบบที่ 2 ══════════ -->
+<section class="sys">
+  <div class="syshd">
+    <span class="sysno">ระบบที่ 2</span>
+    <h2>ใบเคลมสินค้า</h2>
+  </div>
+  <p class="syssub">9 ขั้นทำงาน + ปิดจบ · เดินผ่าน 3 กล่องงาน —
+     <b style="color:var(--b1)">กล่อง 1 เปิด/อนุมัติ/ตรวจรับ</b> ·
+     <b style="color:var(--b2)">กล่อง 2 สโตร์</b> ·
+     <b style="color:var(--b3)">กล่อง 3 จัดซื้อ</b> · ข้ามขั้นไม่ได้ แม้เป็น ADMIN</p>
+
+  <div class="ladder">
+
+    <div class="step" style="--n:var(--b1);--nbg:var(--b1bg)">
+      <div class="spine"><div class="node">1</div></div>
+      <div class="body">
+        <div class="sttl">ผู้เปิดใบกรอกใบเคลม</div>
+        <div class="chips">
+          <span class="chip">กล่องงานที่ 1</span>
+          <span class="chip plain">Production · QC · Design · Sales</span>
+          <span class="chip plain">สถานะ: ร่าง</span>
+        </div>
+        <dl class="rows">
+          <div class="row"><dt>กรอกหัวเอกสาร</dt><dd>ประเภทการเคลม (Pre-Delivery / After-Sales) ·
+            ประเภทงาน · เลขที่ JOB · สถานที่ผลิต · ชนิดงานต่างประเทศ ·
+            CHASSIS STT · CHASSIS ผู้ผลิต · SERIAL NO. · JMC ที่ผูก · วันที่ต้องการของ</dd></div>
+          <div class="row"><dt>กรอกในตาราง</dt><dd>รหัสสินค้า · ชื่อสินค้า · รายละเอียดการเคลม (ไทย/EN) ·
+            จำนวน · หน่วย · วันรับสินค้า · <b>รูป 1–5 รูป</b>
+            <br><span style="color:var(--dim);font-size:13px">ต้องมีรหัสสินค้าหรือชื่อสินค้าอย่างน้อยอย่างใดอย่างหนึ่ง</span></dd></div>
+          <div class="row"><dt>งานต่างประเทศ</dt><dd>คอลัมน์ EN โผล่คู่ช่องไทยทุกแถว · <b>CHASSIS บังคับทั้ง 2 ช่อง</b></dd></div>
+          <div class="row"><dt>กดปุ่ม</dt><dd><span class="btn-say">📤 ส่งขออนุมัติ</span></dd></div>
+          <div class="row"><dt>ระบบทำต่อ</dt><dd>ประทับ<b>ลายเซ็นผู้เปิดใบ</b> · สโตร์กับจัดซื้อยังไม่เห็นใบนี้จนกว่าจะได้รับอนุมัติ</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="step" style="--n:var(--b1);--nbg:var(--b1bg)">
+      <div class="spine"><div class="node">2</div></div>
+      <div class="body">
+        <div class="sttl">ผู้บังคับบัญชาอนุมัติ</div>
+        <div class="chips">
+          <span class="chip">กล่องงานที่ 1</span>
+          <span class="chip plain">ผจก.แผนกขึ้นไป</span>
+        </div>
+        <dl class="rows">
+          <div class="row"><dt>กดปุ่ม</dt><dd><span class="btn-say">✅ อนุมัติ + ส่งให้สโตร์</span></dd></div>
+          <div class="row"><dt>ไม่โอเค</dt><dd>ตีกลับพร้อมเหตุผล → กลับไปขั้นที่ 1</dd></div>
+          <div class="row"><dt>ระบบทำต่อ</dt><dd>ประทับ<b>ลายเซ็นผู้อนุมัติ</b> ·
+            <b>ตั้งแต่นาทีนี้แก้ข้อมูลใบเคลมไม่ได้อีก</b> ผิดต้องเปิดใบใหม่ หรือให้ตีกลับก่อน</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="step" style="--n:var(--b2);--nbg:var(--b2bg)">
+      <div class="spine"><div class="node">3</div></div>
+      <div class="body">
+        <div class="sttl">สโตร์ใส่ข้อมูล แล้วส่งต่อจัดซื้อ</div>
+        <div class="chips">
+          <span class="chip">กล่องงานที่ 2</span>
+          <span class="chip plain">สโตร์</span>
+        </div>
+        <dl class="rows">
+          <div class="row"><dt>กรอก</dt><dd><b>เลขใบส่งมอบ</b> · <b>PO</b> · <b>Supplier</b> ของแต่ละรายการ
+            <br><span style="color:var(--dim);font-size:13px">สโตร์กรอกแค่ 3 ช่องนี้เท่านั้น ที่เหลือเป็นของด่านแรก</span></dd></div>
+          <div class="row"><dt>กดปุ่ม</dt><dd><span class="btn-say">📦 บันทึก + ส่งต่อจัดซื้อ</span></dd></div>
+          <div class="row"><dt>ระบบทำต่อ</dt><dd>ประทับ<b>ลายเซ็นสโตร์</b> · ใส่ PO แล้ววันรับสินค้าเด้งขึ้นเอง</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="step" style="--n:var(--b3);--nbg:var(--b3bg)">
+      <div class="spine"><div class="node">4</div></div>
+      <div class="body">
+        <div class="sttl">จัดซื้อรับเรื่อง แล้วส่งใบแจ้งเคลมให้ Supplier</div>
+        <div class="chips">
+          <span class="chip">กล่องงานที่ 3</span>
+          <span class="chip plain">จัดซื้อ</span>
+        </div>
+        <dl class="rows">
+          <div class="row"><dt>เงื่อนไข</dt><dd><b>ครบลายเซ็นรอบที่ 1 ทั้ง 4 ช่อง</b>
+            (ผู้เปิดใบ · ผู้อนุมัติ · สโตร์ · จัดซื้อ) ปุ่มพิมพ์ถึงจะเปิด</dd></div>
+          <div class="row"><dt>พิมพ์</dt><dd><code>①</code> <b>ใบแจ้งเคลมสินค้า · CLAIM NOTICE</b> —
+            <span class="no">ไม่มีราคาใด ๆ ทั้งสิ้น</span> แต่<b>มีรูป</b> (2 หน้า: หน้ารายการ + แผ่นรูป)
+            <br>ระบบ<b>แยกใบตาม Supplier ให้เอง</b> — แต่ละเจ้าเห็นเฉพาะรายการของตัวเอง</dd></div>
+          <div class="row"><dt>ส่งรูป</dt><dd>ปุ่ม <b>คัดลอกรูปส่ง Supplier</b> — ได้ลิงก์ Drive หรือไฟล์ ZIP</dd></div>
+          <div class="row"><dt>กดปุ่ม</dt><dd><span class="btn-say">📨 ส่งใบแจ้งเคลมให้ Supplier แล้ว</span></dd></div>
+          <div class="row"><dt>ระบบทำต่อ</dt><dd>ประทับ<b>ลายเซ็นจัดซื้อ</b> · บันทึกลงทะเบียนเอกสารที่ส่ง Supplier</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="step" style="--n:var(--b3);--nbg:var(--b3bg)">
+      <div class="spine"><div class="node">5</div></div>
+      <div class="body">
+        <div class="sttl">Supplier ตอบ · จัดซื้อบันทึกผล + คิดต้นทุน</div>
+        <div class="chips">
+          <span class="chip">กล่องงานที่ 3</span>
+          <span class="chip plain">จัดซื้อ</span>
+          <span class="chip plain">🔒 ตัวเงินเห็นเฉพาะจัดซื้อ</span>
+        </div>
+        <dl class="rows">
+          <div class="row"><dt>บันทึกคำตอบ</dt><dd>เลือก <b>1 ใน 4 กรณี</b> (ดูตารางด้านล่าง) ·
+            รายละเอียดผลการเคลม · หมายเหตุ / ข้อความจาก Supplier · แนบรูปแชท-อีเมลได้ทั้ง 2 ช่อง</dd></div>
+          <div class="row"><dt>คิดเงิน</dt><dd>สกุลเงิน (1 ใบ = 1 สกุล 1 เรท) · เรทกรอกมือ <b>ล็อกติดใบถาวร</b> ·
+            ต้นทุน/หน่วย · กำไร (% หรือใส่ราคาตรง) · <b>ค่าแรง</b> ระบุว่าครอบข้อไหน และเรียกเก็บกับเจ้าไหน · ไม่มี VAT</dd></div>
+          <div class="row"><dt>ออกเอกสาร</dt><dd><code>②</code> ใบเรียกเก็บค่าเคลม — เฉพาะกรณีที่ต้องเรียกเงิน ·
+            <code>③</code> ใบสรุปภายใน <span class="no">ห้ามออกนอกบริษัท</span></dd></div>
+          <div class="row"><dt>กดปุ่ม</dt><dd><span class="btn-say">📝 บันทึกผลการเคลม</span></dd></div>
+          <div class="row"><dt>ระบบทำต่อ</dt><dd>ประทับ<b>ลายเซ็นจัดซื้อ (ผลเคลม)</b> แล้ว
+            <b>แยกทางตามคำตอบ</b> — มีของกลับไปขั้น 6 · ไม่มีของกลับข้ามไปขั้น 9</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="step" style="--n:var(--b2);--nbg:var(--b2bg)">
+      <div class="spine"><div class="node">6</div></div>
+      <div class="body">
+        <div class="sttl">ของกลับมาถึง — เข้าสโตร์ก่อนเสมอ</div>
+        <div class="chips">
+          <span class="chip">กล่องงานที่ 2</span>
+          <span class="chip plain">สโตร์</span>
+          <span class="chip plain">สถานะ: ตอบแล้ว</span>
+        </div>
+        <dl class="rows">
+          <div class="row"><dt>กรอก</dt><dd>ที่เก็บในคลัง (Location) · ขนส่ง / เลขพัสดุ ·
+            <b>จำนวนที่มาถึง</b> เทียบกับที่สั่งเคลม (ระบบขึ้นให้ว่าครบ / ไม่ครบ) ·
+            <b>รูปตอนแกะกล่อง</b> · หมายเหตุ</dd></div>
+          <div class="row"><dt>กดปุ่ม</dt><dd><span class="btn-say">📥 รับของเข้าคลัง + แจ้ง QC มาตรวจ</span></dd></div>
+          <div class="row"><dt>ระบบทำต่อ</dt><dd>ออก <span class="emit">เลขที่รับของเข้าคลัง <code>GR-YY/NNNN</code> + วันที่</span> ·
+            ประทับ<b>ลายเซ็นสโตร์รับของเข้า</b> · <b>เด้ง LINE เรียก QC มาตรวจที่คลัง</b></dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="step" style="--n:var(--b1);--nbg:var(--b1bg)">
+      <div class="spine"><div class="node">7</div></div>
+      <div class="body">
+        <div class="sttl">QC มาตรวจรับที่คลัง — ทำเหมือนตรวจ Inspection สินค้า</div>
+        <div class="chips">
+          <span class="chip">กล่องงานที่ 1</span>
+          <span class="chip plain">Production / QC</span>
+        </div>
+        <dl class="rows">
+          <div class="row"><dt>กรอกทีละข้อ</dt><dd>วันที่รับกลับ · จำนวนที่รับ ·
+            <b>รูปของที่ได้กลับมา</b> · <b>ผลตรวจ Accept / ไม่ Accept</b> ·
+            หมายเหตุสภาพของ · ผู้ตรวจ (ระบบใส่ชื่อคนล็อกอินให้)</dd></div>
+          <div class="row"><dt>กดปุ่ม</dt><dd><span class="btn-say">✅ ตรวจเสร็จ + ออกใบตรวจรับของกลับ</span></dd></div>
+          <div class="row"><dt>ระบบทำต่อ</dt><dd>ออก <span class="emit">ใบตรวจรับของกลับ <code>RCV-YY/NNNN</code> + วันที่ + ชื่อผู้ตรวจ</span>
+            (<code>⑤</code> พิมพ์เป็นกระดาษได้ 2 หน้า อ้างอิงเลข GR) · ประทับ<b>ลายเซ็น QC ตรวจรับ</b></dd></div>
+        </dl>
+        <div class="note" style="--n:var(--stt);--nbg:var(--stt-bg)">
+          <b>ถ้าไม่ Accept</b> → กด "วนกลับเป็นเคลมรอบใหม่" ต้องบอกเหตุผล ·
+          ใบเดิม เลขเดิม แต่ขึ้นเป็นรอบใหม่ · <b>ล้างลายเซ็นรอบ 2 และเลขเอกสาร GR / RCV / IS ทั้งหมด</b>
+          แล้วกลับไปหาจัดซื้อที่ขั้นที่ 4 ให้คุยกับ Supplier ใหม่
+        </div>
+      </div>
+    </div>
+
+    <div class="step" style="--n:var(--b2);--nbg:var(--b2bg)">
+      <div class="spine"><div class="node">8</div></div>
+      <div class="body">
+        <div class="sttl">สโตร์เบิกของออกให้หน้างาน</div>
+        <div class="chips">
+          <span class="chip">กล่องงานที่ 2</span>
+          <span class="chip plain">สโตร์</span>
+        </div>
+        <dl class="rows">
+          <div class="row"><dt>เงื่อนไข</dt><dd><b>QC ต้องตรวจผ่านก่อน</b> ถึงจะเบิกออกได้ — ระบบล็อกไว้</dd></div>
+          <div class="row"><dt>กรอก</dt><dd>ผู้รับของหน้างาน · แผนกที่เบิกไปใช้ ·
+            จำนวนที่จ่ายออก (ระบบคิดคงเหลือในคลังให้) · หมายเหตุ</dd></div>
+          <div class="row"><dt>กดปุ่ม</dt><dd><span class="btn-say">📤 เบิกออกให้หน้างาน</span></dd></div>
+          <div class="row"><dt>ระบบทำต่อ</dt><dd>ออก <span class="emit">เลขใบเบิก <code>IS-YY/NNNN</code> + วันที่</span>
+            อ้างอิงใบตรวจรับ · ประทับ<b>ลายเซ็นสโตร์เบิกออก</b></dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="step" style="--n:var(--b3);--nbg:var(--b3bg)">
+      <div class="spine"><div class="node">9</div></div>
+      <div class="body">
+        <div class="sttl">ผู้บริหารอนุมัติปิดใบเคลม</div>
+        <div class="chips">
+          <span class="chip">กล่องงานที่ 3</span>
+          <span class="chip plain">เบียร์ · คุณแบล็ค · คุณประดิษฐ์</span>
+        </div>
+        <dl class="rows">
+          <div class="row"><dt>ก่อนปิด</dt><dd>จัดซื้อระบุว่าต้นทุนไปทางไหน —
+            <b>พนักงานทำเสียหาย</b> (ไประบบรายงานส่ง HR) หรือ
+            <b>ไม่ใช่ความผิดพนักงาน</b> (ลงเป็นต้นทุนของแท็งค์ ผูกกับ JMC)</dd></div>
+          <div class="row"><dt>กดปุ่ม</dt><dd><span class="btn-say">🏁 อนุมัติปิดใบเคลม</span></dd></div>
+          <div class="row"><dt>ระบบทำต่อ</dt><dd>ประทับ<b>ลายเซ็นผู้บริหาร</b> (ครบ 9 ช่อง) ·
+            ส่งข้อมูลให้<b>บัญชี</b>อัตโนมัติ · ขึ้นในรายงาน HR ถ้าระบุว่าพนักงานทำเสียหาย</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="step" style="--n:var(--b4);--nbg:var(--b4bg)">
+      <div class="spine"><div class="node done">10</div></div>
+      <div class="body">
+        <div class="sttl">ปิดจบ</div>
+        <div class="chips"><span class="chip plain">สถานะ: ปิด</span></div>
+        <dl class="rows">
+          <div class="row"><dt>ตอนเก็บเงิน</dt><dd>ไปที่เมนู <b>รวมยอดเรียกเก็บ</b> —
+            รวมหลายใบเคลมของ Supplier เจ้าเดียวกันเป็นใบเดียว ได้เลข
+            <span class="emit"><code>CDN-YY/NNNN</code></span> ของตัวเอง</dd></div>
+        </dl>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ══════════ ตารางอ้างอิง ══════════ -->
+<section class="ref">
+  <h3 class="refh">จุดแยกทาง — คำตอบ Supplier 4 กรณี</h3>
+  <p class="refsub">คำตอบที่จัดซื้อบันทึกในขั้นที่ 5 เป็นตัวตัดสินว่าต้องออกใบเรียกเก็บไหม และของกลับมาให้ตรวจไหม</p>
+  <div class="tw"><table>
+    <thead><tr><th>คำตอบจาก Supplier</th><th>ค่าของ</th><th>ค่าแรง</th>
+      <th>ออกใบ ②</th><th>ของกลับมา</th><th>ไปขั้นไหนต่อ</th></tr></thead>
+    <tbody>
+      <tr><td>ไม่มีของส่งให้ → STT ซื้อเอง ติดตั้งเอง</td><td>เรียกเก็บ</td><td>เรียกเก็บ</td>
+        <td class="yes">✓ ออก</td><td class="dash">ไม่มี</td><td>ข้ามไปขั้น 9</td></tr>
+      <tr><td>ส่งของใหม่มาให้ → STT ติดตั้งเอง</td><td class="dash">ไม่คิด</td><td>เรียกเก็บ</td>
+        <td class="yes">✓ ออก</td><td class="yes">มี</td><td>ขั้น 6 → 7 → 8 → 9</td></tr>
+      <tr><td>อุปกรณ์เปลี่ยนกลับมาแล้วจบ</td><td class="dash">—</td><td class="dash">—</td>
+        <td class="no">✕ ปิดที่ใบ ③</td><td class="yes">มี</td><td>ขั้น 6 → 7 → 8 → 9</td></tr>
+      <tr><td>ไม่รับเคลม (เลยประกัน / เหตุผลอื่น)</td><td class="dash">—</td><td class="dash">—</td>
+        <td class="no">✕ ปิดภายใน</td><td class="dash">ไม่มี</td><td>ข้ามไปขั้น 9</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="ref">
+  <h3 class="refh">ลายเซ็น 9 ช่อง 2 รอบ</h3>
+  <p class="refsub">ระบบประทับให้เอง ไม่เซ็นมือ — ชื่อ + แผนก + วันเวลา จากคนที่ล็อกอิน</p>
+  <div class="tw"><table>
+    <thead><tr><th>รอบ</th><th>ช่อง</th><th>ใครประทับ</th><th>ประทับตอนไหน</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="4" class="num">รอบ 1<br><span class="dash">เปิดและส่งเคลม</span></td>
+        <td class="num">1</td><td>ผู้เปิดใบ</td><td>ขั้นที่ 1 กดส่งขออนุมัติ</td></tr>
+      <tr><td class="num">2</td><td>ผู้อนุมัติ</td><td>ขั้นที่ 2 กดอนุมัติ</td></tr>
+      <tr><td class="num">3</td><td>สโตร์</td><td>ขั้นที่ 3 กดส่งต่อจัดซื้อ</td></tr>
+      <tr><td class="num">4</td><td>จัดซื้อ</td><td>ขั้นที่ 4 — <b>ครบ 4 ช่องนี้ ปุ่มพิมพ์ใบส่ง Supplier ถึงเปิด</b></td></tr>
+      <tr><td rowspan="5" class="num">รอบ 2<br><span class="dash">หลังได้ผลจาก Supplier</span></td>
+        <td class="num">5</td><td>จัดซื้อ (ผลเคลม)</td><td>ขั้นที่ 5 บันทึกผลการเคลม</td></tr>
+      <tr><td class="num">6</td><td>สโตร์รับของเข้า</td><td>ขั้นที่ 6 รับของเข้าคลัง</td></tr>
+      <tr><td class="num">7</td><td>QC ตรวจรับ</td><td>ขั้นที่ 7 ตรวจเสร็จ</td></tr>
+      <tr><td class="num">8</td><td>สโตร์เบิกออก</td><td>ขั้นที่ 8 จ่ายของออก</td></tr>
+      <tr><td class="num">9</td><td>ผู้บริหาร</td><td>ขั้นที่ 9 อนุมัติปิด</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="ref">
+  <h3 class="refh">เลขที่เอกสารทั้งหมดในระบบ</h3>
+  <p class="refsub">ระบบออกเลขให้เองทุกชุด เรียงต่อกัน ไม่ซ้ำ รีเซ็ตทุกปี (ปี พ.ศ. 2 หลัก)</p>
+  <div class="tw"><table>
+    <thead><tr><th>เลขที่</th><th>เอกสาร</th><th>ออกตอนไหน</th><th>มีเงินไหม</th></tr></thead>
+    <tbody>
+      <tr><td class="num"><code>INS-YY/NNNN</code></td><td>ใบ Inspection ตรวจรับสินค้า</td>
+        <td>เปิดใบตรวจ</td><td class="dash">ไม่มี</td></tr>
+      <tr><td class="num"><code>CLM-YY/NNNN</code></td><td>ใบเคลมสินค้า</td>
+        <td>เปิดใบเคลม</td><td class="dash">ไม่มี</td></tr>
+      <tr><td class="num"><code>GR-YY/NNNN</code></td><td>ใบรับของกลับเข้าคลัง</td>
+        <td>ขั้นที่ 6 สโตร์รับเข้า</td><td class="dash">ไม่มี</td></tr>
+      <tr><td class="num"><code>RCV-YY/NNNN</code></td><td>ใบตรวจรับของกลับ ⑤</td>
+        <td>ขั้นที่ 7 QC ตรวจเสร็จ</td><td class="dash">ไม่มี</td></tr>
+      <tr><td class="num"><code>IS-YY/NNNN</code></td><td>ใบเบิกออก</td>
+        <td>ขั้นที่ 8 สโตร์จ่ายออก</td><td class="dash">ไม่มี</td></tr>
+      <tr><td class="num"><code>CDN-YY/NNNN</code></td><td>ใบเรียกเก็บรวมหลายใบเคลม</td>
+        <td>เมนูรวมยอดเรียกเก็บ</td><td class="yes">มี</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="ref">
+  <h3 class="refh">กฎที่ระบบบังคับ ข้ามไม่ได้</h3>
+  <p class="refsub">ทุกข้อนี้ระบบล็อกจริง ไม่ใช่แค่ข้อความเตือน · ADMIN ก็ต้องเดินตามกฎเดียวกัน</p>
+  <div class="rules">
+    <div class="rule-c"><h4>อนุมัติแล้ว แก้ไม่ได้</h4>
+      <p>ใบเคลมที่ผ่านอนุมัติและส่งสโตร์แล้ว แก้ข้อมูลไม่ได้อีก ผิดต้องเปิดใบใหม่ หรือให้ตีกลับก่อน</p></div>
+    <div class="rule-c"><h4>ไม่มีรูป บันทึกไม่ได้</h4>
+      <p>ทุกแถวต้องมีรูปอย่างน้อย 1 รูป สูงสุด 5 รูป เพราะใบแจ้งเคลมที่ส่ง Supplier ต้องมีรูปไปด้วย</p></div>
+    <div class="rule-c"><h4>ต้นทุนเห็นแค่จัดซื้อ</h4>
+      <p>คอลัมน์ต้นทุน ราคาเรียกเก็บ กำไร เรท และรายงานที่มีตัวเงิน เปิดได้เฉพาะจัดซื้อและผู้บริหาร</p></div>
+    <div class="rule-c"><h4>ใบ ① ห้ามมีราคา</h4>
+      <p>ใบแจ้งเคลมที่ส่ง Supplier ครั้งแรกไม่มีราคาเลยสักช่อง ระบบล็อกไม่ให้ติ๊กคอลัมน์ราคาตอนพิมพ์</p></div>
+    <div class="rule-c"><h4>ครบ 4 ลายเซ็นก่อนพิมพ์</h4>
+      <p>ปุ่มพิมพ์ใบส่ง Supplier เปิดได้ต่อเมื่อครบลายเซ็นรอบที่ 1 ทั้ง 4 ช่อง</p></div>
+    <div class="rule-c"><h4>ตรวจผ่านก่อนเบิก</h4>
+      <p>ของกลับมาต้องเข้าสโตร์ → QC ตรวจผ่าน → ถึงเบิกออกได้ เรียงลำดับตายตัว</p></div>
+    <div class="rule-c"><h4>ยกเลิกได้คนเดียว</h4>
+      <p>ยกเลิกใบเคลมได้เฉพาะผู้บริหาร ต้องบอกเหตุผล ใบไม่ถูกลบ ยังอยู่ในทะเบียนขึ้นว่ายกเลิกแล้ว</p></div>
+    <div class="rule-c"><h4>LOG แยกจากเอกสาร</h4>
+      <p>ลบ LOG ทิ้งทั้งหมด ใบเคลมและใบ Inspection ยังอยู่ครบ แค่ไม่รู้ว่าใครเคยทำอะไรไว้</p></div>
+  </div>
+</section>
+
+<footer>
+  <span>STT CLAIM · ผังเดินเอกสาร</span>
+  <span>Mockup v9 · 07/09/2569</span>
+</footer>
+
+</div>
+
+</body>
+</html>

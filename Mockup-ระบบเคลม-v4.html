@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STT CLAIM HUB — Mockup v4</title>
+<style>
+*{box-sizing:border-box}
+:root{--red:#E2231A;--line:#ececec;--dim:#999;--s1:#1f7fd8;--s2:#d97706;--s3:#15803d;--sa:#64748b}
+body{margin:0;background:#f4f5f7;color:#1a1a1a;
+     font-family:"Noto Sans Thai","Sarabun",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:13.5px}
+.top{background:#fff;border-bottom:3px solid var(--red);height:58px;display:flex;align-items:center;
+     gap:12px;padding:0 18px;position:sticky;top:0;z-index:60}
+.lg{font-weight:800;font-style:italic;color:var(--red);font-size:16px}
+.lg span{display:block;font-style:normal;font-weight:400;color:var(--dim);font-size:10px}
+.sp{flex:1}
+select,input,textarea{font-family:inherit;font-size:13px;border:1px solid #ddd;border-radius:8px;
+     padding:7px 9px;background:#fff;color:#1a1a1a;width:100%}
+.btn{border:1px solid #ddd;background:#fff;border-radius:8px;padding:8px 13px;font-size:13px;
+     cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn:hover{border-color:#aaa}
+.btn.p{background:var(--red);border-color:var(--red);color:#fff;font-weight:700}
+.btn.g{background:#0f7a34;border-color:#0f7a34;color:#fff;font-weight:700}
+.btn.b{background:#1558b0;border-color:#1558b0;color:#fff;font-weight:700}
+.btn.dk{background:#1f2937;border-color:#1f2937;color:#fff}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.wrap{max-width:1180px;margin:0 auto;padding:18px 14px 60px}
+
+/* ── หน้าแรก แบบ NOVA ── */
+.hero{background:linear-gradient(120deg,#141414 0%,#5e1712 52%,#E2231A 100%);color:#fff;border-radius:18px;
+      padding:22px 26px;margin-bottom:20px;box-shadow:0 12px 32px rgba(226,35,26,.2)}
+.hero h1{margin:0;font-size:23px;letter-spacing:.5px}
+.hero p{margin:5px 0 0;font-size:13px;opacity:.9}
+.hchip{display:inline-block;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);
+       border-radius:20px;padding:3px 12px;font-size:11.5px;margin-top:11px;font-weight:600}
+.modgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.modcard{border-radius:16px;padding:20px 20px 16px;border:1px solid var(--line);background:#fff;
+         box-shadow:0 6px 18px -12px rgba(0,0,0,.25)}
+.modhd{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+.modic{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+       font-size:23px;background:var(--acbg)}
+.modttl{font-size:17px;font-weight:800}
+.modstep{margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:var(--ac);
+         border-radius:20px;padding:3px 11px}
+.modrole{font-size:11px;color:var(--dim);letter-spacing:.4px;margin-bottom:10px}
+.moditem{display:flex;align-items:flex-start;gap:11px;padding:11px 10px;border-radius:10px;cursor:pointer;
+         border-top:1px solid #f2f2f2}
+.moditem:hover{background:#fafbfc}
+.moditem.off{opacity:.4;cursor:not-allowed}
+.mi-ic{font-size:19px;margin-top:1px}
+.mi-t{font-size:14.5px;font-weight:700}
+.mi-d{font-size:12px;color:var(--dim);margin-top:1px;line-height:1.45}
+.mi-n{margin-left:auto;background:var(--red);color:#fff;border-radius:20px;padding:2px 9px;
+      font-size:11.5px;font-weight:700;align-self:center}
+.mi-n.zero{background:#eceff2;color:#9aa3ad}
+.modtag{margin-top:11px;font-size:11.5px;border-radius:9px;padding:8px 11px;line-height:1.5;
+        background:#fafbfc;border:1px solid #f0f0f0;color:#777}
+
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.crumb{font-size:12px;color:var(--dim);margin-bottom:12px}
+.crumb a{color:var(--red);cursor:pointer;text-decoration:none}
+.hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.hd h2{margin:0;font-size:17px}
+.hd .sub{font-size:12px;color:var(--dim)}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid #e8e8e8;padding:7px 9px;font-size:12.5px;vertical-align:middle}
+thead th{background:#f7f8fa;font-weight:700;font-size:13px;text-align:center;color:#111}
+tbody tr.k{cursor:pointer}tbody tr.k:hover{background:#fffaf9}
+.c{text-align:center}.r{text-align:right}
+.pill{display:inline-block;font-size:11px;border:1px solid #ddd;border-radius:20px;padding:2px 9px;white-space:nowrap}
+.pill.ins{border-color:#bcd9f0;color:#175a91;background:#f2f9ff}
+.pill.clm{border-color:#f3c5c2;color:#a3231b;background:#fff5f4}
+.pill.g{border-color:#b6e0c2;color:#1f7a3d;background:#f2fbf5}
+.pill.r{border-color:#f0c2c2;color:#b3261e;background:#fff5f5}
+.pill.y{border-color:#f0dfae;color:#8a6b12;background:#fffaef}
+.stab{display:flex;gap:7px;margin-bottom:11px}
+.stab button{border:1px solid #ddd;background:#fff;border-radius:9px;padding:7px 15px;font-family:inherit;
+             font-size:13px;cursor:pointer}
+.stab button.on{border-color:var(--red);color:var(--red);background:#fff6f5;font-weight:700}
+.empty{text-align:center;color:var(--dim);padding:26px;border:1px dashed #ddd;border-radius:10px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 16px}
+.f label{display:block;font-size:12px;font-weight:700;margin-bottom:3px}
+.f.o1 label{color:var(--s1)}.f.o2 label{color:var(--s2)}.f.o3 label{color:var(--s3)}.f.oa label{color:var(--sa)}
+.f .rq{color:var(--red)}
+.locked{background:#f4f5f7;color:#9aa3ad}
+.key{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--dim);padding:0 0 10px;align-items:center}
+.key i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:4px}
+.d1{background:var(--s1)}.d2{background:var(--s2)}.d3{background:var(--s3)}.da{background:var(--sa)}
+.warn{background:#fff4e5;border:1px solid #f0c675;border-radius:10px;padding:10px 13px;
+      font-size:12.5px;color:#8a5a00;margin-bottom:11px;line-height:1.6}
+.rej{background:#fff5f5;border:1px solid #f0c2c2;border-radius:10px;padding:10px 13px;
+     font-size:12.5px;color:#b3261e;margin-bottom:11px;line-height:1.6}
+.okbox{background:#f2fbf5;border:1px solid #b6e0c2;border-radius:10px;padding:10px 13px;
+       font-size:12.5px;color:#1f7a3d;margin-bottom:11px}
+.sign{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.sg{flex:1 1 150px;border:1px solid #e8e8e8;border-radius:9px;padding:8px 10px;min-height:60px}
+.sg i{display:block;font-style:normal;font-size:10px;color:#8b929a;margin-bottom:3px}
+.sg b{display:block;font-size:11.5px;font-weight:600;line-height:1.5}
+.sg small{display:block;color:var(--dim);font-weight:400;font-size:10.5px}
+.sg.wait{background:#fbfcfd}.sg.wait b{color:#c9ced4;font-weight:400}
+.sg.next{border-color:var(--red);background:#fff8f7}
+.ph{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.thumb{width:48px;height:36px;border-radius:6px;background:linear-gradient(135deg,#c9d3dc,#96a3af);
+       display:flex;align-items:center;justify-content:center;font-size:13px}
+.addph{width:48px;height:36px;border:1px dashed #c3c8ce;border-radius:6px;display:flex;
+       align-items:center;justify-content:center;color:#9aa3ad;font-size:15px}
+.needph{font-size:10px;color:#b3261e;border:1px solid #f0c2c2;border-radius:5px;padding:1px 5px;background:#fff5f5}
+.tick{width:17px;height:17px;cursor:pointer}
+.tipbar{font-size:11.5px;background:#fffbe9;border:1px solid #ece0a8;border-radius:9px;
+        padding:8px 12px;margin-bottom:14px;line-height:1.65;color:#5a4a12}
+.tipbar b{color:#000}
+@media(max-width:900px){.modgrid{grid-template-columns:1fr}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="lg">STT CLAIM HUB <span>งานเคลม · ตรวจรับสินค้า — Mockup v4</span></div>
+  <div class="sp"></div>
+  <span style="font-size:12px;color:#999">ทดลองเป็น:</span>
+  <select style="width:auto" id="role" onchange="setRole(this.value)">
+    <option value="QC">คุณสมชาย · QC</option>
+    <option value="APPROVER">คุณวิชัย · ผจก.ผลิต (ผู้อนุมัติ)</option>
+    <option value="STORE">คุณนภา · สโตร์</option>
+    <option value="PURCHASE">คุณเอ · จัดซื้อ</option>
+    <option value="ADMIN">เบียร์ · ผู้บริหาร</option>
+  </select>
+  <button class="btn" onclick="reset()">↺ เริ่มใหม่</button>
+</div>
+
+<div class="wrap">
+  <div class="tipbar" id="tip"></div>
+  <div id="view"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   Mockup v4 — ลอกโครงจากโค้ด NOVA จริง (js-core.html · MODULES/ITEMS/ITEMROLE)
+   + เบียร์อธิบาย 4 ก.ย. 2569:
+     กล่อง 1  เปิดใบเคลม *หรือ* ใบ Inspection — ใครเปิดก็ได้ หลัก ๆ Production/QC/Design/Sales
+              เปิดเสร็จ → ส่งผู้บังคับบัญชา Approve (อนุมัติทั้ง 2 ชนิดเอกสาร)
+     กล่อง 2  Pass ไปสโตร์ → ใส่ข้อมูล → กดส่งต่อจัดซื้อ
+     กล่อง 3  Pass ไปจัดซื้อ → คุยกับ Supplier · คำตอบ + คำนวณต้นทุน → จัดซื้อขอปิดใบเคลม
+     Inspection: ตรวจแล้วข้อไหนไม่ผ่าน **ติ๊กว่าส่งไปสร้างใบเคลม** → เข้ากระบวนการเคลมทันที
+   ═══════════════════════════════════════════════════════════════════════ */
+
+var USERS={QC:{n:'คุณสมชาย',p:'QC'},APPROVER:{n:'คุณวิชัย',p:'ผจก.ผลิต'},
+           STORE:{n:'คุณนภา',p:'สโตร์'},PURCHASE:{n:'คุณเอ',p:'จัดซื้อ'},ADMIN:{n:'เบียร์',p:'ผู้บริหาร'}};
+var ROLE='QC', VIEW='home', CURDOC=null, STAB='pend';
+function me(){return USERS[ROLE];}
+function $(i){return document.getElementById(i);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function now(){var d=new Date(),p=function(n){return String(n).padStart(2,'0');};
+  return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+(d.getFullYear()+543)+' '+p(d.getHours())+':'+p(d.getMinutes());}
+function tip(h){$('tip').innerHTML=h;}
+
+/* ─── สายงาน: ขั้น = ใครถือเอกสารอยู่ ───
+   ใช้ชุดเดียวกันทั้งใบเคลมและใบ Inspection (เบียร์: อนุมัติทั้ง 2 ชนิด) */
+var ST={
+ DRAFT :{no:1,box:1,name:'ร่าง · กำลังกรอก',   who:'ผู้เปิดใบ (Production/QC/Design/Sales)',
+         roles:['QC','PRODUCTION','DESIGN','SALES'], act:'📤 ส่งขออนุมัติ', sign:'ผู้เปิดใบ', next:'APPR'},
+ APPR  :{no:2,box:1,name:'รอผู้บังคับบัญชาอนุมัติ', who:'ผจก.แผนกขึ้นไป',
+         roles:['APPROVER'], act:'✅ อนุมัติ + ส่งให้สโตร์', sign:'ผู้อนุมัติ', next:'STORE', rej:'DRAFT'},
+ STORE :{no:3,box:2,name:'สโตร์ใส่ข้อมูล',      who:'สโตร์',
+         roles:['STORE'], act:'📦 บันทึก + ส่งต่อจัดซื้อ', sign:'สโตร์', next:'BUY', rej:'DRAFT'},
+ BUY   :{no:4,box:3,name:'จัดซื้อดำเนินการ',     who:'จัดซื้อ',
+         roles:['PURCHASE'], act:'🛒 บันทึกผล + ขอปิดใบเคลม', sign:'จัดซื้อ', next:'CLOSE', rej:'STORE'},
+ CLOSE :{no:5,box:3,name:'รอผู้บริหารอนุมัติปิด', who:'ผู้บริหาร',
+         roles:['ADMIN'], act:'🏁 อนุมัติปิดใบเคลม', sign:'ผู้บริหาร', next:'DONE'},
+ DONE  :{no:6,box:3,name:'ปิดจบแล้ว', who:'—', roles:[]}
+};
+/* ใบ Inspection สายสั้น: ร่าง → อนุมัติ → จบ (ข้อที่ติ๊กจะแตกเป็นใบเคลม) */
+var STI={
+ DRAFT:{no:1,box:1,name:'ร่าง · กำลังตรวจ', who:'ผู้ตรวจ (Production/QC/Design)',
+        roles:['QC','PRODUCTION','DESIGN'], act:'📤 ส่งขออนุมัติผลตรวจ', sign:'ผู้ตรวจ', next:'APPR'},
+ APPR :{no:2,box:1,name:'รอผู้บังคับบัญชาอนุมัติ', who:'ผจก.แผนกขึ้นไป',
+        roles:['APPROVER'], act:'✅ อนุมัติผลตรวจ + สร้างใบเคลมจากข้อที่ติ๊ก', sign:'ผู้อนุมัติ',
+        next:'DONE', rej:'DRAFT'},
+ DONE :{no:3,box:1,name:'อนุมัติแล้ว', who:'—', roles:[]}
+};
+function stg(d){ return (d.kind==='INS'?STI:ST)[d.stage]; }
+
+function seed(){return [
+ {no:'CLM-69/0001',kind:'CLM',stage:'STORE',job:'JT-69/0009',cust:'โชคชัยพัฒนาออยล์',
+  model:'SEMI-TRAILER 32,000 L',date:'02/09/2569',by:'คุณสมชาย',dept:'QC',area:'for',ctype:'after',
+  from:'INS-69/0001',dn:'',want:'30/09/2569',rej:'',
+  sign:{'ผู้เปิดใบ':'คุณสมชาย · QC · 02/09/2569 09:10','ผู้อนุมัติ':'คุณวิชัย · ผจก.ผลิต · 02/09/2569 14:02'},
+  items:[{code:'VLV-3040',nm:'API VALVE 4"',th:'วาล์วรั่วซึมบริเวณหน้าแปลน ตรวจพบตอนทดสอบแรงดัน',
+          qty:'2',unit:'PCS',po:'',sup:'',ph:2,cost:''},
+         {code:'',nm:'งานเชื่อมผิวในตัวถัง',th:'รอยเชื่อมไม่เต็มแนว ต้องเชื่อมซ่อมใหม่',
+          qty:'1',unit:'จุด',po:'',sup:'',ph:2,cost:''}]},
+
+ {no:'CLM-69/0002',kind:'CLM',stage:'DRAFT',job:'JM-69/0021',cust:'บจก. ปิโตรเลียมสยาม',
+  model:'TANK BODY 20,000 L',date:'04/09/2569',by:'คุณสมชาย',dept:'QC',area:'dom',ctype:'pre',
+  from:'',dn:'',want:'',rej:'',sign:{},
+  items:[{code:'GSK-08',nm:'',th:'',qty:'4',unit:'',po:'',sup:'',ph:0,cost:''}]},
+
+ {no:'CLM-69/0003',kind:'CLM',stage:'BUY',job:'JT-69/0014',cust:'บจก. ขนส่งไทยเจริญ',
+  model:'SEMI-TRAILER 28,000 L',date:'01/09/2569',by:'คุณสมชาย',dept:'QC',area:'dom',ctype:'pre',
+  from:'',dn:'DN-69/0501',want:'25/09/2569',rej:'',
+  sign:{'ผู้เปิดใบ':'คุณสมชาย · QC · 01/09/2569 08:30','ผู้อนุมัติ':'คุณวิชัย · ผจก.ผลิต · 01/09/2569 10:15',
+        'สโตร์':'คุณนภา · สโตร์ · 01/09/2569 15:40'},
+  items:[{code:'GSK-08',nm:'GASKET NBR 8"',th:'ประเก็นฉีกขาดตั้งแต่แกะกล่อง',qty:'4',unit:'PCS',
+          po:'PO-69/0501',sup:'บจก. ไทยพัฒนาวาล์ว',ph:3,cost:''}]},
+
+ {no:'INS-69/0002',kind:'INS',stage:'DRAFT',job:'JM-69/0021',cust:'บจก. ปิโตรเลียมสยาม',
+  model:'TANK BODY 20,000 L',date:'04/09/2569',by:'คุณสมชาย',dept:'QC',area:'dom',
+  tpl:'สินค้าในประเทศที่ต้องตรวจเฉพาะ',rej:'',sign:{},
+  items:[{t:'สภาพบรรจุภัณฑ์ ไม่ฉีกขาด',acc:'ACC',found:'',ph:1,toClaim:false},
+         {t:'จำนวนตรงกับใบส่งของ',acc:'',found:'',ph:0,toClaim:false},
+         {t:'ไม่มีรอยแตกร้าว / รั่วซึม',acc:'UNACC',found:'ประเก็นฉีกขาดตั้งแต่แกะกล่อง 4 ชิ้น',ph:0,toClaim:false}]},
+
+ {no:'INS-69/0003',kind:'INS',stage:'APPR',job:'JT-69/0009',cust:'โชคชัยพัฒนาออยล์',
+  model:'SEMI-TRAILER 32,000 L',date:'03/09/2569',by:'คุณสมชาย',dept:'QC',area:'for',
+  tpl:'แท็งค์นำเข้า (Tankers)',rej:'',
+  sign:{'ผู้ตรวจ':'คุณสมชาย · QC · 03/09/2569 16:20'},
+  items:[{t:'สภาพผิวนอกตัวถัง',acc:'ACC',found:'',ph:1,toClaim:false},
+         {t:'แมนโฮลปิดสนิท บานพับปกติ',acc:'UNACC',found:'บานพับคด ปิดไม่สนิท',ph:2,toClaim:true},
+         {t:'ทดสอบแรงดันผ่าน',acc:'UNACC',found:'พบน้ำซึมที่หน้าแปลนวาล์วจ่าย',ph:2,toClaim:true}]}
+];}
+var DOCS=seed();
+function reset(){DOCS=seed();CURDOC=null;go('home');}
+function setRole(r){ROLE=r; if(CURDOC) openDoc(CURDOC); else go(VIEW);}
+function doc(n){for(var i=0;i<DOCS.length;i++) if(DOCS[i].no===n) return DOCS[i]; return null;}
+
+function isOwner(d){
+  var s=stg(d); if(!s||!s.roles.length) return false;
+  if(ROLE==='ADMIN') return s.roles.indexOf('ADMIN')>=0;   // ผู้บริหารมีคิวของตัวเอง ไม่ทำแทนคนอื่น
+  return s.roles.indexOf(ROLE)>=0;
+}
+/* ร่างของผู้เปิด — สโตร์/จัดซื้อยังไม่เห็น */
+function canSee(d){
+  if(d.stage!=='DRAFT') return true;
+  return ROLE==='ADMIN'||ROLE==='APPROVER'||me().n===d.by||me().p===d.dept;
+}
+function missing(d){
+  var m=[];
+  if(d.kind==='INS'){
+    if(d.stage!=='DRAFT') return m;
+    var todo=[],np=[];
+    d.items.forEach(function(o,i){ if(!o.acc) todo.push(i+1);
+      else if(o.acc==='UNACC'&&!o.ph) np.push(i+1); });
+    if(todo.length) m.push('ข้อ '+todo.join(', ')+' ยังไม่ได้ติ๊กผลตรวจ');
+    if(np.length)   m.push('ข้อ '+np.join(', ')+' ไม่ผ่านแต่ยังไม่มีรูป');
+    return m;
+  }
+  if(d.stage==='DRAFT'){
+    if(!d.want) m.push('ยังไม่ใส่วันที่ต้องการของ');
+    var bad=[],nop=[];
+    d.items.forEach(function(o,i){ if(!o.nm||!o.th) bad.push(i+1); if(!o.ph) nop.push(i+1); });
+    if(bad.length) m.push('รายการที่ '+bad.join(', ')+' ยังไม่ใส่ชื่อสินค้า/รายละเอียด');
+    if(nop.length) m.push('รายการที่ '+nop.join(', ')+' ยังไม่มีรูป');
+  }
+  if(d.stage==='STORE'){
+    if(!d.dn) m.push('ยังไม่ใส่เลขใบส่งมอบ');
+    var np2=[],ns=[];
+    d.items.forEach(function(o,i){ if(!o.po) np2.push(i+1); if(!o.sup) ns.push(i+1); });
+    if(np2.length) m.push('รายการที่ '+np2.join(', ')+' ยังไม่มี PO');
+    if(ns.length)  m.push('รายการที่ '+ns.join(', ')+' ยังไม่มี Supplier');
+  }
+  if(d.stage==='BUY'){
+    var nc=[]; d.items.forEach(function(o,i){ if(!o.cost) nc.push(i+1); });
+    if(nc.length) m.push('รายการที่ '+nc.join(', ')+' ยังไม่ได้ใส่ต้นทุน');
+  }
+  return m;
+}
+
+/* ═══ หน้าแรก — กล่องตามแผนก (ลอกจาก NOVA MODULES) ═══ */
+var MODULES=[
+ {id:1,ic:'📝',name:'กล่องงานที่ 1 · เปิดเอกสาร + อนุมัติ',ac:'#E2231A',acbg:'rgba(226,35,26,.14)',
+  role:'Production · QC · Design · Sales — และผู้บังคับบัญชา',
+  items:[
+   {k:'newclm', ic:'📋',t:'เปิดใบเคลมสินค้า',       d:'เปิดตรงได้เลย · กรอกข้อมูลที่แจ้งไว้ + แนบรูป · บันทึกร่างไว้ก่อนได้'},
+   {k:'newins', ic:'🔍',t:'เปิดใบ Inspection',      d:'ตรวจของตอนมาถึง · ติ๊ก Acc / Un-Acc · ข้อที่ไม่ผ่าน ติ๊กส่งไปสร้างใบเคลม'},
+   {k:'mydraft',ic:'✏️',t:'เอกสารร่างของฉัน',        d:'ใบที่ยังไม่ส่งอนุมัติ · คนอื่นยังไม่เห็น · กลับมาแก้ได้'},
+   {k:'approve',ic:'✅',t:'อนุมัติเอกสาร',           d:'อนุมัติทั้งใบเคลมและใบ Inspection · ไม่โอเคตีกลับพร้อมเหตุผล',
+    only:['APPROVER','ADMIN']}
+  ],
+  tag:'ใครเปิดก็ได้ แต่หลัก ๆ คือ Production / QC / Design / Sales · เปิดเสร็จส่งผู้บังคับบัญชาอนุมัติ'},
+
+ {id:2,ic:'📦',name:'กล่องงานที่ 2 · สโตร์',ac:'#2f7de1',acbg:'rgba(47,125,225,.14)',role:'Store',
+  items:[{k:'store',ic:'📦',t:'งานเคลมรอสโตร์',d:'ใส่เลขใบส่งมอบ · PO · Supplier ของแต่ละรายการ แล้วกดส่งต่อจัดซื้อ'}],
+  tag:'เอกสารจะวิ่งมาที่นี่เองหลังผู้บังคับบัญชาอนุมัติ'},
+
+ {id:3,ic:'🛒',name:'กล่องงานที่ 3 · จัดซื้อ',ac:'#eba00c',acbg:'rgba(235,160,12,.16)',role:'Purchase',
+  items:[
+   {k:'buy',ic:'🛒',t:'งานเคลมรอจัดซื้อ',d:'คุยกับ Supplier · บันทึกคำตอบ · คำนวณต้นทุน · แล้วขอปิดใบเคลม'},
+   {k:'close',ic:'🏁',t:'รออนุมัติปิดใบเคลม',d:'ใบที่จัดซื้อขอปิดแล้ว รอผู้บริหารกดอนุมัติปิด',only:['ADMIN','PURCHASE']}
+  ],
+  tag:'จัดซื้อเป็นคนขอปิดใบเคลม · ผู้บริหารเป็นคนอนุมัติปิด'},
+
+ {id:0,ic:'📊',name:'รายงาน & ทะเบียน',ac:'#12a06f',acbg:'rgba(18,160,111,.14)',role:'ทุกคนเข้าดูได้',
+  items:[
+   {k:'reg',ic:'🗂️',t:'ทะเบียนเอกสารทั้งหมด',d:'ใบเคลม + ใบ Inspection ทุกใบทุกจ๊อบ · สถานะล่าสุด'},
+   {k:'byjob',ic:'🚛',t:'งานเคลมตามจ๊อบ',d:'ดูรายจ๊อบว่ามีใบอะไรบ้าง · ต้นทุนเคลมรวมของรถคันนั้น'}
+  ],
+  tag:'ไม่มีตัวเลขต้นทุนในหน้านี้ ทุก role เปิดดูได้'}
+];
+
+function go(v){ VIEW=v; CURDOC=null;
+  if(v==='home') return home();
+  if(v==='newclm'||v==='newins') return newDoc(v==='newins'?'INS':'CLM');
+  if(v==='mydraft') return listPage('mydraft');
+  if(v==='approve') return listPage('approve');
+  if(v==='store')   return listPage('store');
+  if(v==='buy')     return listPage('buy');
+  if(v==='close')   return listPage('close');
+  if(v==='reg')     return listPage('reg');
+  if(v==='byjob')   return byJob();
+}
+function countOf(k){ return rowsOf(k).length; }
+function rowsOf(k){
+  return DOCS.filter(function(d){
+    if(!canSee(d)) return false;
+    if(k==='mydraft') return d.stage==='DRAFT' && (me().n===d.by||ROLE==='ADMIN');
+    if(k==='approve') return d.stage==='APPR';
+    if(k==='store')   return d.kind==='CLM' && d.stage==='STORE';
+    if(k==='buy')     return d.kind==='CLM' && d.stage==='BUY';
+    if(k==='close')   return d.kind==='CLM' && d.stage==='CLOSE';
+    if(k==='reg')     return true;
+    return false;
+  });
+}
+function home(){
+  var t='<div class="hero"><h1>STT CLAIM HUB</h1>'+
+    '<p>งานเคลม · ตรวจรับสินค้า — เลือกกล่องงานของคุณ</p>'+
+    '<span class="hchip">'+esc(me().n)+' · '+esc(me().p)+'</span></div>';
+  t+='<div class="modgrid">';
+  MODULES.forEach(function(m){
+    var body='';
+    m.items.forEach(function(it){
+      var allowed = !it.only || it.only.indexOf(ROLE)>=0;
+      var n = ['mydraft','approve','store','buy','close'].indexOf(it.k)>=0 ? countOf(it.k) : -1;
+      body+='<div class="moditem'+(allowed?'':' off')+'" onclick="'+(allowed?"go('"+it.k+"')":"alert('เมนูนี้เฉพาะ "+esc(it.only.join(' / '))+"')")+'">'+
+        '<div class="mi-ic">'+it.ic+'</div>'+
+        '<div><div class="mi-t">'+esc(it.t)+'</div><div class="mi-d">'+esc(it.d)+'</div></div>'+
+        (n>=0?'<span class="mi-n'+(n?'':' zero')+'">'+n+'</span>':'')+'</div>';
+    });
+    t+='<div class="modcard" style="--ac:'+m.ac+';--acbg:'+m.acbg+'">'+
+      '<div class="modhd"><div class="modic">'+m.ic+'</div><div class="modttl">'+esc(m.name)+'</div>'+
+      (m.id?'<span class="modstep">ขั้นที่ '+m.id+'</span>':'')+'</div>'+
+      '<div class="modrole">'+esc(m.role)+'</div>'+body+
+      '<div class="modtag">'+esc(m.tag)+'</div></div>';
+  });
+  t+='</div>';
+  $('view').innerHTML=t;
+  tip('<b>หน้าแรก = กล่องงานตามแผนก</b> (โครงเดียวกับ NOVA) · ตัวเลขแดง = ใบที่รอคุณทำในเมนูนั้น · '+
+      '<b>ลองสลับบทบาทมุมขวาบน</b> แล้วดูว่าเมนูและตัวเลขเปลี่ยน');
+}
+
+/* ═══ หน้ารายการของแต่ละกล่อง ═══ */
+var TITLES={mydraft:['✏️ เอกสารร่างของฉัน','ใบที่ยังไม่ส่งอนุมัติ — คนอื่นยังไม่เห็น'],
+  approve:['✅ อนุมัติเอกสาร','ทั้งใบเคลมและใบ Inspection · อนุมัติ หรือ ตีกลับพร้อมเหตุผล'],
+  store:['📦 งานเคลมรอสโตร์','ใส่เลขใบส่งมอบ · PO · Supplier แล้วส่งต่อจัดซื้อ'],
+  buy:['🛒 งานเคลมรอจัดซื้อ','คุยกับ Supplier · บันทึกคำตอบ · คำนวณต้นทุน · ขอปิดใบเคลม'],
+  close:['🏁 รออนุมัติปิดใบเคลม','จัดซื้อขอปิดมาแล้ว รอผู้บริหารอนุมัติ'],
+  reg:['🗂️ ทะเบียนเอกสารทั้งหมด','ใบเคลม + ใบ Inspection ทุกใบทุกจ๊อบ']};
+function listPage(k){
+  VIEW=k;
+  var rows=rowsOf(k), ti=TITLES[k];
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › '+esc(ti[0])+'</div>'+
+    '<div class="card"><div class="hd"><h2>'+esc(ti[0])+'</h2>'+
+    '<span class="sub">'+esc(ti[1])+'</span></div>';
+  if(!rows.length) t+='<div class="empty">ยังไม่มีเอกสารในกล่องนี้</div>';
+  else{
+    t+='<table><thead><tr><th style="width:104px">ชนิด</th><th style="width:118px">เลขที่</th>'+
+      '<th style="width:82px">วันที่</th><th style="width:118px">เลขที่ JOB</th><th>ชื่อลูกค้า</th>'+
+      '<th style="width:180px">ขั้นตอนตอนนี้</th><th style="width:112px">ผู้เปิด</th>'+
+      '<th style="width:72px">รูป</th></tr></thead><tbody>';
+    rows.forEach(function(d){
+      var np=0; d.items.forEach(function(o){ if(!o.ph) np++; });
+      t+='<tr class="k" onclick="openDoc(\''+d.no+'\')">'+
+        '<td class="c"><span class="pill '+(d.kind==='INS'?'ins':'clm')+'">'+
+          (d.kind==='INS'?'ใบ Inspection':'ใบเคลม')+'</span></td>'+
+        '<td><b>'+esc(d.no)+'</b></td><td class="c">'+esc(d.date)+'</td>'+
+        '<td>'+esc(d.job)+'</td><td>'+esc(d.cust)+'</td>'+
+        '<td class="c"><span class="pill'+(d.rej?' r':'')+'">'+(d.rej?'↩ ถูกตีกลับ':stg(d).no+' · '+esc(stg(d).name))+'</span></td>'+
+        '<td>'+esc(d.by)+'</td>'+
+        '<td class="c">'+(np?'<span class="pill r">ขาด '+np+'</span>':'<span class="pill g">ครบ</span>')+'</td></tr>';
+    });
+    t+='</tbody></table>';
+  }
+  t+='</div>';
+  $('view').innerHTML=t;
+  var hint={mydraft:'ใบร่างเก็บไว้ได้เรื่อย ๆ — <b>สโตร์กับจัดซื้อยังไม่เห็น</b> จนกว่าจะส่งอนุมัติและได้รับอนุมัติ',
+    approve:'<b>อนุมัติทั้ง 2 ชนิดเอกสารที่นี่ที่เดียว</b> · ใบ Inspection อนุมัติแล้ว ข้อที่ติ๊กไว้จะ<b>แตกเป็นใบเคลมอัตโนมัติ</b>',
+    store:'เอกสารวิ่งมาเองหลังผู้บังคับบัญชาอนุมัติ · ใส่ข้อมูลครบแล้วกดส่งต่อจัดซื้อ',
+    buy:'จัดซื้อทำ 3 อย่าง — บันทึกคำตอบ Supplier · ใส่ต้นทุน · แล้ว<b>ขอปิดใบเคลม</b>',
+    close:'ขั้นสุดท้าย <b>ผู้บริหารเท่านั้น</b>ที่กดอนุมัติปิดได้',
+    reg:'รวมทุกใบไว้ที่เดียว ไว้ค้นย้อนหลัง'};
+  tip(hint[k]||'');
+}
+
+function byJob(){
+  var jobs={};
+  DOCS.filter(canSee).forEach(function(d){ (jobs[d.job]=jobs[d.job]||{cust:d.cust,ds:[]}).ds.push(d); });
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › งานเคลมตามจ๊อบ</div>';
+  Object.keys(jobs).forEach(function(j){
+    t+='<div class="card"><div class="hd"><h2>'+esc(j)+'</h2><span class="sub">'+esc(jobs[j].cust)+'</span></div>'+
+      '<table><thead><tr><th style="width:110px">ชนิด</th><th style="width:120px">เลขที่</th>'+
+      '<th style="width:82px">วันที่</th><th>ขั้นตอนตอนนี้</th><th style="width:140px">มาจาก</th></tr></thead><tbody>';
+    jobs[j].ds.forEach(function(d){
+      t+='<tr class="k" onclick="openDoc(\''+d.no+'\')">'+
+        '<td class="c"><span class="pill '+(d.kind==='INS'?'ins':'clm')+'">'+
+        (d.kind==='INS'?'ใบ Inspection':'ใบเคลม')+'</span></td><td><b>'+esc(d.no)+'</b></td>'+
+        '<td class="c">'+esc(d.date)+'</td><td>'+stg(d).no+' · '+esc(stg(d).name)+'</td>'+
+        '<td>'+(d.from?esc(d.from):'—')+'</td></tr>';
+    });
+    t+='</tbody></table></div>';
+  });
+  $('view').innerHTML=t;
+  tip('<b>ดูรายจ๊อบ</b> — ใบ Inspection กับใบเคลมของรถคันเดียวกันอยู่ด้วยกัน · คอลัมน์ "มาจาก" บอกว่าใบเคลมนี้แตกมาจากใบตรวจใบไหน');
+}
+
+/* ═══ เปิดเอกสาร ═══ */
+function openDoc(n){ CURDOC=n; var d=doc(n); return d.kind==='INS'?insView(d):clmView(d); }
+function fld(c,l,v,lock,rq){ return '<div class="f '+c+'"><label>'+l+(rq?' <span class="rq">*</span>':'')+
+  '</label><input value="'+esc(v||'')+'" '+(lock?'class="locked" readonly':'')+'></div>'; }
+function ph(n){ var t=''; for(var i=0;i<n;i++) t+='<div class="thumb">🖼️</div>';
+  t+='<div class="addph">+</div>'; if(!n) t+='<span class="needph">ต้องมีรูป</span>'; return t; }
+function signRow(d,order){
+  var t='<div class="sign">';
+  order.forEach(function(r){
+    var v=d.sign[r]||'', p=v.split(' · '), isNext=stg(d).sign===r&&!v;
+    t+='<div class="sg'+(v?'':(isNext?' next':' wait'))+'"><i>'+esc(r)+'</i>'+
+      (v?'<b>'+esc(p[0])+'<small>'+esc(p[1]||'')+'</small><small>'+esc(p[2]||'')+'</small></b>'
+        :'<b>'+(isNext?'⏳ รอคนนี้กด':'— ยังไม่ถึงคิว —')+'</b>')+'</div>';
+  });
+  return t+'</div>';
+}
+function flowStrip(d){
+  var s=stg(d), own=isOwner(d), miss=missing(d);
+  var t='<div class="card">';
+  if(d.rej) t+='<div class="rej">↩ <b>เอกสารนี้ถูกตีกลับให้แก้</b><br>'+esc(d.rej)+'</div>';
+  t+='<div class="hd" style="margin-bottom:6px"><h2>ขั้นที่ '+s.no+' · '+esc(s.name)+'</h2>'+
+     '<span class="sub">รอ '+esc(s.who)+'</span></div>';
+  if(own&&miss.length) t+='<div class="warn">⚠ <b>ยังส่งต่อไม่ได้</b><br>'+esc(miss.join(' · '))+'</div>';
+  if(!s.roles.length) t+='<div class="okbox">✓ เอกสารนี้จบแล้ว</div>';
+  t+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+  if(own&&s.next) t+='<button class="btn '+(s.next==='DONE'?'g':'p')+'" '+(miss.length?'disabled':'')+
+    ' onclick="pass(\''+d.no+'\')">'+esc(s.act)+'</button>';
+  if(own&&d.stage==='DRAFT') t+='<button class="btn" onclick="alert(\'บันทึกร่างแล้ว — กลับมาแก้ได้เรื่อย ๆ\')">💾 บันทึกร่าง</button>';
+  if(own&&s.rej) t+='<button class="btn" onclick="kick(\''+d.no+'\')">↩ ตีกลับให้แก้</button>';
+  if(!own&&s.roles.length) t+='<span class="sub">👁 คุณดูได้ทุกอย่าง แต่ขั้นนี้เป็นหน้าที่ของ <b>'+esc(s.who)+'</b></span>';
+  t+='</div></div>';
+  return t;
+}
+function key(){ return '<div class="key"><span><b class="rq">*</b> ต้องกรอก</span>'+
+  '<span><i class="d1"></i><b style="color:var(--s1)">ฟ้า</b> ผู้เปิดใบกรอก</span>'+
+  '<span><i class="d2"></i><b style="color:var(--s2)">ส้ม</b> สโตร์กรอก</span>'+
+  '<span><i class="d3"></i><b style="color:var(--s3)">เขียว</b> จัดซื้อกรอก</span>'+
+  '<span><i class="da"></i><b style="color:var(--sa)">เทา</b> ระบบเติมเอง</span></div>'; }
+
+function clmView(d){
+  var own=isOwner(d);
+  var lk1=!(own&&d.stage==='DRAFT'), lk2=!(own&&d.stage==='STORE'), lk3=!(own&&d.stage==='BUY');
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › <a onclick="go(\''+VIEW+'\')">กลับรายการ</a> › '+esc(d.no)+'</div>';
+  t+='<div class="card"><div class="hd"><span class="pill clm">ใบเคลมสินค้า</span>'+
+    '<h2>'+esc(d.no)+'</h2><span class="sub">'+esc(d.job)+' · '+esc(d.cust)+' · '+
+    (d.area==='for'?'ต่างประเทศ':'ในประเทศ')+(d.from?' · แตกมาจาก '+esc(d.from):'')+'</span></div>'+
+    signRow(d,['ผู้เปิดใบ','ผู้อนุมัติ','สโตร์','จัดซื้อ','ผู้บริหาร'])+'</div>';
+  t+=flowStrip(d);
+  t+='<div class="card"><div class="hd"><h2>ข้อมูลใบเคลม</h2></div>'+key()+'<div class="grid">'+
+    fld('o1','ประเภทการเคลม',d.ctype==='after'?'หลังส่งมอบ':'ก่อนส่งมอบ',lk1,1)+
+    fld('o1','เลขที่ JOB',d.job,lk1,1)+fld('oa','ชื่อลูกค้า',d.cust,1)+
+    fld('oa','MODEL',d.model,1)+fld('o1','วันที่ต้องการของ',d.want,lk1,1)+
+    fld('o2','เลขใบส่งมอบ',d.dn,lk2,1)+
+    fld('oa','ผู้ขอเคลม',d.by,1)+fld('oa','แผนก',d.dept,1)+fld('oa','วันที่เปิด',d.date,1)+
+    '</div></div>';
+  t+='<div class="card"><div class="hd"><h2>รายการที่เคลม ('+d.items.length+')</h2>'+
+    '<span class="sub">ก๊อปจาก Google Sheets มาวางได้ · ทุกแถวต้องมีรูป</span></div>'+
+    '<div style="overflow-x:auto"><table><thead><tr><th style="width:32px">#</th>'+
+    '<th style="width:92px">รหัสสินค้า</th><th style="width:150px">ชื่อสินค้า</th>'+
+    '<th>รายละเอียดการเคลม</th><th style="width:50px">จน.</th><th style="width:52px">หน่วย</th>'+
+    '<th style="width:96px">PO</th><th style="width:130px">Supplier</th>'+
+    '<th style="width:98px">ต้นทุน</th><th style="width:118px">รูป</th></tr></thead><tbody>';
+  d.items.forEach(function(o,i){
+    t+='<tr><td class="c">'+(i+1)+'</td>'+cel(o.code,lk1)+cel(o.nm,lk1)+cel(o.th,lk1)+
+      cel(o.qty,lk1)+cel(o.unit,lk1)+cel(o.po,lk2)+cel(o.sup,lk2)+cel(o.cost,lk3)+
+      '<td><div class="ph">'+ph(o.ph)+'</div></td></tr>';
+  });
+  t+='</tbody></table></div></div>';
+  if(d.stage==='BUY'||d.stage==='CLOSE'||d.stage==='DONE'){
+    t+='<div class="card"><div class="hd"><h2>คำตอบจาก Supplier</h2>'+
+      '<span class="sub">จัดซื้อกรอก · แนบรูปแชท/อีเมลได้</span></div>'+
+      '<div class="f o3"><label>ผลการเคลม / ข้อความจาก Supplier</label>'+
+      '<textarea rows="2" '+(lk3?'class="locked" readonly':'')+'></textarea></div>'+
+      '<div style="margin-top:8px" class="ph">'+ph(0)+'<span class="sub">รูปแชทกับ Supplier</span></div></div>';
+  }
+  $('view').innerHTML=t;
+  var s=stg(d);
+  tip(!s.roles.length?'<b>ใบนี้ปิดจบแล้ว</b>'
+    :own?('<b>ตาคุณแล้ว</b> — กด “'+esc(s.act)+'” ลายเซ็นจะประทับเอง แล้วใบวิ่งไปกล่องถัดไป')
+        :('<b>คุณคือ '+esc(me().n)+'</b> — ขั้นนี้เป็นของ <b>'+esc(s.who)+'</b> ช่องกรอกเลยเป็นสีเทา · สลับบทบาทดูได้'));
+}
+function cel(v,lk){ return '<td'+(lk?' class="locked"':'')+'>'+esc(v||'')+'</td>'; }
+
+function insView(d){
+  var own=isOwner(d), lk=!(own&&d.stage==='DRAFT');
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › <a onclick="go(\''+VIEW+'\')">กลับรายการ</a> › '+esc(d.no)+'</div>';
+  t+='<div class="card"><div class="hd"><span class="pill ins">ใบ Inspection</span>'+
+    '<h2>'+esc(d.no)+'</h2><span class="sub">'+esc(d.job)+' · '+esc(d.cust)+' · '+esc(d.tpl)+'</span></div>'+
+    signRow(d,['ผู้ตรวจ','ผู้อนุมัติ'])+'</div>';
+  t+=flowStrip(d);
+  var un=d.items.filter(function(o){return o.acc==='UNACC';}),
+      tk=d.items.filter(function(o){return o.toClaim;});
+  t+='<div class="card"><div class="hd"><h2>รายการตรวจ ('+d.items.length+' ข้อ)</h2>'+
+    '<span class="sub">ติ๊ก Acc / Un-Acc ทุกข้อ · ข้อที่ไม่ผ่านต้องมีรูป</span></div>';
+  t+='<div class="warn" style="background:#f2f9ff;border-color:#bcd9f0;color:#175a91">'+
+    '☑️ <b>ช่อง “ส่งไปสร้างใบเคลม”</b> — ติ๊กเฉพาะข้อที่ Un-Acc แล้วอยากเคลมกับ Supplier · '+
+    'พออนุมัติผลตรวจ ระบบจะ<b>สร้างใบเคลมจากข้อที่ติ๊กให้อัตโนมัติ</b> รายละเอียดและรูปตามไปด้วย ไม่ต้องพิมพ์ใหม่</div>';
+  t+='<div style="overflow-x:auto"><table><thead><tr><th style="width:32px">#</th><th>หัวข้อตรวจ</th>'+
+    '<th style="width:94px">ผลตรวจ</th><th style="width:230px">สิ่งที่พบ</th>'+
+    '<th style="width:118px">รูป</th><th style="width:130px">ส่งไปสร้างใบเคลม</th></tr></thead><tbody>';
+  d.items.forEach(function(o,i){
+    var canTick = own && d.stage==='DRAFT' && o.acc==='UNACC';
+    t+='<tr><td class="c">'+(i+1)+'</td><td>'+esc(o.t)+'</td>'+
+      '<td class="c">'+(o.acc==='ACC'?'<span class="pill g">Acc</span>'
+        :o.acc==='UNACC'?'<span class="pill r">Un-Acc</span>':'<span class="pill y">ยังไม่ตรวจ</span>')+'</td>'+
+      '<td'+(lk?' class="locked"':'')+'>'+esc(o.found)+'</td>'+
+      '<td><div class="ph">'+ph(o.ph)+'</div></td>'+
+      '<td class="c">'+(o.acc==='UNACC'
+        ? '<input type="checkbox" class="tick" '+(o.toClaim?'checked':'')+' '+(canTick?'':'disabled')+
+          ' onchange="tickClaim(\''+d.no+'\','+i+',this.checked)">'
+        : '<span class="sub" style="color:#c9ced4">—</span>')+'</td></tr>';
+  });
+  t+='</tbody></table></div>';
+  t+='<div class="okbox" style="margin-top:11px">☑️ ติ๊กส่งไปสร้างใบเคลมแล้ว <b>'+tk.length+'</b> ข้อ '+
+     '(จาก Un-Acc ทั้งหมด '+un.length+' ข้อ)'+
+     (tk.length?' — พออนุมัติ ระบบจะสร้างใบเคลม <b>1 ใบ</b> จาก '+tk.length+' ข้อนี้':'')+'</div>';
+  t+='</div>';
+  $('view').innerHTML=t;
+  var s=stg(d);
+  tip(d.stage==='DONE'?'<b>อนุมัติผลตรวจแล้ว</b>'
+    :own?'<b>ตาคุณแล้ว</b> — ติ๊กผลตรวจให้ครบ · ข้อที่ Un-Acc และอยากเคลม <b>ติ๊กช่องขวาสุด</b> แล้วกดส่งขออนุมัติ'
+        :'<b>ขั้นนี้เป็นของ '+esc(s.who)+'</b> — สลับบทบาทมุมขวาบนเพื่อทดลอง');
+}
+function tickClaim(no,i,v){ doc(no).items[i].toClaim=v; openDoc(no); }
+
+/* ═══ ส่งต่อ / ตีกลับ ═══ */
+function pass(no){
+  var d=doc(no), s=stg(d), m=missing(d);
+  if(m.length){ alert('ยังส่งต่อไม่ได้\n\n· '+m.join('\n· ')); return; }
+  d.sign[s.sign]=me().n+' · '+me().p+' · '+now();
+  d.rej='';
+  var wasIns=(d.kind==='INS'), tk=wasIns?d.items.filter(function(o){return o.toClaim;}):[];
+  d.stage=s.next;
+  var msg='';
+  if(wasIns&&d.stage==='DONE'&&tk.length){
+    var nn='CLM-69/'+String(DOCS.filter(function(x){return x.kind==='CLM';}).length+1).padStart(4,'0');
+    DOCS.push({no:nn,kind:'CLM',stage:'DRAFT',job:d.job,cust:d.cust,model:d.model,date:now().split(' ')[0],
+      by:d.by,dept:d.dept,area:d.area,ctype:'pre',from:d.no,dn:'',want:'',rej:'',
+      sign:{'ผู้เปิดใบ':d.sign['ผู้ตรวจ']||''},
+      items:tk.map(function(o){return {code:'',nm:o.t,th:o.found,qty:'1',unit:'',po:'',sup:'',ph:o.ph,cost:''};})});
+    msg='\n\n☑️ สร้างใบเคลม '+nn+' จากข้อที่ติ๊กไว้ '+tk.length+' ข้อ ให้อัตโนมัติแล้ว\nรายละเอียดและรูปตามไปด้วย';
+  }
+  var ns=stg(d);
+  openDoc(no);
+  setTimeout(function(){
+    alert('✓ '+s.act.replace(/^[^ ]+ /,'')+' เรียบร้อย\n\n'+
+      (ns.roles.length?('เอกสารวิ่งไปหา '+ns.who+'\nโผล่ในกล่องงานที่ '+ns.box+' · เด้ง LINE แจ้งให้เอง')
+                      :'ปิดจบเรียบร้อย')+msg);
+  },60);
+}
+function kick(no){
+  var d=doc(no), s=stg(d);
+  var w=prompt('ตีกลับ '+no+'\n\nบอกเหตุผลว่าต้องแก้อะไร:');
+  if(w===null) return;
+  if(!String(w).trim()){ alert('ต้องบอกเหตุผลครับ'); return; }
+  d.rej=esc(w)+' — โดย '+me().n+' · '+now();
+  d.stage=s.rej;
+  openDoc(no);
+  setTimeout(function(){ alert('↩ ตีกลับแล้ว\n\nเอกสารวิ่งกลับไปหา '+stg(d).who+'\nเด้ง LINE พร้อมเหตุผลให้เอง'); },60);
+}
+
+/* ═══ เปิดเอกสารใหม่ ═══ */
+function newDoc(kind){
+  var isIns=kind==='INS';
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › '+
+    (isIns?'เปิดใบ Inspection':'เปิดใบเคลมสินค้า')+'</div>'+
+    '<div class="card"><div class="hd"><span class="pill '+(isIns?'ins':'clm')+'">'+
+    (isIns?'ใบ Inspection':'ใบเคลมสินค้า')+'</span><h2>'+(isIns?'เปิดใบ Inspection ใหม่':'เปิดใบเคลมใหม่')+'</h2>'+
+    '<span class="sub">ผู้เปิด: '+esc(me().n)+' · '+esc(me().p)+'</span></div>'+
+    '<div class="warn">📝 กรอกของตัวเองให้ครบ + แนบรูป · <b>บันทึกร่างไว้ก่อนได้</b> '+
+    'สโตร์กับจัดซื้อยังไม่เห็น · ครบแล้วกด <b>ส่งขออนุมัติ</b> ไปที่ผู้บังคับบัญชา</div>'+key()+
+    '<div class="grid">'+
+    fld('o1','เลขที่ JOB','',0,1)+fld('oa','ชื่อลูกค้า','ขึ้นเองจากเลขจ๊อบ',1)+
+    fld('oa','MODEL','ขึ้นเองจากเลขจ๊อบ',1)+
+    (isIns?fld('o1','แม่แบบเช็คลิสต์','แท็งค์นำเข้า (Tankers)',0,1)+fld('o1','ผู้ตรวจ',me().n,1)
+          :fld('o1','ประเภทการเคลม','หลังส่งมอบ',0,1)+fld('o1','วันที่ต้องการของ','',0,1))+
+    fld('oa','แผนกที่ขอ',me().p,1)+
+    '</div>'+
+    '<div style="margin-top:14px;display:flex;gap:8px">'+
+    '<button class="btn" onclick="alert(\'บันทึกร่างแล้ว — ไปที่เมนู ✏️ เอกสารร่างของฉัน\')">💾 บันทึกร่าง</button>'+
+    '<button class="btn p" onclick="alert(\'ตัวอย่างการตรวจก่อนส่ง:\\n\\nยังไม่ได้กรอก: เลขที่ JOB'+
+    (isIns?'':' · วันที่ต้องการของ')+'\\nรายการที่ 1 ยังไม่มีรูป\\n\\n→ บอกครบทีเดียว พร้อมกรอบแดงที่ช่องนั้น\')">'+
+    '📤 ส่งขออนุมัติ</button></div></div>';
+  $('view').innerHTML=t;
+  tip(isIns
+    ? '<b>ใบ Inspection</b> — ตรวจของตอนมาถึง · ข้อที่ Un-Acc <b>ติ๊กช่อง “ส่งไปสร้างใบเคลม”</b> พออนุมัติ ระบบสร้างใบเคลมให้เอง'
+    : '<b>ใบเคลม</b> — เปิดตรงได้เลย ไม่ต้องผ่านใบตรวจ (เคลมหลังส่งมอบ / อุปกรณ์ในประเทศ)');
+}
+
+go('home');
+</script>
+</body>
+</html>

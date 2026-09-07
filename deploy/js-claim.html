@@ -158,6 +158,26 @@ function jobTypeOf(jobNo){
 /** ลายเซ็นตามขั้นตอน — ขึ้นเองเมื่อแต่ละคนกดรับ/อนุมัติ/ส่งต่อ ไม่ต้องเซ็นมือ */
 function signRow(signs){
   if (!signs || !signs.length) return '';
+  /* 9 ช่อง 2 รอบ — รอบ 1 ครบ 4 ช่อง ปุ่มพิมพ์ใบส่ง Supplier ถึงเปิด (สเปคข้อ 7) */
+  if (signs[0] && signs[0].round){
+    var r1 = signs.filter(function(x){ return x.round === 1; });
+    var r2 = signs.filter(function(x){ return x.round === 2; });
+    var done1 = r1.every(function(x){ return !!x.text; });
+    var box = function(a){
+      var o = '<div class="signrow">';
+      for (var i = 0; i < a.length; i++){
+        o += '<div class="signbox' + (a[i].text ? '' : ' wait') + '">' +
+             '<i>' + esc(a[i].role) + '</i><b>' +
+             esc(a[i].text || '— ยังไม่ถึงขั้นนี้ —') + '</b></div>';
+      }
+      return o + '</div>';
+    };
+    return '<div class="signttl">รอบที่ 1 — เปิดและส่งเคลม' +
+             (done1 ? '<b class="okt"> ✓ ครบ 4 ช่อง — เปิดปุ่มพิมพ์ใบส่ง Supplier แล้ว</b>'
+                    : '<span class="sub"> ครบ 4 ช่องเมื่อไหร่ ปุ่มพิมพ์ใบส่ง Supplier ถึงจะเปิดใช้ได้</span>') +
+           '</div>' + box(r1) +
+           '<div class="signttl">รอบที่ 2 — หลังได้ผลจาก Supplier</div>' + box(r2);
+  }
   var t = '<div class="signrow">';
   for (var i = 0; i < signs.length; i++){
     t += '<div class="signbox' + (signs[i].text ? '' : ' wait') + '">' +
@@ -596,6 +616,13 @@ function delClaimRow(seq){
   srv('delClaimItem', [CURDOC, seq, AUTH], function(){ go('claim', CURDOC); });
 }
 
+/** เลือกผลการเคลม — คำตอบนี้เปลี่ยนเส้นทางเดินเอกสาร ต้องโหลดใบใหม่ให้เห็นผลทันที */
+function setResult(v){
+  srv('saveClaimField', [CURDOC, 'result', v, AUTH],
+      function(){ go('claim', CURDOC); },
+      function(m){ alert(m); go('claim', CURDOC); });
+}
+
 /* ─── แท็บ ② · คำตอบจาก Supplier ─── */
 function paneSupplier(c, docNo){
   var h = c.head;
@@ -603,16 +630,28 @@ function paneSupplier(c, docNo){
     '<span class="sub">กรอกเมื่อ Supplier ตอบกลับมา · พิมพ์แล้วบันทึกเอง</span></div>';
   t += '<div class="hint" style="margin-bottom:12px">ผลการเคลมเป็นตัวตัดสินว่าต้องออก <b>ใบเรียกเก็บค่าเคลม (แท็บ ③)</b> หรือไม่ — ' +
        'ออกเฉพาะกรณีที่ <b>STT ต้องซื้อหรือซ่อมเอง</b> แล้วเรียกเงินคืนจาก Supplier</div>';
-  t += '<div class="fgrid2">';
-  t += '<div class="frow"><label>ผลการเคลม</label>' +
-    sel('c_result','saveClaimField','result',h['ผลการเคลม'],
-      [['','— ยังไม่ตอบ —'],
-       ['SEND_NEW','Supplier ส่งของใหม่มาให้'],
-       ['SEND_PART','Supplier ส่งอะไหล่มาให้ซ่อม'],
-       ['STT_FIX','ให้ STT ซ่อม/ซื้อเอง แล้วเรียกเก็บเงินคืน'],
-       ['REJECT','Supplier ปฏิเสธการเคลม'],
-       ['OTHER','อื่น ๆ']]) + '</div>';
-  t += '</div>';
+  /* 4 กรณีตามสเปคข้อ 5 — รายการมาจากหลังบ้าน (resultList) ที่เดียว
+     ห้ามก๊อปมาเขียนซ้ำในหน้าเว็บ เคยพลาดมาแล้วตอนรายชื่อขั้นตอน v0.9.0 */
+  var RS = (c.flow && c.flow.results) || [];
+  var cur = String(h['ผลการเคลม'] || '').trim();
+  t += '<div class="tblwrap"><table class="grid resgrid"><thead><tr>' +
+       '<th style="width:44px">เลือก</th><th>กรณี</th>' +
+       '<th style="width:104px">ค่าของ</th><th style="width:104px">ค่าแรง</th>' +
+       '<th style="width:132px">ออกใบเรียกเก็บ</th><th style="width:150px">ของกลับมาไหม</th>' +
+       '</tr></thead><tbody>';
+  for (var ri = 0; ri < RS.length; ri++){
+    var R = RS[ri], on = (cur === R.key);
+    t += '<tr' + (on ? ' class="reson"' : '') + '>' +
+      '<td class="c"><input type="radio" name="cres" value="' + esc(R.key) + '"' +
+        (on ? ' checked' : '') + ' onchange="setResult(this.value)"></td>' +
+      '<td>' + esc(R.text) + '</td>' +
+      '<td class="c">' + esc(R.goods) + '</td><td class="c">' + esc(R.labor) + '</td>' +
+      '<td class="c">' + (R.bill ? '<span class="pill ok">✓ ต้องออกใบ ②</span>'
+                                 : '<span class="pill">ไม่ต้องออก ปิดที่ใบสรุป</span>') + '</td>' +
+      '<td class="c">' + (R.back ? '<span class="pill warn">มี — เข้าสโตร์ แล้ว QC ตรวจ</span>'
+                                 : '<span class="pill">ไม่มี — ข้ามไปปิดจบ</span>') + '</td></tr>';
+  }
+  t += '</tbody></table></div>';
   t += '<div class="frow"><label>รายละเอียดผลการเคลม</label>' +
     '<textarea class="tall" data-save="saveClaimField" data-f="resultDetail" placeholder="สรุปว่าตกลงกันได้ยังไง">' + esc(h['รายละเอียดผลการเคลม']) + '</textarea></div>';
   t += '<div class="frow"><label>หมายเหตุ / ข้อความจาก Supplier</label>' +
@@ -789,10 +828,44 @@ function saveLabourRows(){
 
 /* ─── แท็บ ④ · รับของกลับ + QC ─── */
 function paneReturn(c, docNo){
-  var t = '<div class="card"><div class="cardhd"><h3>รับของกลับจาก Supplier</h3>' +
-    '<span class="sub">ถ่ายรูปของที่ได้กลับมา แล้วให้ Production / QC กดรับ</span></div>';
-  t += '<div class="hint" style="margin-bottom:12px">ของกลับมาแล้ว <b>ต้องถ่ายรูปลงระบบ</b> และให้ Production หรือ QC กด ' +
-       '<b>Accept</b> หรือ <b>ไม่ Accept</b> — ถ้าไม่ Accept ระบบจะเปิดใบเคลมรอบใหม่ให้ (วนกลับ) นี่คือขั้นตอนภายใน ไม่ได้ส่งให้ Supplier</div>';
+  var h = c.head, f = c.flow || {}, dn = f.docNos || {}, stg = f.stage || '';
+  var t = '';
+
+  /* ═══ ขั้น 6 · สโตร์รับของกลับเข้าคลัง ═══
+     เบียร์ 7 ก.ย.: "ของเข้ามาแล้ว ก็ต้องไปที่สโตร์ก่อน สโตร์มีการแจ้ง QC ให้มาตรวจรับสินค้า" */
+  t += '<div class="card"><div class="cardhd">' +
+    '<h3>📥 ขั้นที่ 6 · ของกลับเข้าคลัง — สโตร์รับเข้า</h3>' +
+    '<span class="sub">ของจาก Supplier ต้องเข้าสโตร์ก่อนเสมอ · รับเข้าแล้วระบบแจ้ง QC มาตรวจให้</span></div>';
+  t += '<div class="fgrid">' +
+    fr('เลขที่รับของเข้าคลัง', '<input value="' + esc(dn.gr || '') + '" disabled placeholder="ระบบออกให้ตอนกดรับเข้า">', 'อัตโนมัติ|ระบบออกเลขให้เอง') +
+    fr('วันที่ของเข้าคลัง', '<input value="' + esc(dn.grDate || '') + '" disabled>', 'อัตโนมัติ') +
+    fr('ที่เก็บในคลัง (Location)', ip('c_storeLoc','saveClaimField','storeLoc',h['ที่เก็บในคลัง']), 'สโตร์', true) +
+    fr('ขนส่ง / เลขพัสดุที่ส่งกลับมา', ip('c_storeTrk','saveClaimField','storeTrk',h['ขนส่ง/เลขพัสดุ']), 'สโตร์') +
+    '</div>';
+  t += '<div class="rethd">📷 รูปตอนแกะกล่อง (สโตร์ถ่ายไว้เป็นหลักฐานว่าของมาสภาพไหน)</div>' +
+       '<div data-phbox="G" data-phreq="soft"></div>';
+  if (stg === 'STORE_IN'){
+    t += '<div class="hint" style="margin-top:10px">🔔 กรอกที่เก็บให้ครบ แล้วกดปุ่ม ' +
+         '<b>"รับของเข้าคลัง + แจ้ง QC มาตรวจ"</b> บนหัวเอกสาร — ระบบจะออก<b>เลขที่ + วันที่</b>ให้ ' +
+         'แล้วเด้ง LINE เรียก QC มาตรวจที่คลังทันที</div>';
+  } else if (dn.gr){
+    t += '<div class="phbar ok" style="margin-top:10px">✓ รับเข้าคลังแล้ว <b>' + esc(dn.gr) + '</b> · ' +
+         esc(dn.grDate) + ' — แจ้ง QC เรียบร้อย</div>';
+  }
+  t += '</div>';
+
+  /* ═══ ขั้น 7 · QC ตรวจรับของกลับ = Inspection สินค้าของงานนั้น ═══ */
+  t += '<div class="card"><div class="cardhd"><h3>🔍 ขั้นที่ 7 · ใบตรวจรับของกลับ — QC ตรวจที่คลัง</h3>' +
+    '<span class="sub">ทำเหมือนตรวจ Inspection สินค้าของงานนั้น · มีเลขที่เอกสาร วันที่ และรูป</span></div>';
+  t += '<div class="fgrid">' +
+    fr('เลขที่ใบตรวจรับของกลับ', '<input value="' + esc(dn.rcv || '') + '" disabled placeholder="ระบบออกให้ตอนตรวจเสร็จ">', 'อัตโนมัติ') +
+    fr('วันที่ตรวจ', '<input value="' + esc(dn.rcvDate || '') + '" disabled>', 'อัตโนมัติ') +
+    fr('ผู้ตรวจ', '<input value="' + esc(dn.rcvBy || '') + '" disabled>', 'อัตโนมัติ|ชื่อคนที่กดตรวจเสร็จ') +
+    fr('อ้างอิงใบรับเข้าคลัง', '<input value="' + esc(dn.gr ? (dn.gr + ' · ' + dn.grDate) : '—') + '" disabled>', 'อัตโนมัติ') +
+    '</div>';
+  t += '<div class="hint" style="margin-top:10px">ของกลับมาแล้ว <b>ต้องถ่ายรูปลงระบบ</b> และให้ Production หรือ QC กด ' +
+       '<b>Accept</b> หรือ <b>ไม่ Accept</b> ทีละรายการ — ถ้าไม่ Accept ระบบจะ<b>วนกลับเป็นเคลมรอบใหม่</b> ' +
+       '(ใบเดิม เลขเดิม แต่ล้างลายเซ็นรอบ 2 กับเลขเอกสารทิ้ง แล้วกลับไปหาจัดซื้อ)</div>';
 
   t += '<div class="retform"><div class="frow2">' +
     '<label>รายการที่</label><select id="r_item">';
@@ -827,12 +900,65 @@ function paneReturn(c, docNo){
   if (!rets.length) t += '<tr><td colspan="7" class="c hint">ยังไม่มีการรับของกลับ</td></tr>';
   t += '</tbody></table>';
 
-  if (anyBad){
-    t += '<div class="phbar bad" style="margin-top:12px">มีของที่ QC ไม่ Accept — ต้องเคลมรอบใหม่</div>' +
-      '<div style="margin-top:8px"><button class="btn primary" onclick="doReclaim()">➜ เปิดใบเคลมรอบใหม่จากของที่ไม่ Accept</button></div>';
+  if (anyBad || f.canRejectReturn){
+    t += '<div class="phbar bad" style="margin-top:12px">' +
+      (anyBad ? 'มีของที่ QC ไม่ Accept — ' : '') +
+      'ไม่ Accept = <b>วนกลับเป็นเคลมรอบใหม่</b> ใบเดิม เลขเดิม' +
+      (f.round > 1 ? ' · ตอนนี้เป็น<b>รอบที่ ' + f.round + '</b>' : '') + '</div>' +
+      '<div style="margin-top:8px"><button class="btn primary" onclick="doRejectReturn()">' +
+      '↩ ไม่ Accept — วนกลับเป็นเคลมรอบใหม่</button></div>';
   }
   t += '<div id="retmsg"></div></div>';
+
+  /* ═══ ขั้น 8 · สโตร์เบิกออกให้หน้างาน ═══ */
+  t += '<div class="card"><div class="cardhd"><h3>📤 ขั้นที่ 8 · เบิกของออกให้หน้างาน — สโตร์</h3>' +
+    '<span class="sub">QC ตรวจผ่านแล้วเท่านั้น สโตร์ถึงจ่ายของออกได้</span></div>';
+  t += '<div class="fgrid">' +
+    fr('เลขที่ใบเบิก', '<input value="' + esc(dn.is || '') + '" disabled placeholder="ระบบออกให้ตอนกดเบิกออก">', 'อัตโนมัติ') +
+    fr('วันที่เบิกออก', '<input value="' + esc(dn.isDate || '') + '" disabled>', 'อัตโนมัติ') +
+    fr('ผู้รับของ (หน้างาน)', ip('c_issueTo','saveClaimField','issueTo',h['ผู้รับของหน้างาน']), 'สโตร์', true) +
+    fr('แผนกที่เบิกไปใช้', ip('c_issueDept','saveClaimField','issueDept',h['แผนกที่เบิกไปใช้']), 'สโตร์', true) +
+    fr('อ้างอิงใบตรวจรับ', '<input value="' + esc(dn.rcv || '—') + '" disabled>', 'อัตโนมัติ') +
+    '</div>';
+  if (dn.is){
+    t += '<div class="phbar ok" style="margin-top:10px">✓ เบิกออกแล้ว <b>' + esc(dn.is) + '</b> · ' +
+         esc(dn.isDate) + ' — ของถึงมือหน้างานเรียบร้อย</div>';
+  }
+  t += '</div>';
+
+  /* ═══ ขั้น 9 · ปิดจบ ต้นทุนไปทางไหน (สเปคข้อ 3.7-3.8) ═══ */
+  var bl = String(h['ความรับผิดชอบ'] || '');
+  t += '<div class="card"><div class="cardhd"><h3>🏁 ขั้นที่ 9 · ปิดจบ — ต้นทุนไปทางไหน</h3>' +
+    '<span class="sub">จัดซื้อระบุก่อนให้ผู้บริหารกดปิด · ระบบส่งต่อให้ HR และบัญชีเอง</span></div>';
+  t += '<div class="frow"><label>ความรับผิดชอบ</label>' +
+    sel('c_blame','saveClaimField','blame',bl,
+      [['','— ยังไม่ระบุ —'],
+       ['EMP','พนักงานทำเสียหาย → ออกรายงานส่ง HR ไปหักเงิน'],
+       ['JOB','ไม่ใช่ความผิดพนักงาน → ลงเป็นต้นทุนของแท็งค์ ผูกกับ JMC']]) + '</div>';
+  if (bl === 'EMP'){
+    t += '<div class="fgrid">' +
+      fr('ชื่อผู้ทำเสียหาย', ip('c_blameWho','saveClaimField','blameWho',h['ชื่อผู้ทำเสียหาย']), 'จัดซื้อ', true) +
+      fr('แผนกของคนนั้น', ip('c_blameDept','saveClaimField','blameDept',h['แผนกผู้ทำเสียหาย']), 'จัดซื้อ', true) +
+      '</div>' +
+      '<div class="hint" style="margin-top:8px">ใบนี้จะไปโผล่ในเมนู <b>รายงานส่ง HR</b> · ' +
+      'ระบบไม่หักเงินเอง HR เป็นคนตัดสินใจตามระเบียบบริษัท</div>';
+  }
+  t += '<div class="hint" style="margin-top:8px">ทั้ง 2 กรณี ระบบส่งข้อมูลให้ <b>บัญชี</b> อัตโนมัติเมื่อใบปิดจบ ' +
+       '(บัญชีรับข้อมูลอย่างเดียว ไม่ต้องกดติ๊กอะไรในระบบเคลม)</div></div>';
   return t;
+}
+
+/** ไม่ Accept ของที่ Supplier ส่งกลับมา → วนกลับเป็นเคลมรอบใหม่ (ใบเดิม เลขเดิม) */
+function doRejectReturn(){
+  var why = prompt('ไม่ Accept ของที่ Supplier ส่งกลับมา\n\nไม่ Accept เพราะอะไร (Supplier จะได้รู้ว่าไม่ผ่านตรงไหน):');
+  if (why === null) return;
+  if (!String(why).trim()){ alert('ต้องบอกเหตุผลครับ'); return; }
+  srv('rejectReturn', [CURDOC, why, AUTH], function(r){
+    alert('↩ วนกลับเป็นเคลมรอบใหม่แล้ว — รอบที่ ' + r.round + '\n\n' +
+          'ใบเดิม เลขเดิม · ล้างลายเซ็นรอบ 2 และเลขเอกสาร GR / RCV / IS ให้แล้ว\n' +
+          'กลับไปหาจัดซื้อให้คุยกับ Supplier ใหม่');
+    go('claim', CURDOC);
+  }, function(m){ alert(m); });
 }
 function addReturn(acc){
   var rec = { itemSeq:$('r_item') ? $('r_item').value : '', date:$('r_date').value,

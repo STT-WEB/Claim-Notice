@@ -1,0 +1,1981 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STT CLAIM HUB — Mockup v9</title>
+<style>
+*{box-sizing:border-box}
+:root{--red:#E2231A;--line:#ececec;--dim:#999;--s1:#1f7fd8;--s2:#d97706;--s3:#15803d;--sa:#64748b}
+body{margin:0;background:#f4f5f7;color:#1a1a1a;
+     font-family:"Noto Sans Thai","Sarabun",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:13.5px}
+.top{background:#fff;border-bottom:3px solid var(--red);height:58px;display:flex;align-items:center;
+     gap:12px;padding:0 18px;position:sticky;top:0;z-index:60}
+.lg{font-weight:800;font-style:italic;color:var(--red);font-size:16px}
+.lg span{display:block;font-style:normal;font-weight:400;color:var(--dim);font-size:10px}
+.sp{flex:1}
+select,input,textarea{font-family:inherit;font-size:13px;border:1px solid #ddd;border-radius:8px;
+     padding:7px 9px;background:#fff;color:#1a1a1a;width:100%}
+.btn{border:1px solid #ddd;background:#fff;border-radius:8px;padding:8px 13px;font-size:13px;
+     cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn:hover{border-color:#aaa}
+.btn.p{background:var(--red);border-color:var(--red);color:#fff;font-weight:700}
+.btn.g{background:#0f7a34;border-color:#0f7a34;color:#fff;font-weight:700}
+.btn.b{background:#1558b0;border-color:#1558b0;color:#fff;font-weight:700}
+.btn.dk{background:#1f2937;border-color:#1f2937;color:#fff}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.wrap{max-width:1180px;margin:0 auto;padding:18px 14px 60px}
+
+/* ── หน้าแรก แบบ NOVA ── */
+.hero{background:linear-gradient(120deg,#141414 0%,#5e1712 52%,#E2231A 100%);color:#fff;border-radius:18px;
+      padding:22px 26px;margin-bottom:20px;box-shadow:0 12px 32px rgba(226,35,26,.2)}
+.hero h1{margin:0;font-size:23px;letter-spacing:.5px}
+.hero p{margin:5px 0 0;font-size:13px;opacity:.9}
+.hchip{display:inline-block;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);
+       border-radius:20px;padding:3px 12px;font-size:11.5px;margin-top:11px;font-weight:600}
+.modgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.modcard{border-radius:16px;padding:20px 20px 16px;border:1px solid var(--line);background:#fff;
+         box-shadow:0 6px 18px -12px rgba(0,0,0,.25)}
+.modhd{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+.modic{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+       font-size:23px;background:var(--acbg)}
+.modttl{font-size:17px;font-weight:800}
+.modstep{margin-left:auto;font-size:11px;font-weight:700;color:#fff;background:var(--ac);
+         border-radius:20px;padding:3px 11px}
+.modrole{font-size:11px;color:var(--dim);letter-spacing:.4px;margin-bottom:10px}
+.moditem{display:flex;align-items:flex-start;gap:11px;padding:11px 10px;border-radius:10px;cursor:pointer;
+         border-top:1px solid #f2f2f2}
+.moditem:hover{background:#fafbfc}
+.moditem.off{opacity:.4;cursor:not-allowed}
+.mi-ic{font-size:19px;margin-top:1px}
+.mi-t{font-size:14.5px;font-weight:700}
+.mi-d{font-size:12px;color:var(--dim);margin-top:1px;line-height:1.45}
+.mi-n{margin-left:auto;background:var(--red);color:#fff;border-radius:20px;padding:2px 9px;
+      font-size:11.5px;font-weight:700;align-self:center}
+.mi-n.zero{background:#eceff2;color:#9aa3ad}
+.modtag{margin-top:11px;font-size:11.5px;border-radius:9px;padding:8px 11px;line-height:1.5;
+        background:#fafbfc;border:1px solid #f0f0f0;color:#777}
+
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.crumb{font-size:12px;color:var(--dim);margin-bottom:12px}
+.crumb a{color:var(--red);cursor:pointer;text-decoration:none}
+.hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.hd h2{margin:0;font-size:17px}
+.hd .sub{font-size:12px;color:var(--dim)}
+/* ── ตารางแบบ Excel: เส้นตารางทุกด้าน ช่องกรอกไร้ขอบเต็มเซลล์ แถวเตี้ย ไม่เปลืองที่ ── */
+table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #b8bfc7}
+table.wide{min-width:1040px}
+th,td{border:1px solid #d4d9df;font-size:12.5px;vertical-align:middle;padding:4px 7px;
+      line-height:1.45;overflow-wrap:anywhere;word-break:normal}
+thead th{background:#eaeef2;font-weight:700;font-size:12px;text-align:center;color:#1a1a1a;
+         padding:5px 6px;white-space:normal}
+tbody tr:nth-child(even)>td{background:#fafbfc}
+tbody tr:hover>td{background:#fff9e8}
+td.rowno{background:#eaeef2;color:#6b7683;text-align:center;font-size:11.5px;font-weight:600;width:34px}
+/* ช่องกรอกในตาราง = เซลล์ Excel ไม่ใช่กล่อง */
+td.in{padding:0}
+td.in>input,td.in>select,td.in>textarea{width:100%;height:100%;min-height:26px;border:0;border-radius:0;
+  background:transparent;padding:4px 7px;font:inherit;font-size:12.5px;outline:0;display:block}
+td.in>input:focus,td.in>select:focus,td.in>textarea:focus{background:#fffbe6;
+  box-shadow:inset 0 0 0 2px var(--s1)}
+td.in>input::placeholder{color:#c2c8cf}
+td.locked{background:#eef0f2;color:#98a1aa}
+tbody tr.k{cursor:pointer}tbody tr.k:hover{background:#fffaf9}
+.c{text-align:center}.r{text-align:right}
+.pill{display:inline-block;font-size:11px;border:1px solid #ddd;border-radius:20px;padding:2px 9px;white-space:nowrap}
+.pill.ins{border-color:#bcd9f0;color:#175a91;background:#f2f9ff}
+.pill.clm{border-color:#f3c5c2;color:#a3231b;background:#fff5f4}
+.pill.g{border-color:#b6e0c2;color:#1f7a3d;background:#f2fbf5}
+.pill.r{border-color:#f0c2c2;color:#b3261e;background:#fff5f5}
+.pill.y{border-color:#f0dfae;color:#8a6b12;background:#fffaef}
+.stab{display:flex;gap:7px;margin-bottom:11px}
+.stab button{border:1px solid #ddd;background:#fff;border-radius:9px;padding:7px 15px;font-family:inherit;
+             font-size:13px;cursor:pointer}
+.stab button.on{border-color:var(--red);color:var(--red);background:#fff6f5;font-weight:700}
+.empty{text-align:center;color:var(--dim);padding:26px;border:1px dashed #ddd;border-radius:10px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 16px}
+.f label{display:block;font-size:12px;font-weight:700;margin-bottom:3px}
+.f.o1 label{color:var(--s1)}.f.o2 label{color:var(--s2)}.f.o3 label{color:var(--s3)}.f.oa label{color:var(--sa)}
+.f .rq{color:var(--red)}
+.locked{background:#f4f5f7;color:#9aa3ad}
+.key{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--dim);padding:0 0 10px;align-items:center}
+.key i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:4px}
+.d1{background:var(--s1)}.d2{background:var(--s2)}.d3{background:var(--s3)}.da{background:var(--sa)}
+.warn{background:#fff4e5;border:1px solid #f0c675;border-radius:10px;padding:10px 13px;
+      font-size:12.5px;color:#8a5a00;margin-bottom:11px;line-height:1.6}
+.rej{background:#fff5f5;border:1px solid #f0c2c2;border-radius:10px;padding:10px 13px;
+     font-size:12.5px;color:#b3261e;margin-bottom:11px;line-height:1.6}
+.okbox{background:#f2fbf5;border:1px solid #b6e0c2;border-radius:10px;padding:10px 13px;
+       font-size:12.5px;color:#1f7a3d;margin-bottom:11px}
+.sign{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.sg{flex:1 1 150px;border:1px solid #e8e8e8;border-radius:9px;padding:8px 10px;min-height:60px}
+.sg i{display:block;font-style:normal;font-size:10px;color:#8b929a;margin-bottom:3px}
+.sg b{display:block;font-size:11.5px;font-weight:600;line-height:1.5}
+.sg small{display:block;color:var(--dim);font-weight:400;font-size:10.5px}
+.sg.wait{background:#fbfcfd}.sg.wait b{color:#c9ced4;font-weight:400}
+.sg.next{border-color:var(--red);background:#fff8f7}
+.ph{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.thumb{width:48px;height:36px;border-radius:6px;background:linear-gradient(135deg,#c9d3dc,#96a3af);
+       display:flex;align-items:center;justify-content:center;font-size:13px}
+.addph{width:48px;height:36px;border:1px dashed #c3c8ce;border-radius:6px;display:flex;
+       align-items:center;justify-content:center;color:#9aa3ad;font-size:15px}
+.needph{font-size:10px;color:#b3261e;border:1px solid #f0c2c2;border-radius:5px;padding:1px 5px;background:#fff5f5}
+.tick{width:17px;height:17px;cursor:pointer}
+.tipbar{font-size:11.5px;background:#fffbe9;border:1px solid #ece0a8;border-radius:9px;
+        padding:8px 12px;margin-bottom:14px;line-height:1.65;color:#5a4a12}
+.tipbar b{color:#000}
+.opt{display:block;font-weight:400;font-size:10px;color:#999;margin-top:1px}
+thead th.own1{color:var(--s1);border-bottom:2px solid var(--s1)}
+thead th.own2{color:var(--s2);border-bottom:2px solid var(--s2)}
+thead th.own3{color:var(--s3);border-bottom:2px solid var(--s3)}
+.thumb.std{background:linear-gradient(135deg,#dbeafe,#93c5fd);color:#1e40af}
+.tx{cursor:pointer;font-size:12px;opacity:.6}.tx:hover{opacity:1}
+#txpop{position:fixed;z-index:99;width:250px;background:#fff;border:1px solid var(--s1);
+  border-radius:9px;box-shadow:0 8px 22px rgba(0,0,0,.16);padding:10px 11px;font-size:11.5px;line-height:1.6}
+#txpop h4{margin:0 0 5px;font-size:11px;color:var(--s1)}
+#txpop textarea{width:100%;font:inherit;border:1px solid #ddd;border-radius:6px;padding:5px;resize:vertical}
+#txpop .x{float:right;cursor:pointer;color:#999}
+.sgttl{font-size:11.5px;font-weight:700;color:#6b7683;margin:2px 0 5px}
+.sgttl .okt{color:#1f7a3d}
+/* ── ตัวอย่างกระดาษ A4 ที่จะปริ้นจริง ── */
+.a4{background:#fff;border:1px solid #c8ced5;box-shadow:0 3px 14px rgba(0,0,0,.09);
+    padding:26px 30px;max-width:800px;margin:0 auto;font-size:12px;color:#111}
+.a4hd{display:flex;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:8px}
+.a4co{font-weight:800;font-size:14px;letter-spacing:.2px}
+.a4sub{font-size:11px;color:#555;margin-top:1px}
+.a4no{margin-left:auto;text-align:right;font-size:11.5px;line-height:1.65}
+.a4t{text-align:center;margin:14px 0 12px;font-size:15px;letter-spacing:.5px}
+.a4i{width:100%;border-collapse:collapse;margin-bottom:11px;border:0}
+.a4i td{border:0;padding:2px 4px;font-size:11.5px}
+.a4i td:nth-child(odd){color:#666;width:96px}
+.a4tb{width:100%;border-collapse:collapse;border:1px solid #333}
+.a4tb th,.a4tb td{border:1px solid #333;padding:5px 6px;font-size:11.5px}
+.a4tb thead th{background:#f0f0f0;text-align:center}
+.a4sm{width:100%;border-collapse:collapse;margin-top:9px;border:1px solid #333}
+.a4sm td{border:1px solid #333;padding:5px 7px;font-size:11.5px}
+.a4sm .tot td{font-weight:800;background:#f4f4f4}
+.a4nt{margin-top:9px;font-size:11px;color:#444;border:1px dashed #999;padding:6px 8px;line-height:1.6}
+.pph{display:flex;gap:2px;justify-content:center;flex-wrap:wrap}
+.pth{width:26px;height:20px;border:1px solid #333;border-radius:2px;display:inline-flex;
+     align-items:center;justify-content:center;font-size:11px;background:#f2f4f6}
+.pphn{font-size:9.5px;color:#666;margin-top:2px}
+.phgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.phbox{margin:0;border:1px solid #333;padding:6px}
+.phimg{height:150px;background:linear-gradient(135deg,#e3e8ed,#c2ccd6);display:flex;
+       align-items:center;justify-content:center;font-size:34px;border:1px solid #ccc}
+.phbox figcaption{font-size:10.5px;line-height:1.5;margin-top:5px}
+.phbox figcaption i{color:#555}
+.scrollhint{font-size:11px;color:#8a5a00;background:#fff8e6;border:1px solid #f0d9a0;
+  border-radius:6px;padding:3px 9px;display:inline-block;margin-bottom:5px}
+.a4sg{display:flex;gap:26px;margin-top:26px}
+.a4sg div{flex:1;border-top:1px solid #333;padding-top:5px;text-align:center}
+.a4sg i{display:block;font-style:normal;font-size:10.5px;color:#666}
+.a4sg b{display:block;font-size:11.5px;margin-top:3px;min-height:16px}
+.a4ft{margin-top:20px;border-top:1px solid #ccc;padding-top:5px;text-align:center;
+      font-size:10.5px;color:#777;letter-spacing:.4px}
+@media(max-width:900px){.modgrid{grid-template-columns:1fr}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="lg">STT CLAIM HUB <span>งานเคลม · ตรวจรับสินค้า — Mockup v9</span></div>
+  <div class="sp"></div>
+  <span style="font-size:12px;color:#999">ทดลองเป็น:</span>
+  <select style="width:auto" id="role" onchange="setRole(this.value)">
+    <option value="QC">คุณสมชาย · QC</option>
+    <option value="APPROVER">คุณวิชัย · ผจก.ผลิต (ผู้อนุมัติ)</option>
+    <option value="STORE">คุณนภา · สโตร์</option>
+    <option value="PURCHASE">คุณเอ · จัดซื้อ</option>
+    <option value="ADMIN">เบียร์ · ผู้บริหาร</option>
+  </select>
+  <button class="btn" onclick="reset()">↺ เริ่มใหม่</button>
+</div>
+
+<div class="wrap">
+  <div class="tipbar" id="tip"></div>
+  <div id="view"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   Mockup v9 — ลอกโครงจากโค้ด NOVA จริง (js-core.html · MODULES/ITEMS/ITEMROLE)
+   + เบียร์อธิบาย 4 ก.ย. 2569:
+     กล่อง 1  เปิดใบเคลม *หรือ* ใบ Inspection — ใครเปิดก็ได้ หลัก ๆ Production/QC/Design/Sales
+              เปิดเสร็จ → ส่งผู้บังคับบัญชา Approve (อนุมัติทั้ง 2 ชนิดเอกสาร)
+     กล่อง 2  Pass ไปสโตร์ → ใส่ข้อมูล → กดส่งต่อจัดซื้อ
+     กล่อง 3  Pass ไปจัดซื้อ → คุยกับ Supplier · คำตอบ + คำนวณต้นทุน → จัดซื้อขอปิดใบเคลม
+     Inspection: ตรวจแล้วข้อไหนไม่ผ่าน **ติ๊กว่าส่งไปสร้างใบเคลม** → เข้ากระบวนการเคลมทันที
+   ═══════════════════════════════════════════════════════════════════════ */
+
+var USERS={QC:{n:'คุณสมชาย',p:'QC'},APPROVER:{n:'คุณวิชัย',p:'ผจก.ผลิต'},
+           STORE:{n:'คุณนภา',p:'สโตร์'},PURCHASE:{n:'คุณเอ',p:'จัดซื้อ'},ADMIN:{n:'เบียร์',p:'ผู้บริหาร'}};
+var ROLE='QC', VIEW='home', CURDOC=null, STAB='pend';
+function me(){return USERS[ROLE];}
+function $(i){return document.getElementById(i);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function now(){var d=new Date(),p=function(n){return String(n).padStart(2,'0');};
+  return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+(d.getFullYear()+543)+' '+p(d.getHours())+':'+p(d.getMinutes());}
+function tip(h){$('tip').innerHTML=h; setTimeout(scrollHints,0);}
+/* ตารางไหนกว้างเกินจอ บอกให้รู้ว่าเลื่อนดูได้ ไม่ใช่คอลัมน์หาย */
+function scrollHints(){
+  var ws=document.querySelectorAll('#view div[style*="overflow-x"]');
+  for(var i=0;i<ws.length;i++){
+    var w=ws[i];
+    if(w.previousElementSibling&&w.previousElementSibling.className==='scrollhint')
+      w.previousElementSibling.remove();
+    if(w.scrollWidth>w.clientWidth+4){
+      var h=document.createElement('div'); h.className='scrollhint';
+      h.textContent='↔ ตารางกว้างกว่าจอ — เลื่อนซ้าย-ขวาดูคอลัมน์ที่เหลือได้ (คอลัมน์ไม่ได้หายไปไหน)';
+      w.parentNode.insertBefore(h,w);
+    }
+  }
+}
+
+/* ─── สายงาน: ขั้น = ใครถือเอกสารอยู่ ───
+   ใช้ชุดเดียวกันทั้งใบเคลมและใบ Inspection (เบียร์: อนุมัติทั้ง 2 ชนิด) */
+/* สเปคข้อ 7 — ลายเซ็น 7 ช่อง 2 รอบ (ระบบประทับให้ ไม่เซ็นมือ)
+   รอบ 1: ผู้แจ้ง → ผู้อนุมัติ → สโตร์ → จัดซื้อ   ครบ 4 ช่อง ปุ่มพิมพ์ใบส่ง Supplier ถึงเปิด
+   รอบ 2: จัดซื้อบันทึกผล → QC ยืนยันของที่ได้เปลี่ยน → ผู้บริหารอนุมัติปิด */
+var ST={
+ DRAFT :{no:1,box:1,name:'ร่าง · กำลังกรอก',   who:'ผู้เปิดใบ (Production/QC/Design/Sales)',
+         roles:['QC','PRODUCTION','DESIGN','SALES'], act:'📤 ส่งขออนุมัติ', sign:'ผู้เปิดใบ', next:'APPR'},
+ APPR  :{no:2,box:1,name:'รอผู้บังคับบัญชาอนุมัติ', who:'ผจก.แผนกขึ้นไป',
+         roles:['APPROVER'], act:'✅ อนุมัติ + ส่งให้สโตร์', sign:'ผู้อนุมัติ', next:'STORE', rej:'DRAFT'},
+ STORE :{no:3,box:2,name:'สโตร์ใส่ข้อมูล',      who:'สโตร์',
+         roles:['STORE'], act:'📦 บันทึก + ส่งต่อจัดซื้อ', sign:'สโตร์', next:'BUY', rej:'DRAFT'},
+ BUY   :{no:4,box:3,name:'จัดซื้อรับทราบ + ส่งเคลม Supplier', who:'จัดซื้อ',
+         roles:['PURCHASE'], act:'📨 ส่งใบแจ้งเคลมให้ Supplier แล้ว', sign:'จัดซื้อ',
+         next:'RESULT', rej:'STORE'},
+ RESULT:{no:5,box:3,name:'รอคำตอบ Supplier · จัดซื้อบันทึกผล', who:'จัดซื้อ',
+         roles:['PURCHASE'], act:'📝 บันทึกผลการเคลม', sign:'จัดซื้อ (ผลเคลม)', next:'RECV'},
+ SIN   :{no:6,box:2,name:'ของกลับเข้าคลัง · สโตร์รับเข้า', who:'สโตร์',
+         roles:['STORE'], act:'📥 รับของเข้าคลัง + แจ้ง QC มาตรวจ', sign:'สโตร์รับของเข้า', next:'RECV'},
+ RECV  :{no:7,box:1,name:'สโตร์แจ้งแล้ว · รอ QC มาตรวจรับ', who:'Production / QC',
+         roles:['QC','PRODUCTION'], act:'✅ ตรวจเสร็จ + ออกใบตรวจรับของกลับ', sign:'QC ตรวจรับ', next:'ISSUE'},
+ ISSUE :{no:8,box:2,name:'ตรวจผ่านแล้ว · รอสโตร์เบิกออก', who:'สโตร์',
+         roles:['STORE'], act:'📤 เบิกออกให้หน้างาน', sign:'สโตร์เบิกออก', next:'CLOSE'},
+ CLOSE :{no:9,box:3,name:'รอผู้บริหารอนุมัติปิด', who:'ผู้บริหาร (เบียร์ / คุณแบล็ค / คุณประดิษฐ์)',
+         roles:['ADMIN'], act:'🏁 อนุมัติปิดใบเคลม', sign:'ผู้บริหาร', next:'DONE'},
+ DONE  :{no:10,box:3,name:'ปิดจบแล้ว', who:'—', roles:[]}
+};
+var SIGN_R1=['ผู้เปิดใบ','ผู้อนุมัติ','สโตร์','จัดซื้อ'];
+var SIGN_R2=['จัดซื้อ (ผลเคลม)','สโตร์รับของเข้า','QC ตรวจรับ','สโตร์เบิกออก','ผู้บริหาร'];
+/* ครบ 4 ช่องรอบแรก → ปุ่มพิมพ์ใบส่ง Supplier ถึงจะเปิดใช้ได้ (สเปคข้อ 7) */
+function r1done(d){ return SIGN_R1.every(function(k){ return !!d.sign[k]; }); }
+
+/* สเปคข้อ 5 — คำตอบ Supplier ตัดสินว่าออกใบ ② ไหม และมีของกลับมาให้ QC ตรวจไหม */
+var RESULTS={
+ BUYSELF:{t:'Supplier ไม่มีของส่งให้ → STT ซื้อเอง ติดตั้งเอง', goods:'เรียกเก็บ', labor:'เรียกเก็บ',
+          bill:1, back:0},
+ NEWPART:{t:'Supplier ส่งของใหม่มาให้ → STT ติดตั้งเอง', goods:'ไม่คิด', labor:'เรียกเก็บ',
+          bill:1, back:1},
+ SWAP:   {t:'อุปกรณ์เปลี่ยนกลับมาแล้วจบ', goods:'—', labor:'—', bill:0, back:1},
+ REJECT: {t:'Supplier ไม่รับเคลม (เลยประกัน / เหตุผลอื่น)', goods:'—', labor:'—', bill:0, back:0}
+};
+/* ไม่มีของกลับ → ข้ามขั้น QC ตรวจรับไปหาผู้บริหารเลย */
+function afterResult(d){ var r=RESULTS[d.result]; return (r&&r.back)?'SIN':'CLOSE'; }
+/* เลขที่เอกสารของแต่ละขั้น — ระบบออกให้เอง พร้อมวันที่ */
+function newNo(pre){ return pre+'-69/'+String(Math.floor(Math.random()*9000)+1000); }
+
+/* ใบ Inspection สายสั้น: ร่าง → อนุมัติ → จบ (ข้อที่ติ๊กจะแตกเป็นใบเคลม) */
+var STI={
+ DRAFT:{no:1,box:1,name:'ร่าง · กำลังตรวจ', who:'ผู้ตรวจ (Production/QC/Design)',
+        roles:['QC','PRODUCTION','DESIGN'], act:'📤 ส่งขออนุมัติผลตรวจ', sign:'ผู้ตรวจ', next:'APPR'},
+ APPR :{no:2,box:1,name:'รอผู้บังคับบัญชาอนุมัติ', who:'ผจก.แผนกขึ้นไป',
+        roles:['APPROVER'], act:'✅ อนุมัติผลตรวจ + สร้างใบเคลมจากข้อที่ติ๊ก', sign:'ผู้อนุมัติ',
+        next:'DONE', rej:'DRAFT'},
+ DONE :{no:3,box:1,name:'อนุมัติแล้ว', who:'—', roles:[]}
+};
+function stg(d){ return (d.kind==='INS'?STI:ST)[d.stage]; }
+
+function seed(){return [
+ {no:'CLM-69/0001',kind:'CLM',stage:'STORE',job:'JT-69/0009',cust:'โชคชัยพัฒนาออยล์',
+  model:'SEMI-TRAILER 32,000 L',date:'02/09/2569',by:'คุณสมชาย',dept:'QC',area:'for',ctype:'after',
+  jtype:'JT',jmc:'JMC-69/0032',from:'INS-69/0001',dn:'',want:'30/09/2569',rej:'',
+  fkind:'Tankers (ไม่ผ่านสโตร์)',cs:'STT-32K-6912',cm:'LZGJ2A9D6PX102338',sn:'TK-2026-0338',
+  sign:{'ผู้เปิดใบ':'คุณสมชาย · QC · 02/09/2569 09:10','ผู้อนุมัติ':'คุณวิชัย · ผจก.ผลิต · 02/09/2569 14:02'},
+  items:[{code:'VLV-3040',nm:'API VALVE 4"',th:'วาล์วรั่วซึมบริเวณหน้าแปลน ตรวจพบตอนทดสอบแรงดัน',
+          en:'API valve leaking at the flange face, found during pressure test',
+          qty:'2',unit:'PCS',recv:'28/08/2569',po:'',sup:'',ph:2,cost:''},
+         {code:'',nm:'งานเชื่อมผิวในตัวถัง',th:'รอยเชื่อมไม่เต็มแนว ต้องเชื่อมซ่อมใหม่',
+          en:'Weld bead incomplete along the seam, needs re-welding',
+          qty:'1',unit:'จุด',recv:'28/08/2569',po:'',sup:'',ph:2,cost:''}]},
+
+ {no:'CLM-69/0002',kind:'CLM',stage:'DRAFT',job:'JM-69/0021',cust:'บจก. ปิโตรเลียมสยาม',
+  model:'TANK BODY 20,000 L',date:'04/09/2569',by:'คุณสมชาย',dept:'QC',area:'dom',ctype:'pre',
+  jtype:'JM',jmc:'',from:'',dn:'',want:'',rej:'',sign:{},
+  fkind:'',cs:'STT-20K-6907',cm:'',sn:'',
+  items:[{code:'GSK-08',nm:'',th:'',en:'',qty:'4',unit:'',recv:'',po:'',sup:'',ph:0,cost:''}]},
+
+ {no:'CLM-69/0003',kind:'CLM',stage:'BUY',job:'JT-69/0014',cust:'บจก. ขนส่งไทยเจริญ',
+  model:'SEMI-TRAILER 28,000 L',date:'01/09/2569',by:'คุณสมชาย',dept:'QC',area:'dom',ctype:'pre',
+  jtype:'JT',jmc:'',from:'',dn:'DN-69/0501',want:'25/09/2569',rej:'',
+  sign:{'ผู้เปิดใบ':'คุณสมชาย · QC · 01/09/2569 08:30','ผู้อนุมัติ':'คุณวิชัย · ผจก.ผลิต · 01/09/2569 10:15',
+        'สโตร์':'คุณนภา · สโตร์ · 01/09/2569 15:40'},
+  fkind:'',cs:'STT-28K-6903',cm:'',sn:'TK-2026-0119',
+  result:'',rate:'36.50',labor:'8500',margin:'12',round:1,rdetail:'',rnote:'',
+  blame:'EMP',blameWho:'คุณเอกชัย',blameDept:'Production',cancel:'',billNo:'',
+  labors:[{th:'',en:'',cov:'',sup:'',amt:''}],
+  items:[{code:'GSK-08',nm:'GASKET NBR 8"',th:'ประเก็นฉีกขาดตั้งแต่แกะกล่อง',en:'',qty:'4',unit:'PCS',
+          recv:'26/08/2569',po:'PO-69/0501',sup:'บจก. ไทยพัฒนาวาล์ว',ph:3,cost:'4800',back:''},
+         {code:'VLV-1020',nm:'BALL VALVE 2"',th:'ก้านวาล์วคด หมุนไม่สุด',en:'',qty:'2',unit:'PCS',
+          recv:'26/08/2569',po:'PO-69/0507',sup:'บจก. สยามฟิตติ้ง',ph:2,cost:'6200',back:''}]},
+
+ {no:'CLM-69/0004',kind:'CLM',stage:'SIN',job:'JT-69/0009',cust:'โชคชัยพัฒนาออยล์',
+  model:'SEMI-TRAILER 32,000 L',date:'28/08/2569',by:'คุณสมชาย',dept:'QC',area:'for',ctype:'pre',
+  jtype:'JT',jmc:'JMC-69/0028',from:'',dn:'DN-69/0488',want:'20/09/2569',rej:'',
+  fkind:'Tankers (ไม่ผ่านสโตร์)',cs:'STT-32K-6912',cm:'LZGJ2A9D6PX102338',sn:'TK-2026-0338',
+  result:'NEWPART',rate:'36.50',labor:'12000',margin:'10',round:1,blame:'JOB',cancel:'',billNo:'',
+  rdetail:'Supplier ยอมรับว่าเป็นความบกพร่องจากการผลิต ตกลงส่งชุดแมนโฮลและวาล์วใหม่มาให้ '+
+          'แต่ให้ STT ถอด-ประกอบเอง จึงเรียกเก็บเฉพาะค่าแรง',
+  rnote:'อีเมลจาก CIMC (02/09/2026): "We confirm the replacement parts will be shipped '+
+        'within 10 working days. Labour cost to be borne by STT and invoiced to us."',
+  labors:[{th:'ถอด-ประกอบชุดแมนโฮลใหม่ + ทดสอบแรงดันซ้ำ',
+           en:'Remove and refit new manhole assembly, re-run pressure test',
+           cov:'1, 2',sup:'CIMC Vehicles Co., Ltd.',amt:'12,000'}],
+  sign:{'ผู้เปิดใบ':'คุณสมชาย · QC · 28/08/2569 09:00','ผู้อนุมัติ':'คุณวิชัย · ผจก.ผลิต · 28/08/2569 11:20',
+        'สโตร์':'คุณนภา · สโตร์ · 28/08/2569 14:05','จัดซื้อ':'คุณเอ · จัดซื้อ · 29/08/2569 09:30',
+        'จัดซื้อ (ผลเคลม)':'คุณเอ · จัดซื้อ · 02/09/2569 16:10'},
+  loc:'',trk:'',isTo:'',isDept:'',grNo:'',grDate:'',rcvNo:'',rcvDate:'',rcvBy:'',isNo:'',isDate:'',
+  items:[{code:'MH-400',nm:'MANHOLE COVER 400',th:'บานพับคด ปิดไม่สนิท',
+          en:'Manhole hinge bent, lid does not close tight',qty:'1',unit:'SET',
+          recv:'25/08/2569',po:'PO-69/0466',sup:'CIMC Vehicles Co., Ltd.',ph:3,cost:'18500',back:''},
+         {code:'VLV-3040',nm:'API VALVE 4"',th:'วาล์วรั่วซึมที่หน้าแปลน',
+          en:'API valve leaking at the flange face',qty:'1',unit:'PCS',
+          recv:'25/08/2569',po:'PO-69/0466',sup:'CIMC Vehicles Co., Ltd.',ph:2,cost:'9800',back:''}]},
+
+ {no:'CLM-69/0005',kind:'CLM',stage:'DONE',job:'JT-69/0014',cust:'บจก. ขนส่งไทยเจริญ',
+  model:'SEMI-TRAILER 28,000 L',date:'20/08/2569',by:'คุณสมชาย',dept:'QC',area:'dom',ctype:'pre',
+  jtype:'JT',jmc:'JMC-69/0019',from:'',dn:'DN-69/0455',want:'05/09/2569',rej:'',
+  fkind:'',cs:'STT-28K-6903',cm:'',sn:'TK-2026-0119',
+  result:'BUYSELF',rate:'36.50',labor:'5200',margin:'15',round:1,blame:'JOB',cancel:'',billNo:'',
+  loc:'ชั้น B-02',trk:'',isTo:'คุณต้น',isDept:'Production',
+  grNo:'GR-69/0332',grDate:'25/08/2569',rcvNo:'RCV-69/0210',rcvDate:'26/08/2569',
+  rcvBy:'คุณสมชาย · QC',isNo:'IS-69/0288',isDate:'27/08/2569',
+  rdetail:'Supplier แจ้งว่าไม่มีสต๊อกอะไหล่รุ่นนี้แล้ว ให้ STT จัดซื้อและติดตั้งเอง แล้วเรียกเก็บคืนทั้งค่าของและค่าแรง',
+  rnote:'',
+  labors:[{th:'เปลี่ยนชุดวาล์วก้นถัง + ทดสอบรั่ว',en:'Replace bottom valve assembly and leak test',
+           cov:'1',sup:'บจก. สยามฟิตติ้ง',amt:'5,200'}],
+  sign:{'ผู้เปิดใบ':'คุณสมชาย · QC · 20/08/2569 08:40','ผู้อนุมัติ':'คุณวิชัย · ผจก.ผลิต · 20/08/2569 10:05',
+        'สโตร์':'คุณนภา · สโตร์ · 20/08/2569 13:30','จัดซื้อ':'คุณเอ · จัดซื้อ · 21/08/2569 09:15',
+        'จัดซื้อ (ผลเคลม)':'คุณเอ · จัดซื้อ · 24/08/2569 15:40',
+        'สโตร์รับของเข้า':'คุณนภา · สโตร์ · 25/08/2569 09:20',
+        'QC ตรวจรับ':'คุณสมชาย · QC · 26/08/2569 10:45',
+        'สโตร์เบิกออก':'คุณนภา · สโตร์ · 27/08/2569 08:30',
+        'ผู้บริหาร':'เบียร์ · ผู้บริหาร · 28/08/2569 17:20'},
+  items:[{code:'VLV-BTM6',nm:'BOTTOM VALVE 6"',th:'วาล์วก้นถังปิดไม่สนิท มีน้ำมันซึม',en:'',
+          qty:'1',unit:'SET',recv:'18/08/2569',po:'PO-69/0455',sup:'บจก. สยามฟิตติ้ง',
+          ph:3,cost:'14200',back:'ACC'}]},
+
+ {no:'INS-69/0002',kind:'INS',stage:'DRAFT',job:'JM-69/0021',cust:'บจก. ปิโตรเลียมสยาม',
+  model:'TANK BODY 20,000 L',date:'04/09/2569',by:'คุณสมชาย',dept:'QC',area:'dom',
+  itype:'GOODS',tpl:'ตรวจสินค้า (ไม่มี STD)',jtype:'JM',rej:'',sign:{},
+  fkind:'',cs:'STT-20K-6907',cm:'',sn:'',want:'',
+  po:'PO-69/0512',sup:'บจก. ไทยพัฒนาวาล์ว',recv:'03/09/2569',note:'',
+  items:[{cat:'บรรจุภัณฑ์',t:'สภาพบรรจุภัณฑ์ ไม่ฉีกขาด',ten:'Packaging intact',
+          acc:'ACC',found:'',qty:'',unit:'',ph:1,std:0,toClaim:false},
+         {cat:'จำนวน',t:'จำนวนตรงกับใบส่งของ',ten:'Quantity matches delivery note',
+          acc:'',found:'',qty:'',unit:'',ph:0,std:0,toClaim:false},
+         {cat:'สภาพสินค้า',t:'ไม่มีรอยแตกร้าว / รั่วซึม',ten:'No crack or leak',
+          acc:'UNACC',found:'ประเก็นฉีกขาดตั้งแต่แกะกล่อง 4 ชิ้น',qty:'4',unit:'PCS',ph:0,std:0,toClaim:false}]},
+
+ {no:'INS-69/0003',kind:'INS',stage:'APPR',job:'JT-69/0009',cust:'โชคชัยพัฒนาออยล์',
+  model:'SEMI-TRAILER 32,000 L',date:'03/09/2569',by:'คุณสมชาย',dept:'QC',area:'for',
+  itype:'TANKER',tpl:'Inspection Tankers — STD ของ SEMI-TRAILER 32,000 L',jtype:'JT',rej:'',
+  fkind:'Tankers (ไม่ผ่านสโตร์)',cs:'STT-32K-6912',cm:'LZGJ2A9D6PX102338',sn:'TK-2026-0338',want:'',
+  sign:{'ผู้ตรวจ':'คุณสมชาย · QC · 03/09/2569 16:20'},
+  po:'PO-69/0466',sup:'CIMC Vehicles Co., Ltd.',recv:'25/08/2569',
+  note:'ตรวจร่วมกัน 3 แผนก Production / QC / Design ที่ลานรับรถ',
+  items:[{cat:'ตัวถัง',t:'สภาพผิวนอกตัวถัง',ten:'Outer shell condition',
+          acc:'ACC',found:'',en:'',qty:'',unit:'',ph:1,std:1,toClaim:false},
+         {cat:'อุปกรณ์บนถัง',t:'แมนโฮลปิดสนิท บานพับปกติ',ten:'Manhole seals tight, hinge normal',
+          acc:'UNACC',found:'บานพับคด ปิดไม่สนิท',
+          en:'Manhole hinge bent, lid does not close tight',qty:'1',unit:'SET',ph:2,std:1,toClaim:true},
+         {cat:'ทดสอบ',t:'ทดสอบแรงดันผ่าน',ten:'Pressure test passed',
+          acc:'UNACC',found:'พบน้ำซึมที่หน้าแปลนวาล์วจ่าย',
+          en:'Water seepage found at the discharge valve flange',qty:'1',unit:'PCS',ph:2,std:1,toClaim:true}]}
+];}
+var DOCS=seed();
+function reset(){DOCS=seed();CURDOC=null;go('home');}
+function setRole(r){ROLE=r; var sl=$('role'); if(sl&&sl.value!==r) sl.value=r; if(CURDOC) openDoc(CURDOC); else go(VIEW);}
+function doc(n){for(var i=0;i<DOCS.length;i++) if(DOCS[i].no===n) return DOCS[i]; return null;}
+
+function isOwner(d){
+  var s=stg(d); if(!s||!s.roles.length) return false;
+  if(ROLE==='ADMIN') return s.roles.indexOf('ADMIN')>=0;   // ผู้บริหารมีคิวของตัวเอง ไม่ทำแทนคนอื่น
+  return s.roles.indexOf(ROLE)>=0;
+}
+/* ร่างของผู้เปิด — สโตร์/จัดซื้อยังไม่เห็น */
+function canSee(d){
+  if(d.stage!=='DRAFT') return true;
+  return ROLE==='ADMIN'||ROLE==='APPROVER'||me().n===d.by||me().p===d.dept;
+}
+function missing(d){
+  var m=[];
+  /* เบียร์: "ถ้าต่างประเทศ ต้องมี CHASSIS ผู้ผลิต บังคับใส่ CHASSIS STT ด้วย" */
+  if(d.stage==='DRAFT'&&d.area==='for'){
+    if(!d.cs) m.push('งานต่างประเทศ — ยังไม่ใส่ CHASSIS NO. (STT)');
+    if(!d.cm) m.push('งานต่างประเทศ — ยังไม่ใส่ CHASSIS NO. (ผู้ผลิต)');
+    if(!d.fkind) m.push('งานต่างประเทศ — ยังไม่เลือกชนิดงาน (อุปกรณ์ / Tankers)');
+  }
+  if(d.kind==='INS'){
+    if(d.stage!=='DRAFT') return m;
+    var todo=[],np=[];
+    d.items.forEach(function(o,i){ if(!o.acc) todo.push(i+1);
+      else if(o.acc==='UNACC'&&!o.ph) np.push(i+1); });
+    if(todo.length) m.push('ข้อ '+todo.join(', ')+' ยังไม่ได้ติ๊กผลตรวจ');
+    if(np.length)   m.push('ข้อ '+np.join(', ')+' ไม่ผ่านแต่ยังไม่มีรูป');
+    return m;
+  }
+  if(d.stage==='DRAFT'){
+    if(!d.want) m.push('ยังไม่ใส่วันที่ต้องการของ');
+    var bad=[],nop=[];
+    d.items.forEach(function(o,i){ if(!o.nm||!o.th) bad.push(i+1); if(!o.ph) nop.push(i+1); });
+    if(bad.length) m.push('รายการที่ '+bad.join(', ')+' ยังไม่ใส่ชื่อสินค้า/รายละเอียด');
+    if(nop.length) m.push('รายการที่ '+nop.join(', ')+' ยังไม่มีรูป');
+  }
+  if(d.stage==='STORE'){
+    if(!d.dn) m.push('ยังไม่ใส่เลขใบส่งมอบ');
+    var np2=[],ns=[];
+    d.items.forEach(function(o,i){ if(!o.po) np2.push(i+1); if(!o.sup) ns.push(i+1); });
+    if(np2.length) m.push('รายการที่ '+np2.join(', ')+' ยังไม่มี PO');
+    if(ns.length)  m.push('รายการที่ '+ns.join(', ')+' ยังไม่มี Supplier');
+  }
+  if(d.stage==='RESULT'){
+    if(!d.result) m.push('ยังไม่ได้เลือกคำตอบจาก Supplier (4 กรณี)');
+    var nc=[]; d.items.forEach(function(o,i){ if(!o.cost) nc.push(i+1); });
+    if(nc.length) m.push('รายการที่ '+nc.join(', ')+' ยังไม่ได้ใส่ต้นทุน');
+  }
+  if(d.stage==='SIN'){
+    if(!d.loc) m.push('ยังไม่ได้ระบุที่เก็บในคลัง (Location)');
+  }
+  if(d.stage==='ISSUE'){
+    if(!d.isTo)   m.push('ยังไม่ได้ระบุผู้รับของหน้างาน');
+    if(!d.isDept) m.push('ยังไม่ได้ระบุแผนกที่เบิกไปใช้');
+  }
+  if(d.stage==='RECV'){
+    var nb=[],no2=[];
+    d.items.forEach(function(o,i){ if(!o.back) nb.push(i+1); else if(o.back==='NO') no2.push(i+1); });
+    if(nb.length)  m.push('ของที่ได้กลับมา ข้อ '+nb.join(', ')+' ยังไม่ได้ตรวจรับ');
+    if(no2.length) m.push('ข้อ '+no2.join(', ')+' ไม่ Accept — ต้องกดปุ่ม "วนกลับเป็นเคลมรอบใหม่"');
+  }
+  return m;
+}
+
+/* ═══ หน้าแรก — กล่องตามแผนก (ลอกจาก NOVA MODULES) ═══ */
+var MODULES=[
+ {id:1,ic:'📝',name:'กล่องงานที่ 1 · เปิดเอกสาร + อนุมัติ',ac:'#E2231A',acbg:'rgba(226,35,26,.14)',
+  role:'Production · QC · Design · Sales — และผู้บังคับบัญชา',
+  items:[
+   {k:'newclm', ic:'📋',t:'เปิดใบเคลมสินค้า',       d:'เปิดตรงได้เลย · กรอกข้อมูลที่แจ้งไว้ + แนบรูป · บันทึกร่างไว้ก่อนได้'},
+   {k:'newins', ic:'🔍',t:'เปิดใบ Inspection',      d:'ตรวจของตอนมาถึง · ติ๊ก Acc / Un-Acc · ข้อที่ไม่ผ่าน ติ๊กส่งไปสร้างใบเคลม'},
+   {k:'recv',ic:'🔍',t:'สโตร์เรียกมาตรวจรับของกลับ',
+    d:'สโตร์รับของเข้าคลังแล้วแจ้งมา · ไปตรวจที่คลัง ถ่ายรูป ติ๊ก Accept · ออกใบตรวจรับมีเลขที่+วันที่',
+    only:['QC','PRODUCTION','ADMIN']},
+   {k:'mydraft',ic:'✏️',t:'เอกสารร่างของฉัน',        d:'ใบที่ยังไม่ส่งอนุมัติ · คนอื่นยังไม่เห็น · กลับมาแก้ได้'},
+   {k:'approve',ic:'✅',t:'อนุมัติเอกสาร',           d:'อนุมัติทั้งใบเคลมและใบ Inspection · ไม่โอเคตีกลับพร้อมเหตุผล',
+    only:['APPROVER','ADMIN']}
+  ],
+  tag:'ใครเปิดก็ได้ แต่หลัก ๆ คือ Production / QC / Design / Sales · เปิดเสร็จส่งผู้บังคับบัญชาอนุมัติ · '+
+      'ของที่ Supplier ส่งกลับมา QC ก็ตรวจรับที่กล่องนี้'},
+
+ {id:2,ic:'📦',name:'กล่องงานที่ 2 · สโตร์',ac:'#2f7de1',acbg:'rgba(47,125,225,.14)',role:'Store',
+  items:[
+   {k:'store',ic:'📦',t:'งานเคลมรอสโตร์',d:'ใส่เลขใบส่งมอบ · PO · Supplier ของแต่ละรายการ แล้วกดส่งต่อจัดซื้อ'},
+   {k:'sin',ic:'📥',t:'ของกลับเข้าคลัง รอรับเข้า',
+    d:'ของจาก Supplier มาถึงคลัง · รับเข้า ออกเลขที่ + วันที่ แล้วแจ้ง QC มาตรวจ'},
+   {k:'issue',ic:'📤',t:'ตรวจผ่านแล้ว รอเบิกออก',
+    d:'QC ตรวจผ่านแล้ว · จ่ายของออกให้หน้างาน ออกเลขใบเบิก + วันที่'}
+  ],
+  tag:'เอกสารวิ่งมาเองหลังผู้บังคับบัญชาอนุมัติ · ของที่ Supplier ส่งกลับมาก็เข้าคลังที่นี่ก่อน '+
+      'สโตร์แจ้ง QC มาตรวจ ตรวจผ่านแล้วค่อยเบิกออก'},
+
+ {id:3,ic:'🛒',name:'กล่องงานที่ 3 · จัดซื้อ',ac:'#eba00c',acbg:'rgba(235,160,12,.16)',role:'Purchase',
+  items:[
+   {k:'buy',ic:'🛒',t:'รับเรื่อง + ส่งเคลม Supplier',d:'ครบ 4 ลายเซ็นแล้วพิมพ์ ① ใบแจ้งเคลม (ไม่มีราคา) แยกใบตาม Supplier'},
+   {k:'result',ic:'💬',t:'รอคำตอบ Supplier + คิดต้นทุน',d:'เลือก 1 ใน 4 กรณี · ใส่ต้นทุน/ค่าแรง/กำไร · ออก ② ใบเรียกเก็บถ้าต้องเรียกเงิน'},
+   {k:'close',ic:'🏁',t:'รออนุมัติปิดใบเคลม',d:'ใบที่จบขั้นตอนแล้ว รอผู้บริหารกดอนุมัติปิด',only:['ADMIN','PURCHASE']},
+   {k:'supdoc',ic:'🗃️',t:'ทะเบียนเอกสารที่ส่ง Supplier',d:'จ๊อบนี้เคยออกเอกสารอะไรไปให้ใครบ้าง · แนบไฟล์ที่เซ็นกลับมาได้'}
+  ],
+  tag:'ใบ ① ไม่มีราคา (แต่มีรูป) · ใบ ② มีราคา · ใบ ③ ภายในห้ามออกนอกบริษัท · '+
+      'ของกลับมา QC เป็นคนตรวจรับที่กล่อง 1 · ผู้บริหารเป็นคนอนุมัติปิด'},
+
+ {id:0,ic:'📊',name:'รายงาน & ทะเบียน',ac:'#12a06f',acbg:'rgba(18,160,111,.14)',role:'ทุกคนเข้าดูได้',
+  items:[
+   {k:'reg',ic:'🗂️',t:'ทะเบียนเอกสารทั้งหมด',
+    d:'ใบเคลม + ใบ Inspection ทุกใบทุกจ๊อบ · สถานะล่าสุด · ยกเลิกใบเคลมได้ (ผู้บริหารเท่านั้น)'},
+   {k:'byjob',ic:'🚛',t:'งานเคลมตามจ๊อบ',
+    d:'ดูรายจ๊อบว่ามีใบอะไรบ้าง · ต้นทุนเคลมรวมของรถคันนั้น ผูกกับ JMC'},
+   {k:'bill',ic:'🧾',t:'รวมยอดเรียกเก็บ → ออกใบเดียว',
+    d:'รวมหลายใบเคลมของ Supplier เจ้าเดียวกัน ออกใบเรียกเก็บใบเดียว มีเลขที่ของตัวเอง',
+    only:['PURCHASE','ADMIN']},
+   {k:'hr',ic:'👥',t:'รายงานส่ง HR (หักเงินพนักงาน)',
+    d:'ใบที่ปิดจบแล้วและระบุว่าพนักงานทำเสียหาย · ส่งให้ HR ไปหักเงิน',
+    only:['ADMIN','PURCHASE']},
+   {k:'acc',ic:'📒',t:'ข้อมูลส่งบัญชี',
+    d:'ใบที่ปิดจบแล้วทั้งหมด · บัญชีรับข้อมูลอย่างเดียว ไม่ต้องกดติ๊ก',
+    only:['ADMIN','PURCHASE']},
+   {k:'log',ic:'🕘',t:'LOG ประวัติการใช้งาน',
+    d:'ใครทำอะไรกับใบไหน เมื่อไหร่ · ลบ LOG ไม่กระทบตัวเอกสาร',
+    only:['ADMIN']}
+  ],
+  tag:'ทุก role เปิดทะเบียนกับรายจ๊อบดูได้ · เมนูที่มีตัวเงินเปิดได้เฉพาะจัดซื้อและผู้บริหาร'}
+];
+
+function go(v){ VIEW=v; CURDOC=null;
+  if(v==='home') return home();
+  if(v==='newclm'||v==='newins') return newDoc(v==='newins'?'INS':'CLM');
+  if(v==='mydraft') return listPage('mydraft');
+  if(v==='approve') return listPage('approve');
+  if(v==='store')   return listPage('store');
+  if(v==='buy')     return listPage('buy');
+  if(v==='result')  return listPage('result');
+  if(v==='recv')    return listPage('recv');
+  if(v==='sin')     return listPage('sin');
+  if(v==='issue')   return listPage('issue');
+  if(v==='supdoc')  return supDoc();
+  if(v==='bill')    return billPage();
+  if(v==='hr')      return hrPage();
+  if(v==='acc')     return accPage();
+  if(v==='log')     return logPage();
+  if(v==='close')   return listPage('close');
+  if(v==='reg')     return listPage('reg');
+  if(v==='byjob')   return byJob();
+}
+function countOf(k){ return rowsOf(k).length; }
+function rowsOf(k){
+  return DOCS.filter(function(d){
+    if(!canSee(d)) return false;
+    if(d.cancel && k!=='reg') return false;   /* ใบที่ยกเลิกแล้ว เหลือแค่ในทะเบียน */
+    if(k==='mydraft') return d.stage==='DRAFT' && (me().n===d.by||ROLE==='ADMIN');
+    if(k==='approve') return d.stage==='APPR';
+    if(k==='store')   return d.kind==='CLM' && d.stage==='STORE';
+    if(k==='buy')     return d.kind==='CLM' && d.stage==='BUY';
+    if(k==='result')  return d.kind==='CLM' && d.stage==='RESULT';
+    if(k==='recv')    return d.kind==='CLM' && d.stage==='RECV';
+    if(k==='sin')     return d.kind==='CLM' && d.stage==='SIN';
+    if(k==='issue')   return d.kind==='CLM' && d.stage==='ISSUE';
+    if(k==='close')   return d.kind==='CLM' && d.stage==='CLOSE';
+    if(k==='reg')     return true;
+    return false;
+  });
+}
+function home(){
+  var t='<div class="hero"><h1>STT CLAIM HUB</h1>'+
+    '<p>งานเคลม · ตรวจรับสินค้า — เลือกกล่องงานของคุณ</p>'+
+    '<span class="hchip">'+esc(me().n)+' · '+esc(me().p)+'</span></div>';
+  t+='<div class="modgrid">';
+  MODULES.forEach(function(m){
+    var body='';
+    m.items.forEach(function(it){
+      var allowed = !it.only || it.only.indexOf(ROLE)>=0;
+      var n = ['mydraft','approve','store','buy','result','sin','recv','issue','close'].indexOf(it.k)>=0 ? countOf(it.k) : -1;
+      body+='<div class="moditem'+(allowed?'':' off')+'" onclick="'+(allowed?"go('"+it.k+"')":"alert('เมนูนี้เฉพาะ "+esc(it.only.join(' / '))+"')")+'">'+
+        '<div class="mi-ic">'+it.ic+'</div>'+
+        '<div><div class="mi-t">'+esc(it.t)+'</div><div class="mi-d">'+esc(it.d)+'</div></div>'+
+        (n>=0?'<span class="mi-n'+(n?'':' zero')+'">'+n+'</span>':'')+'</div>';
+    });
+    t+='<div class="modcard" style="--ac:'+m.ac+';--acbg:'+m.acbg+'">'+
+      '<div class="modhd"><div class="modic">'+m.ic+'</div><div class="modttl">'+esc(m.name)+'</div>'+
+      (m.id?'<span class="modstep">ขั้นที่ '+m.id+'</span>':'')+'</div>'+
+      '<div class="modrole">'+esc(m.role)+'</div>'+body+
+      '<div class="modtag">'+esc(m.tag)+'</div></div>';
+  });
+  t+='</div>';
+  $('view').innerHTML=t;
+  tip('<b>หน้าแรก = กล่องงานตามแผนก</b> (โครงเดียวกับ NOVA) · ตัวเลขแดง = ใบที่รอคุณทำในเมนูนั้น · '+
+      '<b>ลองสลับบทบาทมุมขวาบน</b> แล้วดูว่าเมนูและตัวเลขเปลี่ยน');
+}
+
+/* ═══ หน้ารายการของแต่ละกล่อง ═══ */
+var TITLES={mydraft:['✏️ เอกสารร่างของฉัน','ใบที่ยังไม่ส่งอนุมัติ — คนอื่นยังไม่เห็น'],
+  approve:['✅ อนุมัติเอกสาร','ทั้งใบเคลมและใบ Inspection · อนุมัติ หรือ ตีกลับพร้อมเหตุผล'],
+  store:['📦 งานเคลมรอสโตร์','ใส่เลขใบส่งมอบ · PO · Supplier แล้วส่งต่อจัดซื้อ'],
+  buy:['🛒 รับเรื่อง + ส่งเคลม Supplier','ครบ 4 ลายเซ็นแล้วพิมพ์ ① ใบแจ้งเคลม แยกใบตาม Supplier'],
+  result:['💬 รอคำตอบ Supplier + คิดต้นทุน','เลือก 1 ใน 4 กรณี · ใส่ต้นทุน ค่าแรง กำไร · ออกใบ ② ถ้าต้องเรียกเงิน'],
+  recv:['🔍 ตรวจรับของกลับ (สโตร์เรียกมา)','ไปตรวจที่คลัง ถ่ายรูป ติ๊ก Accept — ออกใบตรวจรับมีเลขที่ + วันที่'],
+  sin:['📥 ของกลับเข้าคลัง รอสโตร์รับเข้า','รับเข้า ออกเลขที่ + วันที่ แล้วแจ้ง QC มาตรวจ'],
+  issue:['📤 ตรวจผ่านแล้ว รอสโตร์เบิกออก','จ่ายของออกให้หน้างาน ออกเลขใบเบิก + วันที่'],
+  close:['🏁 รออนุมัติปิดใบเคลม','จัดซื้อขอปิดมาแล้ว รอผู้บริหารอนุมัติ'],
+  reg:['🗂️ ทะเบียนเอกสารทั้งหมด','ใบเคลม + ใบ Inspection ทุกใบทุกจ๊อบ']};
+function listPage(k){
+  VIEW=k;
+  var rows=rowsOf(k), ti=TITLES[k];
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › '+esc(ti[0])+'</div>'+
+    '<div class="card"><div class="hd"><h2>'+esc(ti[0])+'</h2>'+
+    '<span class="sub">'+esc(ti[1])+'</span></div>';
+  if(!rows.length) t+='<div class="empty">ยังไม่มีเอกสารในกล่องนี้</div>';
+  else{
+    var isReg=(k==='reg'), canX=(ROLE==='ADMIN');
+    t+='<div style="overflow-x:auto"><table class="wide" style="min-width:'+(isReg?1090:880)+'px">'+
+      '<thead><tr><th style="width:92px">ชนิด</th><th style="width:112px">เลขที่</th>'+
+      '<th style="width:94px">วันที่</th><th style="width:108px">เลขที่ JOB</th>'+
+      '<th style="min-width:120px">ชื่อลูกค้า</th>'+
+      (isReg?'<th style="width:150px">สถานะ</th>':'')+
+      '<th style="width:158px">ขั้นตอนตอนนี้</th><th style="width:88px">ผู้เปิด</th>'+
+      '<th style="width:62px">รูป</th>'+
+      (isReg?'<th style="width:96px">ยกเลิกใบ</th>':'')+
+      '</tr></thead><tbody>';
+    rows.forEach(function(d){
+      var np=0; d.items.forEach(function(o){ if(!o.ph) np++; });
+      t+='<tr class="k"'+(d.cancel?' style="opacity:.55"':'')+' onclick="openDoc(\''+d.no+'\')">'+
+        '<td class="c"><span class="pill '+(d.kind==='INS'?'ins':'clm')+'">'+
+          (d.kind==='INS'?'ใบ Inspection':'ใบเคลม')+'</span></td>'+
+        '<td><b>'+esc(d.no)+'</b></td>'+
+        '<td class="c" style="white-space:nowrap">'+esc(d.date)+'</td>'+
+        '<td>'+esc(d.job)+'</td><td>'+esc(d.cust)+'</td>'+
+        (isReg?'<td class="c">'+(d.cancel?'<span class="pill r">ยกเลิกแล้ว</span>'
+                                         :'<span class="pill">'+esc(statusOf(d))+'</span>')+'</td>':'')+
+        '<td class="c"><span class="pill'+(d.rej?' r':'')+'">'+
+          (d.cancel?'—':d.rej?'↩ ถูกตีกลับ':stg(d).no+' · '+esc(stg(d).name))+'</span></td>'+
+        '<td>'+esc(d.by)+'</td>'+
+        '<td class="c">'+(np?'<span class="pill r">ขาด '+np+'</span>':'<span class="pill g">ครบ</span>')+'</td>'+
+        (isReg?'<td class="c" onclick="event.stopPropagation()">'+
+          (d.cancel?'<span class="sub">'+esc(d.cancelBy||'')+'</span>'
+           :canX?'<button class="btn" style="padding:3px 9px;font-size:11.5px" '+
+                 'onclick="killDoc(\''+d.no+'\')">✕ ยกเลิก</button>'
+                :'<span class="sub">เฉพาะผู้บริหาร</span>')+'</td>':'')+
+        '</tr>';
+    });
+    t+='</tbody></table></div>';
+  }
+  t+='</div>';
+  $('view').innerHTML=t;
+  var hint={mydraft:'ใบร่างเก็บไว้ได้เรื่อย ๆ — <b>สโตร์กับจัดซื้อยังไม่เห็น</b> จนกว่าจะส่งอนุมัติและได้รับอนุมัติ',
+    approve:'<b>อนุมัติทั้ง 2 ชนิดเอกสารที่นี่ที่เดียว</b> · ใบ Inspection อนุมัติแล้ว ข้อที่ติ๊กไว้จะ<b>แตกเป็นใบเคลมอัตโนมัติ</b>',
+    store:'เอกสารวิ่งมาเองหลังผู้บังคับบัญชาอนุมัติ · ใส่ข้อมูลครบแล้วกดส่งต่อจัดซื้อ',
+    buy:'<b>ใบ ① ที่ส่ง Supplier ครั้งแรกไม่มีราคาเลย</b> · ระบบแยกใบให้ทีละเจ้า เจ้านี้ไม่เห็นของเจ้าอื่น',
+    result:'คำตอบ Supplier มี <b>4 กรณี</b> — เป็นตัวตัดสินว่าออกใบ ② ไหม และมีของกลับมาให้ QC ตรวจไหม',
+    recv:'<b>สโตร์รับของเข้าคลังแล้วแจ้งมา</b> — ไปตรวจที่คลัง ถ่ายรูปทุกชิ้น เหมือนตรวจ Inspection สินค้า · '+
+         'ไม่ Accept = <b>วนกลับเป็นเคลมรอบใหม่</b>',
+    sin:'ของจาก Supplier <b>ต้องเข้าสโตร์ก่อนเสมอ</b> · รับเข้าแล้วระบบออกเลขที่ + วันที่ และเด้ง LINE เรียก QC มาตรวจ',
+    issue:'<b>ตรวจผ่านแล้วเท่านั้นถึงเบิกออกได้</b> · ใบเบิกมีเลขที่ + วันที่ อ้างอิงใบตรวจรับของกลับ',
+    close:'ขั้นสุดท้าย <b>ผู้บริหารเท่านั้น</b>ที่กดอนุมัติปิดได้',
+    reg:'รวมทุกใบไว้ที่เดียว ไว้ค้นย้อนหลัง'};
+  tip(hint[k]||'');
+}
+
+/* เบียร์สั่งไว้ในสเปค: "ทะเบียนเอกสารที่ส่งให้ Supplier รายจ๊อบ"
+   เก็บว่าจ๊อบนี้เคยออกเอกสารอะไรไปให้ Supplier บ้าง ออกเมื่อไหร่ ใครออก แนบไฟล์ที่เซ็นกลับมาได้ */
+var SUPLOG=[
+ {job:'JT-69/0009',no:'CLM-69/0004',doc:'① ใบแจ้งเคลมสินค้า',sup:'CIMC Vehicles Co., Ltd.',
+  d:'29/08/2569',by:'คุณเอ · จัดซื้อ',sign:'✔ เซ็นกลับ 30/08/2569'},
+ {job:'JT-69/0009',no:'CLM-69/0004',doc:'② ใบเรียกเก็บค่าเคลม',sup:'CIMC Vehicles Co., Ltd.',
+  d:'02/09/2569',by:'คุณเอ · จัดซื้อ',sign:'— รอเซ็นกลับ'},
+ {job:'JT-69/0009',no:'INS-69/0003',doc:'④ ใบตรวจรับแท็งค์',sup:'CIMC Vehicles Co., Ltd.',
+  d:'03/09/2569',by:'คุณสมชาย · QC',sign:'✔ เซ็นกลับ 04/09/2569'},
+ {job:'JT-69/0014',no:'CLM-69/0003',doc:'① ใบแจ้งเคลมสินค้า',sup:'บจก. ไทยพัฒนาวาล์ว',
+  d:'02/09/2569',by:'คุณเอ · จัดซื้อ',sign:'— รอเซ็นกลับ'}
+];
+function supDoc(){
+  VIEW='supdoc';
+  var jobs={}; SUPLOG.forEach(function(r){ (jobs[r.job]=jobs[r.job]||[]).push(r); });
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › ทะเบียนเอกสารที่ส่ง Supplier</div>';
+  Object.keys(jobs).forEach(function(j){
+    t+='<div class="card"><div class="hd"><h2>'+esc(j)+'</h2>'+
+      '<span class="sub">ส่งไปแล้ว '+jobs[j].length+' ฉบับ</span></div>'+
+      '<div style="overflow-x:auto"><table class="wide" style="min-width:900px"><thead><tr>'+
+      '<th style="width:34px">#</th><th style="width:190px">เอกสาร</th><th style="width:130px">จากใบ</th>'+
+      '<th style="width:210px">ส่งให้ Supplier</th><th style="width:92px">วันที่ส่ง</th>'+
+      '<th style="width:140px">ใครออก</th><th style="width:170px">Supplier เซ็นกลับ</th>'+
+      '<th style="width:110px">ไฟล์แนบ</th></tr></thead><tbody>';
+    jobs[j].forEach(function(r,i){
+      var ok=r.sign.indexOf('✔')===0;
+      t+='<tr><td class="rowno">'+(i+1)+'</td><td><b>'+esc(r.doc)+'</b></td>'+
+        '<td><a style="color:var(--red);cursor:pointer" onclick="openDoc(\''+r.no+'\')">'+esc(r.no)+'</a></td>'+
+        '<td>'+esc(r.sup)+'</td><td class="c">'+esc(r.d)+'</td><td>'+esc(r.by)+'</td>'+
+        '<td class="c"><span class="pill '+(ok?'g':'y')+'">'+esc(r.sign)+'</span></td>'+
+        '<td class="c">'+(ok?'📎 scan.pdf':'<span class="sub">— แนบได้ —</span>')+'</td></tr>';
+    });
+    t+='</tbody></table></div></div>';
+  });
+  $('view').innerHTML=t;
+  tip('<b>ทะเบียนเอกสารที่ส่ง Supplier รายจ๊อบ</b> — เคยส่งอะไรไปให้ใคร เมื่อไหร่ ใครเป็นคนออก '+
+      'และ<b>แนบไฟล์ที่ Supplier เซ็นกลับมา</b>ได้ตรงนี้');
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   รายงาน & ทะเบียน — ของที่เบียร์เคยสั่งไว้แต่ยังไม่ได้ทำ
+   · "ตอนเรียกเก็บเงิน รวมยอดจากใบเคลมหลายใบ ออกใบรับเงินใบเดียวได้"
+   · "ทะเบียนเอกสาร สามารถกดยกเลิกใบเคลมได้ จากเบียร์เท่านั้น"
+   · สเปคข้อ 3.7 พนักงานทำเสียหาย → รายงานให้ HR หักเงิน · ข้อ 3.8 ส่งข้อมูลให้บัญชี
+   · "ถ้าลบข้อมูลใน LOG ทั้งหมด เอกสารใบนั้นหายไปด้วยไหม" → LOG แยกจากเอกสาร
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── รวมยอดเรียกเก็บหลายใบเคลม → ออกใบเดียวต่อ Supplier ── */
+function billRows(){
+  var g={};
+  DOCS.forEach(function(d){
+    if(d.kind!=='CLM'||d.cancel) return;
+    var R=RESULTS[d.result];
+    if(!R||!R.bill) return;                       /* เฉพาะเคสที่ต้องเรียกเงิน */
+    if(['SIN','RECV','ISSUE','CLOSE','DONE'].indexOf(d.stage)<0) return;
+    var B=billOf(d);
+    (d.labors||[]).forEach(function(L){
+      var sup=L.sup||'(ยังไม่ระบุ)';
+      (g[sup]=g[sup]||{rows:[],sum:0});
+    });
+    var sup=(d.items[0]||{}).sup||'(ยังไม่ระบุ)';
+    g[sup]=g[sup]||{rows:[],sum:0};
+    g[sup].rows.push({d:d,amt:B.total,billed:!!d.billNo});
+    g[sup].sum+=B.total;
+  });
+  return g;
+}
+function billPage(){
+  VIEW='bill';
+  var g=billRows(), keys=Object.keys(g);
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › รวมยอดเรียกเก็บ</div>'+
+    '<div class="card"><div class="hd"><h2>🧾 รวมยอดเรียกเก็บ → ออกใบเดียว</h2>'+
+    '<span class="sub">เบียร์สั่งไว้: รวมยอดจากใบเคลมหลายใบ แล้วออกใบเรียกเก็บใบเดียว</span></div>'+
+    '<div class="warn">📌 <b>รวมได้เฉพาะใบของ Supplier เจ้าเดียวกัน</b> และเฉพาะใบที่ผลการเคลมบอกว่าต้องเรียกเงิน '+
+    '(ใบที่ Supplier ไม่รับเคลม หรือเปลี่ยนของแล้วจบ จะไม่ขึ้นในหน้านี้) · '+
+    '<b>ใบรวมมีเลขที่ของตัวเอง CDN-69/xxxx</b> (คนละชุดกับเลขใบส่งมอบ DN- ที่ใช้อยู่แล้ว) แต่ยังอ้างอิงเลขใบเคลมทุกใบที่รวมเข้ามา</div>';
+  if(!keys.length) t+='<div class="empty">ยังไม่มีใบเคลมที่ถึงขั้นเรียกเก็บเงิน</div>';
+  keys.forEach(function(k,gi){
+    var G=g[k];
+    t+='<div style="margin-top:14px"><div class="hd" style="margin-bottom:6px">'+
+      '<h2 style="font-size:15px">'+esc(k)+'</h2>'+
+      '<span class="sub">'+G.rows.length+' ใบเคลม · รวม '+money(G.sum)+' บาท</span></div>'+
+      '<div style="overflow-x:auto"><table class="wide" style="min-width:900px"><thead><tr>'+
+      '<th style="width:44px">รวม</th><th style="width:130px">เลขที่ใบเคลม</th>'+
+      '<th style="width:92px">วันที่</th><th style="width:130px">เลขที่ JOB</th>'+
+      '<th>ผลการเคลม</th><th style="width:120px">ยอดเรียกเก็บ</th>'+
+      '<th style="width:130px">สถานะ</th></tr></thead><tbody>';
+    G.rows.forEach(function(r){
+      t+='<tr><td class="c"><input type="checkbox" class="tick" '+(r.billed?'disabled':'checked')+'></td>'+
+        '<td><a style="color:var(--red);cursor:pointer" onclick="openDoc(\''+r.d.no+'\')">'+esc(r.d.no)+'</a></td>'+
+        '<td class="c">'+esc(r.d.date)+'</td><td>'+esc(r.d.job)+'</td>'+
+        '<td>'+esc((RESULTS[r.d.result]||{}).t||'')+'</td>'+
+        '<td class="r">'+money(r.amt)+'</td>'+
+        '<td class="c">'+(r.billed?'<span class="pill g">ออกใบรวมแล้ว '+esc(r.d.billNo)+'</span>'
+                                  :'<span class="pill y">ยังไม่เรียกเก็บ</span>')+'</td></tr>';
+    });
+    t+='<tr style="font-weight:800"><td colspan="5" class="r">ยอดรวมของเจ้านี้ (ไม่มี VAT)</td>'+
+      '<td class="r">'+money(G.sum)+'</td><td></td></tr>'+
+      '</tbody></table></div>'+
+      '<div style="margin-top:8px"><button class="btn p" onclick="mkBill('+gi+')">'+
+      '🧾 ออกใบเรียกเก็บรวมของ '+esc(k)+'</button> '+
+      '<span class="sub">ระบบออกเลขที่ CDN ให้ใหม่ 1 เลข แล้วผูกกับใบเคลมทุกใบที่ติ๊กไว้</span></div></div>';
+  });
+  $('view').innerHTML=t;
+  tip('<b>ใบรวมยอดเรียกเก็บ</b> — ใบเคลมยังเป็นคนละใบเหมือนเดิม แต่ตอนเก็บเงินรวมเป็นใบเดียวต่อ Supplier '+
+      'จะได้ไม่ต้องไล่เก็บทีละใบ');
+}
+function mkBill(gi){
+  var g=billRows(), k=Object.keys(g)[gi]; if(!k) return;
+  var G=g[k], no=newNo('CDN'), today=now().split(' ')[0];
+  G.rows.forEach(function(r){ if(!r.d.billNo){ r.d.billNo=no; r.d.billDate=today; } });
+  prnBill(k,G,no,today);
+}
+function prnBill(sup,G,no,date){
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › '+
+    '<a onclick="go(\'bill\')">รวมยอดเรียกเก็บ</a> › '+esc(no)+'</div>'+
+    '<div class="card"><div class="hd"><h2>ใบเรียกเก็บรวม — '+esc(sup)+'</h2>'+
+    '<span class="sub">'+esc(no)+' · '+esc(date)+'</span></div>'+
+    '<div class="okbox">✅ <b>รวม '+G.rows.length+' ใบเคลม เป็นใบเรียกเก็บใบเดียว</b> — '+
+    'ใบนี้มีเลขที่ของตัวเอง แต่ยังอ้างอิงเลขใบเคลมทุกใบไว้ ตรวจย้อนได้</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'+
+    '<button class="btn p">🖨️ พิมพ์ / บันทึกเป็น PDF</button>'+
+    '<button class="btn" onclick="go(\'bill\')">← กลับหน้ารวมยอด</button></div>';
+  t+='<div class="a4"><div class="a4hd"><div>'+
+    '<div class="a4co">SUTEE TANKERS &amp; SPECIAL TRUCK CO., LTD.</div>'+
+    '<div class="a4sub">บริษัท สุธี แท็งเกอร์ แอนด์ สเปเชียลทรัค จำกัด</div></div>'+
+    '<div class="a4no"><div><b>'+esc(no)+'</b></div><div>'+esc(date)+'</div>'+
+    '<div>ใบเรียกเก็บรวม</div></div></div>'+
+    '<h3 class="a4t">ใบเรียกเก็บค่าเคลม (รวมหลายใบ) · CONSOLIDATED CLAIM DEBIT NOTE</h3>'+
+    '<table class="a4i"><tr><td>ถึง (Supplier)</td><td><b>'+esc(sup)+'</b></td>'+
+    '<td>จำนวนใบเคลม</td><td>'+G.rows.length+' ใบ</td></tr></table>'+
+    '<table class="a4tb"><thead><tr><th style="width:28px">#</th><th style="width:130px">เลขที่ใบเคลม</th>'+
+    '<th style="width:86px">วันที่</th><th style="width:120px">เลขที่ JOB</th>'+
+    '<th>รายการ</th><th style="width:110px">ยอด (บาท)</th></tr></thead><tbody>';
+  G.rows.forEach(function(r,i){
+    t+='<tr><td class="c">'+(i+1)+'</td><td><b>'+esc(r.d.no)+'</b></td>'+
+      '<td class="c">'+esc(r.d.date)+'</td><td>'+esc(r.d.job)+'</td>'+
+      '<td>'+esc(r.d.items.map(function(o){return o.nm;}).filter(Boolean).join(' · '))+'</td>'+
+      '<td class="r">'+money(r.amt)+'</td></tr>';
+  });
+  t+='</tbody></table>'+
+    '<table class="a4sm"><tr class="tot"><td>ยอดเรียกเก็บรวมทั้งสิ้น (ไม่มี VAT)</td>'+
+    '<td class="r">'+money(G.sum)+' บาท</td></tr></table>'+
+    '<div class="a4nt">** ใบนี้รวมยอดจากใบเคลมที่ระบุไว้ข้างต้นทั้งหมด · '+
+    'รายละเอียดรายการและรูปถ่ายอยู่ในใบแจ้งเคลมแต่ละใบที่ส่งไปก่อนหน้านี้ **</div>'+
+    '<div class="a4sg"><div><i>ผู้ออกเอกสาร</i><b>'+esc(me().n)+' · '+esc(me().p)+'</b></div>'+
+    '<div><i>Supplier ลงนามรับทราบ</i><b>&nbsp;</b></div></div>'+
+    '<div class="a4ft">FM-WH-03 · Rev.00 · หน้า 1/1</div></div></div>';
+  $('view').innerHTML=t;
+  tip('<b>ออกใบรวมแล้ว '+esc(no)+'</b> — ใบเคลมที่รวมเข้ามาจะขึ้นสถานะ "ออกใบรวมแล้ว" '+
+      'ไม่ถูกดึงมารวมซ้ำอีก');
+}
+
+/* ── รายงานส่ง HR หักเงินพนักงาน (สเปคข้อ 3.7) ── */
+function hrPage(){
+  VIEW='hr';
+  var rows=DOCS.filter(function(d){ return d.kind==='CLM'&&!d.cancel&&d.blame==='EMP'; });
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › รายงานส่ง HR</div>'+
+    '<div class="card"><div class="hd"><h2>👥 รายงานส่ง HR — หักเงินพนักงาน</h2>'+
+    '<span class="sub">เฉพาะใบที่จัดซื้อระบุว่า "พนักงานทำเสียหาย" ตอนปิดจบ</span></div>'+
+    '<div class="warn">📌 HR ยังไม่มีหน้าจอในระบบนี้ — ระบบ<b>ออกเป็นรายงานให้ก่อน</b> '+
+    'กดส่งออก Excel แล้วส่งให้ HR ไปหักเงินตามระเบียบ</div>';
+  if(!rows.length) t+='<div class="empty">ยังไม่มีใบที่ระบุว่าพนักงานทำเสียหาย</div>';
+  else{
+    t+='<div style="overflow-x:auto"><table class="wide" style="min-width:960px"><thead><tr>'+
+      '<th style="width:32px">#</th><th style="width:130px">เลขที่ใบเคลม</th>'+
+      '<th style="width:90px">วันที่ปิด</th><th style="width:120px">เลขที่ JOB</th>'+
+      '<th style="width:150px">ผู้ทำเสียหาย</th><th style="width:110px">แผนก</th>'+
+      '<th>รายการที่เสียหาย</th><th style="width:120px">มูลค่าความเสียหาย</th>'+
+      '</tr></thead><tbody>';
+    rows.forEach(function(d,i){
+      t+='<tr><td class="rowno">'+(i+1)+'</td>'+
+        '<td><a style="color:var(--red);cursor:pointer" onclick="openDoc(\''+d.no+'\')">'+esc(d.no)+'</a></td>'+
+        '<td class="c">'+esc(d.date)+'</td><td>'+esc(d.job)+'</td>'+
+        '<td>'+esc(d.blameWho||'—')+'</td><td>'+esc(d.blameDept||'—')+'</td>'+
+        '<td>'+esc(d.items.map(function(o){return o.nm;}).filter(Boolean).join(' · '))+'</td>'+
+        '<td class="r">'+money(sumCost(d))+'</td></tr>';
+    });
+    t+='</tbody></table></div>'+
+      '<div style="margin-top:10px"><button class="btn b">📊 ส่งออก Excel ให้ HR</button> '+
+      '<span class="sub">ระบบไม่หักเงินเอง · HR เป็นคนตัดสินใจตามระเบียบบริษัท</span></div>';
+  }
+  $('view').innerHTML=t;
+  tip('<b>รายงานส่ง HR</b> — เฉพาะเคสที่ระบุว่าพนักงานทำเสียหาย · เคสอื่นลงเป็นต้นทุนของแท็งค์แทน');
+}
+
+/* ── ข้อมูลส่งบัญชี (สเปคข้อ 3.8) ── */
+function accPage(){
+  VIEW='acc';
+  var rows=DOCS.filter(function(d){ return d.kind==='CLM'&&!d.cancel&&
+    ['CLOSE','DONE'].indexOf(d.stage)>=0; });
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › ข้อมูลส่งบัญชี</div>'+
+    '<div class="card"><div class="hd"><h2>📒 ข้อมูลส่งบัญชี</h2>'+
+    '<span class="sub">ใบที่จบขั้นตอนแล้ว · บัญชีรับข้อมูลอย่างเดียว ไม่ต้องกดติ๊กอะไร</span></div>';
+  if(!rows.length) t+='<div class="empty">ยังไม่มีใบที่ถึงขั้นปิดจบ</div>';
+  else{
+    t+='<div style="overflow-x:auto"><table class="wide" style="min-width:1060px"><thead><tr>'+
+      '<th style="width:32px">#</th><th style="width:130px">เลขที่ใบเคลม</th>'+
+      '<th style="width:120px">เลขที่ JOB</th><th style="width:130px">JMC ที่ผูก</th>'+
+      '<th style="width:170px">Supplier</th>'+
+      '<th style="width:110px">ต้นทุนของ</th><th style="width:100px">ค่าแรง</th>'+
+      '<th style="width:120px">เรียกเก็บได้</th><th style="width:150px">ลงเป็นอะไร</th>'+
+      '</tr></thead><tbody>';
+    var tc=0,tl=0,tb=0;
+    rows.forEach(function(d,i){
+      var B=billOf(d); tc+=B.cost; tl+=B.lab; tb+=B.total;
+      t+='<tr><td class="rowno">'+(i+1)+'</td>'+
+        '<td><a style="color:var(--red);cursor:pointer" onclick="openDoc(\''+d.no+'\')">'+esc(d.no)+'</a></td>'+
+        '<td>'+esc(d.job)+'</td><td>'+esc(d.jmc||'— ยังไม่ผูก —')+'</td>'+
+        '<td>'+esc((d.items[0]||{}).sup||'—')+'</td>'+
+        '<td class="r">'+money(B.cost)+'</td><td class="r">'+money(B.lab)+'</td>'+
+        '<td class="r">'+money(B.total)+'</td>'+
+        '<td class="c">'+(d.blame==='EMP'?'<span class="pill y">หักเงินพนักงาน</span>'
+                                          :'<span class="pill">ต้นทุนของแท็งค์</span>')+'</td></tr>';
+    });
+    t+='<tr style="font-weight:800"><td colspan="5" class="r">รวมทั้งหมด</td>'+
+      '<td class="r">'+money(tc)+'</td><td class="r">'+money(tl)+'</td>'+
+      '<td class="r">'+money(tb)+'</td><td></td></tr>'+
+      '</tbody></table></div>'+
+      '<div style="margin-top:10px"><button class="btn b">📊 ส่งออก Excel ให้บัญชี</button></div>';
+  }
+  $('view').innerHTML=t;
+  tip('<b>ส่งบัญชี</b> — ระบบส่งให้อัตโนมัติเมื่อใบปิดจบ · บัญชีไม่ต้องเข้ามากดอะไรในระบบเคลม');
+}
+
+/* ── LOG — แยกจากตัวเอกสาร (ตอบคำถามเบียร์: ลบ LOG แล้วเอกสารไม่หาย) ── */
+var LOGS=[
+ {t:'07/09/2569 09:12',u:'คุณสมชาย · QC',   a:'เปิดใบเคลม',            n:'CLM-69/0004'},
+ {t:'07/09/2569 11:20',u:'คุณวิชัย · ผจก.ผลิต',a:'อนุมัติใบเคลม',        n:'CLM-69/0004'},
+ {t:'07/09/2569 14:05',u:'คุณนภา · สโตร์',   a:'บันทึก PO + Supplier',  n:'CLM-69/0004'},
+ {t:'07/09/2569 09:30',u:'คุณเอ · จัดซื้อ',   a:'พิมพ์ใบแจ้งเคลม ①',     n:'CLM-69/0004'},
+ {t:'07/09/2569 16:10',u:'คุณเอ · จัดซื้อ',   a:'บันทึกผลการเคลม',      n:'CLM-69/0004'},
+ {t:'06/09/2569 10:02',u:'คุณสมชาย · QC',   a:'ติ๊กส่งไปสร้างใบเคลม',    n:'INS-69/0003'}
+];
+function logPage(){
+  VIEW='log';
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › LOG ประวัติการใช้งาน</div>'+
+    '<div class="card"><div class="hd"><h2>🕘 LOG ประวัติการใช้งาน</h2>'+
+    '<span class="sub">ใครทำอะไรกับใบไหน เมื่อไหร่ · ผู้บริหารเท่านั้นที่เปิดดูได้</span></div>'+
+    '<div class="okbox">✅ <b>ตอบคำถามที่เบียร์เคยถาม — ลบ LOG แล้วเอกสารไม่หาย</b><br>'+
+    'LOG เก็บอยู่คนละแท็บกับตัวเอกสาร · ลบ LOG ทิ้งทั้งหมด ใบเคลมและใบ Inspection ยังอยู่ครบ '+
+    'แค่ไม่รู้ว่าใครเคยทำอะไรไว้เท่านั้น</div>'+
+    '<div style="overflow-x:auto"><table class="wide" style="min-width:720px"><thead><tr>'+
+    '<th style="width:32px">#</th><th style="width:150px">เวลา</th>'+
+    '<th style="width:180px">ใคร</th><th>ทำอะไร</th>'+
+    '<th style="width:140px">กับใบไหน</th></tr></thead><tbody>';
+  LOGS.forEach(function(l,i){
+    t+='<tr><td class="rowno">'+(i+1)+'</td><td>'+esc(l.t)+'</td><td>'+esc(l.u)+'</td>'+
+      '<td>'+esc(l.a)+'</td>'+
+      '<td><a style="color:var(--red);cursor:pointer" onclick="openDoc(\''+l.n+'\')">'+esc(l.n)+'</a></td></tr>';
+  });
+  t+='</tbody></table></div></div>';
+  $('view').innerHTML=t;
+  tip('<b>LOG แยกจากเอกสาร</b> — ใช้ตรวจย้อนว่าใครแก้อะไรไว้ · ลบ LOG ไม่กระทบตัวใบเคลม');
+}
+
+function byJob(){
+  var jobs={};
+  DOCS.filter(canSee).forEach(function(d){ (jobs[d.job]=jobs[d.job]||{cust:d.cust,ds:[]}).ds.push(d); });
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › งานเคลมตามจ๊อบ</div>';
+  Object.keys(jobs).forEach(function(j){
+    t+='<div class="card"><div class="hd"><h2>'+esc(j)+'</h2><span class="sub">'+esc(jobs[j].cust)+'</span></div>'+
+      '<table><thead><tr><th style="width:104px">ชนิด</th><th style="width:118px">เลขที่</th>'+
+      '<th style="width:94px">วันที่</th><th>ขั้นตอนตอนนี้</th><th style="width:132px">มาจาก</th></tr></thead><tbody>';
+    jobs[j].ds.forEach(function(d){
+      t+='<tr class="k" onclick="openDoc(\''+d.no+'\')">'+
+        '<td class="c"><span class="pill '+(d.kind==='INS'?'ins':'clm')+'">'+
+        (d.kind==='INS'?'ใบ Inspection':'ใบเคลม')+'</span></td><td><b>'+esc(d.no)+'</b></td>'+
+        '<td class="c" style="white-space:nowrap">'+esc(d.date)+'</td>'+
+        '<td>'+stg(d).no+' · '+esc(stg(d).name)+'</td>'+
+        '<td>'+(d.from?esc(d.from):'—')+'</td></tr>';
+    });
+    t+='</tbody></table>';
+    /* ต้นทุนเคลมรวมของรถคันนั้น — เห็นเฉพาะจัดซื้อ/ผู้บริหาร */
+    if(seeCost()){
+      var cs=0,ls=0,bs=0,jm={};
+      jobs[j].ds.forEach(function(d){
+        if(d.kind!=='CLM'||d.cancel) return;
+        var B=billOf(d); cs+=B.cost; ls+=B.lab; bs+=B.total;
+        if(d.jmc) jm[d.jmc]=1;
+      });
+      t+='<div style="margin-top:11px"><b style="font-size:12.5px">ต้นทุนเคลมรวมของรถคันนี้ '+
+        '<span class="pill r">🔒 เห็นเฉพาะจัดซื้อ</span></b>'+
+        '<div style="overflow-x:auto;margin-top:6px"><table class="wide" style="min-width:640px"><thead><tr>'+
+        '<th>รายการ</th><th style="width:150px">บาท</th><th style="width:220px">ที่มา</th>'+
+        '</tr></thead><tbody>'+
+        '<tr><td>ต้นทุนของ (รวมทุกใบเคลมของคันนี้)</td><td class="r">'+money(cs)+'</td>'+
+          '<td>ดึงจาก NOVA ตามเลข JMC</td></tr>'+
+        '<tr><td>ค่าแรงคน</td><td class="r">'+money(ls)+'</td>'+
+          '<td>HR ใส่ในระบบเคลม</td></tr>'+
+        '<tr><td>เรียกเก็บคืนจาก Supplier ได้</td><td class="r">'+money(bs)+'</td>'+
+          '<td>จากใบ ② ที่ออกไป</td></tr>'+
+        '<tr style="font-weight:800"><td>ต้นทุนเคลมสุทธิที่ STT รับเอง</td>'+
+          '<td class="r">'+money(cs+ls-bs)+'</td>'+
+          '<td>ผูกกับ JMC '+esc(Object.keys(jm).join(', ')||'— ยังไม่ผูก —')+'</td></tr>'+
+        '</tbody></table></div></div>';
+    }
+    t+='</div>';
+  });
+  $('view').innerHTML=t;
+  tip('<b>ดูรายจ๊อบ</b> — ใบ Inspection กับใบเคลมของรถคันเดียวกันอยู่ด้วยกัน · '+
+      'คอลัมน์ "มาจาก" บอกว่าใบเคลมนี้แตกมาจากใบตรวจใบไหน'+
+      (seeCost()?' · ด้านล่างมี<b>ต้นทุนเคลมรวมของรถคันนั้น</b>':''));
+}
+
+/* ═══ เปิดเอกสาร ═══ */
+function openDoc(n){ CURDOC=n; var d=doc(n); return d.kind==='INS'?insView(d):clmView(d); }
+function fld(c,l,v,lock,rq){ return '<div class="f '+c+'"><label>'+l+(rq?' <span class="rq">*</span>':'')+
+  '</label><input value="'+esc(v||'')+'" '+(lock?'class="locked" readonly':'')+'></div>'; }
+function ph(n){ var t=''; for(var i=0;i<n;i++) t+='<div class="thumb">🖼️</div>';
+  t+='<div class="addph">+</div>'; if(!n) t+='<span class="needph">ต้องมีรูป</span>'; return t; }
+function signRow(d,order){
+  var t='<div class="sign">';
+  order.forEach(function(r){
+    var v=d.sign[r]||'', p=v.split(' · '), isNext=stg(d).sign===r&&!v;
+    t+='<div class="sg'+(v?'':(isNext?' next':' wait'))+'"><i>'+esc(r)+'</i>'+
+      (v?'<b>'+esc(p[0])+'<small>'+esc(p[1]||'')+'</small><small>'+esc(p[2]||'')+'</small></b>'
+        :'<b>'+(isNext?'⏳ รอคนนี้กด':'— ยังไม่ถึงคิว —')+'</b>')+'</div>';
+  });
+  return t+'</div>';
+}
+function flowStrip(d){
+  var s=stg(d), own=isOwner(d), miss=missing(d);
+  var t='<div class="card">';
+  if(d.rej) t+='<div class="rej">↩ <b>เอกสารนี้ถูกตีกลับให้แก้</b><br>'+esc(d.rej)+'</div>';
+  t+='<div class="hd" style="margin-bottom:6px"><h2>ขั้นที่ '+s.no+' · '+esc(s.name)+'</h2>'+
+     '<span class="sub">รอ '+esc(s.who)+'</span></div>';
+  if(own&&miss.length) t+='<div class="warn">⚠ <b>ยังส่งต่อไม่ได้</b><br>'+esc(miss.join(' · '))+'</div>';
+  if(!s.roles.length) t+='<div class="okbox">✓ เอกสารนี้จบแล้ว</div>';
+  t+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+  if(own&&s.next) t+='<button class="btn '+(s.next==='DONE'?'g':'p')+'" '+(miss.length?'disabled':'')+
+    ' onclick="pass(\''+d.no+'\')">'+esc(s.act)+'</button>';
+  if(own&&d.stage==='DRAFT') t+='<button class="btn" onclick="alert(\'บันทึกร่างแล้ว — กลับมาแก้ได้เรื่อย ๆ\')">💾 บันทึกร่าง</button>';
+  if(own&&s.rej) t+='<button class="btn" onclick="kick(\''+d.no+'\')">↩ ตีกลับให้แก้</button>';
+  if(!own&&s.roles.length) t+='<span class="sub">👁 คุณดูได้ทุกอย่าง แต่ขั้นนี้เป็นหน้าที่ของ <b>'+esc(s.who)+'</b></span>';
+  t+='</div></div>';
+  return t;
+}
+function key(kind){
+  if(kind==='INS') return '<div class="key"><span><b class="rq">*</b> ต้องกรอก</span>'+
+    '<span><i class="d1"></i><b style="color:var(--s1)">ฟ้า</b> ผู้ตรวจ (ด่านแรก) กรอกเองทั้งหมด — '+
+      'ชนิด Inspection · ประเภทงาน · เลขที่ JOB · สถานที่ผลิต · CHASSIS ×2 · SERIAL '+
+      'และในตาราง: ผลตรวจ Acc/Un-Acc · สิ่งที่พบ (ไทย/EN) · <b>รูปของจริง</b> · ติ๊กส่งไปสร้างใบเคลม</span>'+
+    '<span><i class="da"></i><b style="color:var(--sa)">เทา</b> ระบบเติมเอง (ชื่อลูกค้า · MODEL · รูป STD · ผู้ตรวจ · วันที่)</span></div>';
+  return '<div class="key"><span><b class="rq">*</b> ต้องกรอก</span>'+
+  '<span><i class="d1"></i><b style="color:var(--s1)">ฟ้า</b> ผู้เปิดใบ (ด่านแรก) กรอก — '+
+    'ประเภทการเคลม · ประเภทงาน · เลขที่ JOB · สถานที่ผลิต · ชนิดงานต่างประเทศ · CHASSIS ×2 · SERIAL · JMC · วันที่ต้องการของ '+
+    'และในตาราง: รหัสสินค้า · ชื่อสินค้า · รายละเอียด (ไทย/EN) · จำนวน · หน่วย · วันรับสินค้า · <b>รูป</b></span>'+
+  '<span><i class="d2"></i><b style="color:var(--s2)">ส้ม</b> สโตร์กรอก — เลขใบส่งมอบ · PO · Supplier <b>เท่านั้น</b></span>'+
+  '<span><i class="d3"></i><b style="color:var(--s3)">เขียว</b> จัดซื้อกรอก — คำตอบ Supplier · <b>ต้นทุน (คนอื่นไม่เห็น)</b></span>'+
+  '<span><i class="da"></i><b style="color:var(--sa)">เทา</b> ระบบเติมเอง</span></div>'; }
+
+/* ช่อง "สถานะ (ร่าง/ส่งแล้ว/ตอบแล้ว/เรียกเก็บ/ปิด)" จากไฟล์ช่องกรอกทั้งระบบ
+   เบียร์เคยถามว่า "สถานะคืออะไร ใครต้องเป็นคนเปลี่ยนสถานะ" → ระบบเปลี่ยนให้เองตามขั้นงาน ไม่มีใครกดเอง */
+function statusOf(d){
+  if(d.kind==='INS') return {DRAFT:'ร่าง',APPR:'ส่งแล้ว',DONE:'ปิด'}[d.stage]||'';
+  var R=RESULTS[d.result];
+  return {DRAFT:'ร่าง',APPR:'ส่งแล้ว',STORE:'ส่งแล้ว',BUY:'ส่งแล้ว',RESULT:'ส่งแล้ว',
+          SIN:'ตอบแล้ว · ของกลับเข้าคลัง',RECV:'ตอบแล้ว · รอ QC ตรวจ',
+          ISSUE:'ตอบแล้ว · ตรวจผ่าน รอเบิกออก',
+          CLOSE:(R&&R.bill)?'เรียกเก็บ':'ตอบแล้ว',DONE:'ปิด'}[d.stage]||'';
+}
+
+/* เบียร์: "ทุกคนจะไม่เห็นช่องต้นทุน จะเห็นแค่จัดซื้อเท่านั้น" */
+function seeCost(){ return ROLE==='PURCHASE'||ROLE==='ADMIN'; }
+/* เบียร์: "ถ้าเอกสารถูก Approve ส่งสโตร์แล้วจะแก้ไขใบเคลมไม่ได้ ต้องเปิดใบเคลมใหม่เท่านั้น" */
+function lockedAfterAppr(d){ return d.kind==='CLM' && ['STORE','BUY','CLOSE','DONE'].indexOf(d.stage)>=0; }
+
+function clmView(d){
+  var own=isOwner(d);
+  var lk1=!(own&&d.stage==='DRAFT'), lk2=!(own&&d.stage==='STORE'), lk3=!(own&&d.stage==='BUY');
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › <a onclick="go(\''+VIEW+'\')">กลับรายการ</a> › '+esc(d.no)+'</div>';
+  t+='<div class="card"><div class="hd"><span class="pill clm">ใบเคลมสินค้า</span>'+
+    '<h2>'+esc(d.no)+'</h2><span class="sub">'+esc(d.job)+' · '+esc(d.cust)+' · '+
+    (d.area==='for'?'ต่างประเทศ':'ในประเทศ')+(d.from?' · แตกมาจาก '+esc(d.from):'')+'</span></div>'+
+    '<div class="sgttl">รอบที่ 1 — เปิดและส่งเคลม '+
+      (r1done(d)?'<b class="okt">✓ ครบ 4 ช่อง — เปิดปุ่มพิมพ์ใบส่ง Supplier แล้ว</b>'
+                :'<span class="sub">ครบ 4 ช่องเมื่อไหร่ ปุ่มพิมพ์ใบส่ง Supplier ถึงจะเปิดใช้ได้</span>')+'</div>'+
+    signRow(d,SIGN_R1)+
+    '<div class="sgttl" style="margin-top:9px">รอบที่ 2 — หลังได้ผลจาก Supplier'+
+      (d.round>1?' <b class="okt" style="color:#b3261e">· รอบเคลมที่ '+d.round+'</b>':'')+'</div>'+
+    signRow(d,SIGN_R2)+'</div>';
+  t+=flowStrip(d);
+  t+='<div class="card"><div class="hd"><h2>ข้อมูลใบเคลม</h2></div>';
+  if(lockedAfterAppr(d)) t+='<div class="rej" style="background:#f4f5f7;border-color:#ddd;color:#555">'+
+    '🔒 <b>ใบนี้ผ่านการอนุมัติและส่งให้สโตร์แล้ว — แก้ไขข้อมูลใบเคลมไม่ได้อีก</b><br>'+
+    'ถ้าข้อมูลผิดหรือมีของเพิ่ม ต้อง<b>เปิดใบเคลมใบใหม่</b> (หรือให้ตีกลับไปต้นน้ำก่อน)</div>';
+  var isFor=(d.area==='for');
+  t+=key()+'<div class="grid">'+
+    fld('o1','ประเภทการเคลม',d.ctype==='after'?'After-Sales (หลังส่งมอบ)':'Pre-Delivery (ก่อนส่งมอบ)',lk1,1)+
+    fld('o1','ประเภทงาน',d.jtype,lk1,1)+
+    fld('o1','เลขที่ JOB',d.job,lk1,1)+
+    fld('oa','ชื่อลูกค้า',d.cust,1)+fld('oa','MODEL',d.model,1)+
+    fld('o1','สถานที่ผลิต',isFor?'ต่างประเทศ':'ในประเทศ',lk1,1)+
+    (isFor?fld('o1','ชนิดงานต่างประเทศ',d.fkind,lk1,1):'')+
+    fld('o1','CHASSIS NO. (STT)',d.cs,lk1,isFor)+
+    (isFor?fld('o1','CHASSIS NO. (ผู้ผลิต)',d.cm,lk1,1):'')+
+    fld('o1','SERIAL NO.',d.sn,lk1)+
+    fld('o1','JMC ที่ผูก',d.jmc,lk1,d.ctype==='after')+
+    fld('o1','วันที่ต้องการของ',d.want,lk1,1)+
+    fld('o2','เลขใบส่งมอบ',d.dn,lk2,1)+fld('oa','ผู้ขอเคลม',d.by,1)+
+    fld('oa','แผนก',d.dept,1)+fld('oa','วันที่เปิด',d.date,1)+
+    fld('oa','สถานะ',statusOf(d),1)+
+    '</div></div>';
+  t+='<div class="card"><div class="hd"><h2>รายการที่เคลม ('+d.items.length+')</h2>'+
+    '<span class="sub">อย่างน้อยต้องมีรหัสหรือชื่อสินค้า · ทุกแถวมีรูป 1–5 รูป</span></div>'+
+    '<div style="overflow-x:auto"><table class="wide"><thead><tr><th style="width:32px">#</th>'+
+    '<th class="own1" style="width:92px">รหัสสินค้า<span class="opt">ใส่แล้วชื่อ+หน่วยขึ้นเอง</span></th>'+
+    '<th class="own1" style="width:126px">ชื่อสินค้า</th>'+
+    '<th class="own1" style="width:200px">รายละเอียดการเคลม'+(isFor?' (ไทย)':'')+'</th>'+
+    (isFor?'<th class="own1" style="width:180px">Claim description (EN)'+
+      '<span class="opt">แปลให้ · กด 🔎 ตรวจคำแปล</span></th>':'')+
+    '<th class="own1" style="width:50px">จน.</th>'+
+    '<th class="own1" style="width:52px">หน่วย</th>'+
+    '<th class="own1" style="width:104px">วันรับสินค้า</th>'+
+    '<th class="own2" style="width:112px">PO</th><th class="own2" style="width:128px">Supplier</th>'+
+    (seeCost()?'<th class="own3" style="width:88px">ต้นทุน 🔒</th>':'')+
+    '<th class="own1" style="width:106px">รูป</th></tr></thead><tbody>';
+  d.items.forEach(function(o,i){
+    t+='<tr><td class="rowno">'+(i+1)+'</td>'+cel(o.code,lk1)+cel(o.nm,lk1)+cel(o.th,lk1)+
+      (isFor?'<td'+(lk1?' class="locked"':'')+'>'+esc(o.en||'')+
+        ' <a class="tx" onclick="tx(this)" title="ตรวจคำแปล">🔎</a></td>':'')+
+      cel(o.qty,lk1)+cel(o.unit,lk1)+cel(o.recv,lk1)+cel(o.po,lk2)+cel(o.sup,lk2)+
+      (seeCost()?cel(o.cost,lk3):'')+
+      '<td><div class="ph">'+ph(o.ph)+'</div></td></tr>';
+  });
+  t+='</tbody></table></div></div>';
+  if(['BUY','RESULT','RECV','CLOSE','DONE'].indexOf(d.stage)>=0) t+=buySide(d);
+  if(['SIN','RECV','ISSUE','CLOSE','DONE'].indexOf(d.stage)>=0)    t+=sinSide(d);
+  if(['RECV','ISSUE','CLOSE','DONE'].indexOf(d.stage)>=0)           t+=recvSide(d);
+  if(['ISSUE','CLOSE','DONE'].indexOf(d.stage)>=0)                  t+=issueSide(d);
+  $('view').innerHTML=t;
+  var s=stg(d);
+  tip(!s.roles.length?'<b>ใบนี้ปิดจบแล้ว</b>'
+    :own?('<b>ตาคุณแล้ว</b> — กด “'+esc(s.act)+'” ลายเซ็นจะประทับเอง แล้วใบวิ่งไปกล่องถัดไป')
+        :('<b>คุณคือ '+esc(me().n)+'</b> — ขั้นนี้เป็นของ <b>'+esc(s.who)+'</b> ช่องกรอกเลยเป็นสีเทา · สลับบทบาทดูได้'));
+}
+function cel(v,lk){ return '<td'+(lk?' class="locked"':'')+'>'+esc(v||'')+'</td>'; }
+
+function insView(d){
+  var own=isOwner(d), lk=!(own&&d.stage==='DRAFT');
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › <a onclick="go(\''+VIEW+'\')">กลับรายการ</a> › '+esc(d.no)+'</div>';
+  var isTk=(d.itype==='TANKER');
+  t+='<div class="card"><div class="hd"><span class="pill ins">'+
+    (isTk?'Inspection Tankers':'Inspection สินค้า')+'</span>'+
+    '<h2>'+esc(d.no)+'</h2><span class="sub">'+esc(d.job)+' · '+esc(d.cust)+' · '+esc(d.tpl)+'</span></div>'+
+    signRow(d,['ผู้ตรวจ','ผู้อนุมัติ'])+'</div>';
+  t+=flowStrip(d);
+  var isForI=(d.area==='for');
+  t+='<div class="card"><div class="hd"><h2>ข้อมูลใบ Inspection</h2>'+
+    '<span class="sub">ผู้ตรวจ (ด่านแรก) กรอกทั้งหมด</span></div>'+key('INS')+'<div class="grid">'+
+    '<div class="f o1"><label>ชนิด Inspection <span class="rq">*</span></label>'+
+      '<input class="locked" readonly value="'+esc(isTk?'① Tankers — มีรูป STD':'② สินค้า — ไม่มี STD')+'"></div>'+
+    fld('o1','ประเภทงาน',d.jtype,lk,1)+
+    fld('o1','เลขที่ JOB',d.job,lk,1)+
+    fld('oa','ชื่อลูกค้า',d.cust,1)+fld('oa','MODEL',d.model,1)+
+    fld('o1','สถานที่ผลิต',isForI?'ต่างประเทศ':'ในประเทศ',lk,1)+
+    (isForI?fld('o1','ชนิดงานต่างประเทศ',d.fkind,lk,1):'')+
+    fld('o1','CHASSIS NO. (STT)',d.cs,lk,isForI)+
+    (isForI?fld('o1','CHASSIS NO. (ผู้ผลิต)',d.cm,lk,1):'')+
+    fld('o1','SERIAL NO.',d.sn,lk)+
+    fld('o1','แม่แบบเช็คลิสต์',d.tpl,lk,1)+
+    fld('o1','PO',d.po||'',lk)+
+    fld('o1','Supplier',d.sup||'',lk,1)+
+    fld('o1','วันรับสินค้า',d.recv||'',lk)+
+    fld('oa','ผู้ตรวจ',d.by,1)+fld('oa','แผนก',d.dept,1)+fld('oa','วันที่ตรวจ',d.date,1)+
+    fld('oa','สถานะ',statusOf(d),1)+
+    '</div>'+
+    '<div class="f o1" style="margin-top:9px"><label>หมายเหตุ</label>'+
+    '<textarea rows="2" '+(lk?'class="locked" readonly':'')+'>'+esc(d.note||'')+'</textarea></div>'+
+    '</div>';
+  var un=d.items.filter(function(o){return o.acc==='UNACC';}),
+      tk=d.items.filter(function(o){return o.toClaim;});
+  t+='<div class="card"><div class="hd"><h2>รายการตรวจ ('+d.items.length+' ข้อ)</h2>'+
+    '<span class="sub">ติ๊ก Acc / Un-Acc ทุกข้อ · ข้อที่ไม่ผ่านต้องมีรูป</span></div>';
+  t+='<div class="warn" style="background:#fffbe9;border-color:#ece0a8;color:#5a4a12">'+
+    (isTk
+     ? '📐 <b>Inspection Tankers</b> — มี <b>รูป STD ประจำรุ่น '+esc(d.model)+'</b> บอกว่าจุดนี้ของถูกต้องหน้าตายังไง '+
+       'ผู้ตรวจถ่ายรูปของจริงมาเทียบ · <b>ถ่ายหน้างานก่อน แล้วค่อยมากรอกข้อมูลทีหลังได้</b> เก็บเป็นฉบับร่างไว้'
+     : '📷 <b>Inspection สินค้า</b> — <b>ไม่มีรูป STD</b> ถ่ายรูปของที่ได้มาแล้วติ๊กว่า Acc / Un-Acc '+
+       '· ถ่ายหน้างานก่อน แล้วค่อยมากรอกทีหลังได้ เก็บเป็นฉบับร่างไว้')+'</div>';
+  t+='<div class="warn" style="background:#f2f9ff;border-color:#bcd9f0;color:#175a91">'+
+    '☑️ <b>ช่อง “ส่งไปสร้างใบเคลม”</b> — ติ๊กเฉพาะข้อที่ Un-Acc แล้วอยากเคลมกับ Supplier · '+
+    'พออนุมัติผลตรวจ ระบบจะ<b>สร้างใบเคลมจากข้อที่ติ๊กให้อัตโนมัติ</b> รายละเอียดและรูปตามไปด้วย ไม่ต้องพิมพ์ใหม่</div>';
+  t+='<div style="overflow-x:auto"><table class="wide" style="min-width:'+(isForI?1280:1000)+'px">'+
+    '<thead><tr><th style="width:32px">#</th>'+
+    '<th style="width:100px">หมวด<span class="opt">มาจากแม่แบบ</span></th>'+
+    '<th style="width:168px">หัวข้อตรวจ</th>'+
+    (isForI?'<th style="width:158px">หัวข้อ (EN)<span class="opt">มาจากแม่แบบ</span></th>':'')+
+    (isTk?'<th class="stdcol" style="width:88px">รูป STD<span class="opt">มาตรฐานของรุ่นนี้</span></th>':'')+
+    '<th style="width:88px">ผลตรวจ</th><th style="width:176px">สิ่งที่พบ'+(isForI?' (ไทย)':'')+'</th>'+
+    (isForI?'<th style="width:176px">Finding (EN)<span class="opt">แปลให้ · 🔎 ตรวจคำแปล</span></th>':'')+
+    '<th style="width:50px">จน.<span class="opt">ถ้าไม่ผ่าน</span></th>'+
+    '<th style="width:56px">หน่วย<span class="opt">ถ้าไม่ผ่าน</span></th>'+
+    '<th style="width:108px">รูปของจริง<span class="opt">สูงสุด 5 รูป</span></th>'+
+    '<th style="width:118px">ส่งไปสร้างใบเคลม</th></tr></thead><tbody>';
+  d.items.forEach(function(o,i){
+    var canTick = own && d.stage==='DRAFT' && o.acc==='UNACC';
+    t+='<tr><td class="rowno">'+(i+1)+'</td><td>'+esc(o.cat||'—')+'</td><td>'+esc(o.t)+'</td>'+
+      (isForI?'<td>'+esc(o.ten||'')+'</td>':'')+
+      (isTk?'<td class="c stdcol">'+(o.std?'<div class="thumb std">📐</div>':'<span class="sub" style="color:#c9ced4">—</span>')+'</td>':'')+
+      '<td class="c">'+(o.acc==='ACC'?'<span class="pill g">Acc</span>'
+        :o.acc==='UNACC'?'<span class="pill r">Un-Acc</span>':'<span class="pill y">ยังไม่ตรวจ</span>')+'</td>'+
+      '<td'+(lk?' class="locked"':'')+'>'+esc(o.found)+'</td>'+
+      (isForI?'<td'+(lk?' class="locked"':'')+'>'+esc(o.en||'')+
+        (o.found?' <a class="tx" onclick="tx(this)" title="ตรวจคำแปล">🔎</a>':'')+'</td>':'')+
+      '<td class="c'+(lk?' locked':'')+'">'+esc(o.qty||(o.acc==='UNACC'?'':'—'))+'</td>'+
+      '<td class="c'+(lk?' locked':'')+'">'+esc(o.unit||(o.acc==='UNACC'?'':'—'))+'</td>'+
+      '<td><div class="ph">'+ph(o.ph)+'</div></td>'+
+      '<td class="c">'+(o.acc==='UNACC'
+        ? '<input type="checkbox" class="tick" '+(o.toClaim?'checked':'')+' '+(canTick?'':'disabled')+
+          ' onchange="tickClaim(\''+d.no+'\','+i+',this.checked)">'
+        : '<span class="sub" style="color:#c9ced4">—</span>')+'</td></tr>';
+  });
+  t+='</tbody></table></div>';
+  t+='<div class="okbox" style="margin-top:11px">☑️ ติ๊กส่งไปสร้างใบเคลมแล้ว <b>'+tk.length+'</b> ข้อ '+
+     '(จาก Un-Acc ทั้งหมด '+un.length+' ข้อ)'+
+     (tk.length?' — พออนุมัติ ระบบจะสร้างใบเคลม <b>1 ใบ</b> จาก '+tk.length+' ข้อนี้':'')+'</div>';
+  t+='</div>';
+  $('view').innerHTML=t;
+  var s=stg(d);
+  tip(d.stage==='DONE'?'<b>อนุมัติผลตรวจแล้ว</b>'
+    :own?'<b>ตาคุณแล้ว</b> — ติ๊กผลตรวจให้ครบ · ข้อที่ Un-Acc และอยากเคลม <b>ติ๊กช่องขวาสุด</b> แล้วกดส่งขออนุมัติ'
+        :'<b>ขั้นนี้เป็นของ '+esc(s.who)+'</b> — สลับบทบาทมุมขวาบนเพื่อทดลอง');
+}
+function tickClaim(no,i,v){ doc(no).items[i].toClaim=v; openDoc(no); }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   ฝั่งจัดซื้อ — สเปคข้อ 2 (เอกสาร 4 ฉบับ) · ข้อ 5 (กรณีออกใบ ②) · ข้อ 6 (เรื่องเงิน)
+   เบียร์: "ตอนปริ้นแจ้ง Sup ครั้งแรก มันจะไม่มียอดราคาอยู่แล้ว" · "แยก Supplier ให้ด้วย"
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* 1 ใบเคลมมีได้หลาย PO หลาย Supplier → ใบ ① และ ② แยกใบตาม Supplier อัตโนมัติ */
+function bySup(d){
+  var g=[], ix={};
+  d.items.forEach(function(o,i){
+    var k=o.sup||'(ยังไม่ระบุ Supplier)';
+    if(ix[k]===undefined){ ix[k]=g.length; g.push({sup:k,rows:[]}); }
+    g[ix[k]].rows.push({o:o,n:i+1});
+  });
+  return g;
+}
+function money(n){ return (Math.round(n*100)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function sumCost(d){ var t=0; d.items.forEach(function(o){ t+=Number(String(o.cost||'').replace(/,/g,''))||0; }); return t; }
+/* สเปคข้อ 5 — บางกรณี "ค่าของไม่คิด" เรียกเก็บแค่ค่าแรง ห้ามเผลอคิดค่าของไปด้วย */
+function billOf(d){
+  var R=RESULTS[d.result]||{}, cost=sumCost(d), lab=Number(d.labor)||0, mgn=Number(d.margin)||0;
+  var goods = (R.goods==='เรียกเก็บ') ? cost : 0;
+  var labor = (R.labor==='เรียกเก็บ') ? lab  : 0;
+  var base  = goods+labor;
+  return {cost:cost, lab:lab, mgn:mgn, goods:goods, labor:labor,
+          profit:base*mgn/100, total:base*(1+mgn/100),
+          chargeGoods:(R.goods==='เรียกเก็บ'), chargeLabor:(R.labor==='เรียกเก็บ')};
+}
+
+function buySide(d){
+  var canBuy = seeCost(), r1=r1done(d), gs=bySup(d), R=RESULTS[d.result];
+  var lkb = !(isOwner(d) && (d.stage==='BUY'||d.stage==='RESULT'));
+
+  /* ── ก. เอกสารที่ต้องพิมพ์ ── */
+  var t='<div class="card"><div class="hd"><h2>📄 เอกสารที่ต้องออก — จัดซื้อ</h2>'+
+    '<span class="sub">1 การเคลม = 1 เลขที่ แต่พิมพ์ได้หลายฉบับ</span></div>';
+  t+='<div class="warn">🖨️ <b>ปุ่มพิมพ์ใบส่ง Supplier เปิดได้ต่อเมื่อครบลายเซ็นรอบที่ 1 ทั้ง 4 ช่อง</b> '+
+     '(ผู้เปิดใบ · ผู้อนุมัติ · สโตร์ · จัดซื้อ)'+(r1?' — <b>ตอนนี้ครบแล้ว</b>':' — <b>ตอนนี้ยังไม่ครบ ปุ่มยังเทาอยู่</b>')+'</div>';
+  t+='<div style="overflow-x:auto"><table class="wide" style="min-width:900px"><thead><tr>'+
+    '<th style="width:34px">ฉบับ</th><th style="width:250px">ชื่อเอกสาร</th>'+
+    '<th style="width:180px">ออกเมื่อไหร่</th><th style="width:150px">มีราคาไหม</th>'+
+    '<th style="width:190px">พิมพ์</th></tr></thead><tbody>';
+  var DOCTYPES=[
+    ['①','ใบแจ้งเคลมสินค้า · CLAIM NOTICE','ทันทีที่เจอปัญหา — ฉบับที่ส่ง Supplier ครั้งแรก',
+     '<b style="color:#b3261e">ไม่มีราคาใด ๆ ทั้งสิ้น</b>','notice',1],
+    ['②','ใบเรียกเก็บค่าเคลม · CLAIM DEBIT NOTE','ทีหลัง เฉพาะเคสที่ต้องเรียกเงิน',
+     'มีราคา + ค่าแรง + สกุลนอก','debit',0],
+    ['③','ใบสรุปงานเคลม (ภายใน)','ตลอดงาน',
+     '<b style="color:#8a5a00">มีต้นทุน กำไร JMC — ห้ามออกนอกบริษัท</b>','sum',0],
+    ['④','ใบตรวจรับแท็งค์ · INSPECTION REPORT','ตอนแท็งค์มาถึง (อยู่ที่ใบ Inspection)','ไม่มีเงิน','ins',0],
+    ['⑤','ใบตรวจรับของกลับ · GOODS RETURN INSPECTION','ตอนของกลับจาก Supplier — QC ตรวจที่คลัง',
+     'ไม่มีเงิน','rcv',0]
+  ];
+  DOCTYPES.forEach(function(x){
+    var on=true, why='';
+    if(x[4]==='notice'){ on=r1&&canBuy; why=!canBuy?'จัดซื้อเป็นคนส่ง':(r1?'':'ยังไม่ครบ 4 ลายเซ็น'); }
+    if(x[4]==='debit'){ on=canBuy&&!!(R&&R.bill);
+      why=!canBuy?'จัดซื้อเป็นคนส่ง':(R?(R.bill?'':'เคสนี้ไม่ต้องออกใบ ②'):'ยังไม่ได้บันทึกผลจาก Supplier'); }
+    if(x[4]==='sum'){ on=canBuy; why=canBuy?'':'เฉพาะจัดซื้อ / ผู้บริหาร'; }
+    if(x[4]==='ins'){ on=!!d.from; why=d.from?'':'ใบนี้ไม่ได้มาจากใบตรวจรับ'; }
+    if(x[4]==='rcv'){ on=!!d.rcvNo; why=d.rcvNo?'':'QC ยังไม่ได้ตรวจรับของกลับ'; }
+    t+='<tr><td class="rowno">'+x[0]+'</td><td><b>'+esc(x[1])+'</b></td>'+
+      '<td>'+esc(x[2])+'</td><td class="c">'+x[3]+'</td><td class="c">'+
+      (on?'<button class="btn '+(x[4]==='notice'?'p':'')+'" onclick="prn(\''+d.no+'\',\''+x[4]+'\',0)">🖨️ พิมพ์</button>'
+         :'<button class="btn" disabled title="'+esc(why)+'">🔒 '+esc(why)+'</button>')+'</td></tr>';
+  });
+  t+='</tbody></table></div>';
+
+  /* ── ข. แยกใบตาม Supplier ── */
+  t+='<div style="margin-top:13px"><div class="hd" style="margin-bottom:7px"><h2 style="font-size:15px">'+
+    '📬 แยกใบตาม Supplier อัตโนมัติ ('+gs.length+' เจ้า)</h2>'+
+    '<span class="sub">แต่ละเจ้าเห็นเฉพาะรายการของตัวเอง ไม่เห็นของเจ้าอื่น ไม่เห็นต้นทุน/กำไร</span></div>'+
+    '<div style="overflow-x:auto"><table class="wide" style="min-width:860px"><thead><tr>'+
+    '<th style="width:34px">#</th><th style="width:230px">Supplier</th>'+
+    '<th style="width:170px">รายการที่เป็นของเจ้านี้</th><th style="width:120px">PO</th>'+
+    '<th style="width:290px">พิมพ์เฉพาะเจ้านี้</th></tr></thead><tbody>';
+  gs.forEach(function(g,i){
+    var pos={}; g.rows.forEach(function(r){ if(r.o.po) pos[r.o.po]=1; });
+    t+='<tr><td class="rowno">'+(i+1)+'</td><td><b>'+esc(g.sup)+'</b></td>'+
+      '<td class="c">ข้อ '+g.rows.map(function(r){return r.n;}).join(', ')+'</td>'+
+      '<td>'+(Object.keys(pos).join(', ')||'—')+'</td>'+
+      '<td class="c">'+
+      (r1&&canBuy?'<button class="btn" onclick="prn(\''+d.no+'\',\'notice\','+i+')">① ใบแจ้งเคลม (ไม่มีราคา)</button> '
+         :'<button class="btn" disabled>① '+(canBuy?'ยังไม่ครบลายเซ็น':'จัดซื้อเป็นคนส่ง')+'</button> ')+
+      (canBuy&&R&&R.bill?'<button class="btn" onclick="prn(\''+d.no+'\',\'debit\','+i+')">② ใบเรียกเก็บ</button>':'')+
+      '</td></tr>';
+  });
+  t+='</tbody></table></div>'+
+    '<div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
+    '<button class="btn b" onclick="copyPh(\''+d.no+'\')">🖼️ คัดลอกรูปส่ง Supplier</button>'+
+    '<span class="sub">เลือกได้ว่าคัดลอกทั้งหมดหรือเฉพาะบางรูป · ได้เป็นลิงก์ Drive + ไฟล์ ZIP</span></div></div></div>';
+
+  /* ── ค. คำตอบจาก Supplier (สเปคข้อ 5) ── */
+  t+='<div class="card"><div class="hd"><h2>💬 คำตอบจาก Supplier</h2>'+
+    '<span class="sub">จัดซื้อกรอก · คำตอบเป็นตัวตัดสินว่าออกใบ ② ไหม และมีของกลับมาไหม</span></div>'+
+    '<div style="overflow-x:auto"><table class="wide" style="min-width:820px"><thead><tr>'+
+    '<th style="width:44px">เลือก</th><th style="width:330px">กรณี</th>'+
+    '<th style="width:110px">ค่าของ</th><th style="width:110px">ค่าแรง</th>'+
+    '<th style="width:130px">ออกใบ ②?</th><th style="width:150px">ของกลับมาไหม</th></tr></thead><tbody>';
+  Object.keys(RESULTS).forEach(function(k){
+    var r=RESULTS[k];
+    t+='<tr'+(d.result===k?' style="background:#fff8e6"':'')+'>'+
+      '<td class="c"><input type="radio" class="tick" name="res" '+(d.result===k?'checked':'')+
+        ' '+(lkb?'disabled':'')+' onchange="setResult(\''+d.no+'\',\''+k+'\')"></td>'+
+      '<td>'+esc(r.t)+'</td><td class="c">'+esc(r.goods)+'</td><td class="c">'+esc(r.labor)+'</td>'+
+      '<td class="c">'+(r.bill?'<span class="pill g">✅ ออกใบ ②</span>':'<span class="pill">❌ ปิดจบที่ใบ ③</span>')+'</td>'+
+      '<td class="c">'+(r.back?'<span class="pill y">มี — QC ต้องตรวจรับ</span>':'<span class="pill">ไม่มี</span>')+'</td></tr>';
+  });
+  t+='</tbody></table></div>'+
+    '<div style="margin-top:11px;display:grid;grid-template-columns:1fr 1fr;gap:12px" class="twocol">'+
+      '<div class="f o3"><label>รายละเอียดผลการเคลม</label>'+
+      '<textarea rows="3" '+(lkb?'class="locked" readonly':'')+
+      ' placeholder="สรุปว่าตกลงกันได้ยังไง">'+esc(d.rdetail||'')+'</textarea>'+
+      '<div style="margin-top:7px" class="ph">'+ph(1)+
+      '<span class="sub">รูปประกอบผลการเคลม</span></div></div>'+
+      '<div class="f o3"><label>หมายเหตุ / ข้อความจาก Supplier</label>'+
+      '<textarea rows="3" '+(lkb?'class="locked" readonly':'')+
+      ' placeholder="ก๊อปอีเมลที่ Supplier ตอบมาวางได้เลย">'+esc(d.rnote||'')+'</textarea>'+
+      '<div style="margin-top:7px" class="ph">'+ph(2)+
+      '<span class="sub">รูปแชท / อีเมลที่คุยกับ Supplier</span></div></div>'+
+    '</div></div>';
+
+  /* ── ง. เรื่องเงิน — เห็นเฉพาะจัดซื้อ (สเปคข้อ 6) ── */
+  if(!canBuy){
+    t+='<div class="card"><div class="okbox" style="margin:0;background:#f4f5f7;border-color:#ddd;color:#555">'+
+      '🔒 <b>ส่วนต้นทุน / ราคา / กำไร ซ่อนอยู่</b> — เห็นได้เฉพาะจัดซื้อและผู้บริหาร</div></div>';
+    return t;
+  }
+  var rate=Number(d.rate)||36.5, B=billOf(d), cost=B.cost, lab=B.lab, mgn=B.mgn, bill=B.total;
+  t+='<div class="card" style="border-color:#bfe0cb"><div class="hd">'+
+    '<h2 style="color:var(--s3)">💰 ต้นทุน · ราคาเรียกเก็บ <span class="pill r">🔒 เห็นเฉพาะจัดซื้อ</span></h2>'+
+    '<span class="sub">ไม่มี VAT · 1 ใบเคลม = 1 สกุล 1 เรท</span></div>'+
+    '<div class="grid">'+
+    '<div class="f o3"><label>สกุลเงิน</label><select '+(lkb?'class="locked" disabled':'')+'>'+
+      '<option>USD</option><option>CNY</option><option>EUR</option><option>GBP</option></select></div>'+
+    fld('o3','เรท (กรอกมือ · ล็อกกับใบนี้ถาวร)',String(rate),lkb,1)+
+    fld('oa','วันที่ล็อกเรท',d.date,1)+
+    '<div class="f o3"><label>กำไร</label><select '+(lkb?'class="locked" disabled':'')+'>'+
+      '<option>ใส่เป็น % ของต้นทุน</option><option>ใส่ราคาที่จะเรียกเก็บตรง ๆ</option></select></div>'+
+    fld('o3','กำไร (ใส่ 15% หรือ 500 ก็ได้)',mgn?String(mgn)+'%':'',lkb)+
+    '</div>';
+  /* ต้นทุน/หน่วย และ ราคาเรียกเก็บ/หน่วย — ระบบคิดให้ พิมพ์ทับเองได้ */
+  t+='<div style="margin-top:13px"><b style="font-size:12.5px">ต้นทุนและราคาเรียกเก็บ รายรายการ</b>'+
+    '<div style="overflow-x:auto;margin-top:6px"><table class="wide" style="min-width:820px"><thead><tr>'+
+    '<th style="width:32px">#</th><th style="width:170px">ชื่อสินค้า</th>'+
+    '<th style="width:52px">จน.</th><th style="width:56px">หน่วย</th>'+
+    '<th style="width:120px">ต้นทุน/หน่วย</th><th style="width:120px">ต้นทุนรวม</th>'+
+    '<th style="width:150px">ราคาเรียกเก็บ/หน่วย<span class="opt">ระบบคิดให้ · พิมพ์ทับได้</span></th>'+
+    '<th style="width:150px">Supplier</th></tr></thead><tbody>';
+  d.items.forEach(function(o,i){
+    var c=Number(String(o.cost||'').replace(/,/g,''))||0, q=Number(o.qty)||1;
+    t+='<tr><td class="rowno">'+(i+1)+'</td><td>'+esc(o.nm)+'</td>'+
+      '<td class="c">'+esc(o.qty)+'</td><td class="c">'+esc(o.unit)+'</td>'+
+      '<td class="r'+(lkb?' locked':'')+'">'+money(c/q)+'</td><td class="r'+(lkb?' locked':'')+'">'+money(c)+'</td>'+
+      '<td class="r'+(lkb?' locked':'')+'">'+(B.chargeGoods?money(c/q*(1+mgn/100)):'— ไม่คิดค่าของ —')+'</td>'+
+      '<td>'+esc(o.sup)+'</td></tr>';
+  });
+  t+='</tbody></table></div></div>';
+  /* ค่าแรง — ก้อนเดียวครอบหลายข้อได้ และมี Supplier ของตัวเอง เพื่อแยกยอดตามเจ้า */
+  t+='<div style="margin-top:13px"><b style="font-size:12.5px">ค่าแรง</b> '+
+    '<span class="sub">ค่าแรงก้อนเดียวครอบหลายข้อได้ · ต้องระบุว่าครอบข้อไหน และเรียกเก็บกับเจ้าไหน</span>'+
+    '<div style="overflow-x:auto;margin-top:6px"><table class="wide" style="min-width:900px"><thead><tr>'+
+    '<th style="width:32px">#</th><th style="width:230px">รายละเอียดงาน (ไทย)</th>'+
+    '<th style="width:230px">Description (EN)</th>'+
+    '<th style="width:110px">ครอบคลุมข้อ</th><th style="width:180px">Supplier (ของค่าแรง)</th>'+
+    '<th style="width:120px">จำนวนเงิน (บาท)</th></tr></thead><tbody>';
+  (d.labors&&d.labors.length?d.labors:[{th:'',en:'',cov:'',sup:'',amt:''}]).forEach(function(L,i){
+    t+='<tr><td class="rowno">'+(i+1)+'</td>'+
+      '<td class="in"><input value="'+esc(L.th)+'" '+(lkb?'readonly':'')+' placeholder="เช่น ถอด-ประกอบแมนโฮลใหม่"></td>'+
+      '<td class="in"><input value="'+esc(L.en)+'" '+(lkb?'readonly':'')+' placeholder="แปลให้ 🔎"></td>'+
+      '<td class="in"><input value="'+esc(L.cov)+'" '+(lkb?'readonly':'')+' placeholder="1, 3, 4"></td>'+
+      '<td class="in"><input value="'+esc(L.sup)+'" '+(lkb?'readonly':'')+' placeholder="เลือกจาก VENDORS"></td>'+
+      '<td class="in"><input value="'+esc(L.amt)+'" '+(lkb?'readonly':'')+' style="text-align:right"></td></tr>';
+  });
+  t+='</tbody></table></div>'+(lkb?'':'<div style="margin-top:7px"><button class="btn">+ เพิ่มค่าแรง</button></div>')+'</div>';
+  t+='<div class="warn" style="margin-top:11px;background:#fff5f5;border-color:#f0c2c2;color:#b3261e">'+
+    '⚠️ <b>เรทและต้นทุนนี้ไม่ขึ้นในใบที่ส่ง Supplier</b> — เรทเปลี่ยนทีหลัง ใบเก่าไม่ขยับ · '+
+    'ใบ ① ไม่มีราคาเลย · ใบ ② โชว์เฉพาะยอดที่เรียกเก็บ ไม่โชว์ต้นทุนกับกำไร</div>';
+  t+='<div style="overflow-x:auto"><table class="wide" style="min-width:700px"><thead><tr>'+
+    '<th>รายการ</th><th style="width:150px">บาท</th><th style="width:170px">สกุลนอก (USD)</th>'+
+    '<th style="width:190px">ขึ้นในใบที่ส่ง Supplier?</th></tr></thead><tbody>'+
+    '<tr><td>ต้นทุนของ (รวมทุกรายการ)</td><td class="r">'+money(cost)+'</td>'+
+      '<td class="r">'+money(cost/rate)+'</td><td class="c"><span class="pill r">ไม่ขึ้น (ต้นทุนภายใน)</span></td></tr>'+
+    '<tr><td>ค่าของที่<b>เรียกเก็บ</b>จาก Supplier</td><td class="r">'+money(B.goods)+'</td>'+
+      '<td class="r">'+money(B.goods/rate)+'</td><td class="c">'+
+      (B.chargeGoods?'<span class="pill g">ขึ้นในใบ ②</span>'
+                    :'<span class="pill y">เคสนี้ <b>ไม่คิดค่าของ</b></span>')+'</td></tr>'+
+    '<tr><td>ค่าแรง (ยอดก้อน · มาจากข้อ 1, 2)</td><td class="r">'+money(B.labor)+'</td>'+
+      '<td class="r">'+money(B.labor/rate)+'</td><td class="c">'+
+      (B.chargeLabor?'<span class="pill g">ขึ้นในใบ ②</span>':'<span class="pill">ไม่เรียกเก็บ</span>')+'</td></tr>'+
+    '<tr><td>กำไร '+mgn+'%</td><td class="r">'+money(B.profit)+'</td>'+
+      '<td class="r">'+money(B.profit/rate)+'</td><td class="c"><span class="pill r">ไม่ขึ้น</span></td></tr>'+
+    '<tr style="font-weight:800"><td>ยอดเรียกเก็บรวม (ไม่มี VAT)</td><td class="r">'+money(bill)+'</td>'+
+      '<td class="r">'+money(bill/rate)+'</td><td class="c"><span class="pill g">ขึ้นในใบ ②</span></td></tr>'+
+    '</tbody></table></div>';
+  t+='<div style="margin-top:11px"><b style="font-size:12.5px">เลือกคอลัมน์ที่จะปริ้นให้ Supplier</b>'+
+    '<div class="key" style="margin-top:6px;color:#444">'+
+    ['รหัสสินค้า','ชื่อสินค้า','รายละเอียด (ไทย)','รายละเอียด (EN)','จน.','หน่วย','ราคาต่อหน่วย','ยอดรวม']
+      .map(function(c,i){ return '<label style="display:inline-flex;gap:5px;align-items:center">'+
+        '<input type="checkbox" class="tick" '+(i<6||i>5?'checked':'')+' style="width:15px;height:15px"> '+esc(c)+'</label>'; }).join('')+
+    '</div><span class="sub">ใบ ① ติ๊กราคาไม่ได้ — ระบบล็อกไว้ ไม่ให้ราคาหลุดไปกับใบแจ้งเคลม</span></div>';
+
+  /* ── จ. ปิดจบ ต้นทุนไปทางไหน (สเปคข้อ 3.7-3.8) ── */
+  t+='<div style="margin-top:13px"><b style="font-size:12.5px">ปิดจบแล้ว ต้นทุนไปทางไหน</b>'+
+    '<div style="overflow-x:auto;margin-top:6px"><table class="wide" style="min-width:640px"><thead><tr>'+
+    '<th style="width:44px">เลือก</th><th style="width:260px">กรณี</th><th>ระบบทำอะไรต่อ</th>'+
+    '</tr></thead><tbody>'+
+    '<tr><td class="c"><input type="radio" name="cst" class="tick" '+(d.blame==='EMP'?'checked ':'')+
+      (lkb?'disabled':'')+' onchange="setBlame(\''+d.no+'\',\'EMP\')"></td>'+
+      '<td>พนักงานทำเสียหาย</td><td>ออกรายงานส่ง <b>HR</b> ไปหักเงิน — '+
+      'ใบนี้จะไปโผล่ในเมนู <b>รายงานส่ง HR</b></td></tr>'+
+    '<tr><td class="c"><input type="radio" name="cst" class="tick" '+(d.blame==='EMP'?'':'checked ')+
+      (lkb?'disabled':'')+' onchange="setBlame(\''+d.no+'\',\'JOB\')"></td>'+
+      '<td>ไม่ใช่ความผิดพนักงาน</td><td>ลงเป็น <b>ต้นทุนของแท็งค์ใบนั้น</b> ผูกกับเลข JMC</td></tr>'+
+    '<tr><td class="c">—</td><td>ทั้ง 2 กรณี</td><td>ส่งข้อมูลให้ <b>บัญชี</b> อัตโนมัติ (บัญชีรับอย่างเดียว ไม่ต้องกดติ๊ก)</td></tr>'+
+    '</tbody></table></div></div></div>';
+  return t;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   เบียร์ 7 ก.ย.: "ของเข้ามาแล้ว ก็ต้องไปที่สโตร์ก่อน สโตร์มีการแจ้ง QC ให้มาตรวจรับสินค้า
+   และเบิกออก มีเลขที่เอกสารและวันที่ด้วย ว่าตรวจสอบเสร็จแล้ว มีการถ่ายรูปสินค้า
+   เหมือน Inspection สินค้าของงานนั้น ๆ เลย"
+   → 3 ขั้น: สโตร์รับเข้า (GR) → QC ตรวจรับ (RCV) → สโตร์เบิกออก (IS)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── ขั้น 6 · สโตร์รับของกลับเข้าคลัง แล้วแจ้ง QC ── */
+function sinSide(d){
+  var own=isOwner(d)&&d.stage==='SIN', done=!!d.grNo;
+  var t='<div class="card" style="border-color:#bcd9f0"><div class="hd">'+
+    '<span class="pill" style="border-color:#2f7de1;color:#1558b0;background:#f2f8ff">กล่องงานที่ 2 · สโตร์</span>'+
+    '<h2>📥 ของกลับจาก Supplier เข้าคลัง</h2>'+
+    '<span class="sub">ของมาถึงต้องเข้าสโตร์ก่อน · สโตร์รับเข้าแล้วแจ้ง QC มาตรวจ</span></div>';
+  t+='<div class="grid">'+
+    fld('oa','เลขที่รับของเข้าคลัง',d.grNo||'ระบบออกให้ตอนกดรับเข้า',1,1)+
+    fld('oa','วันที่ของเข้าคลัง',d.grDate||'—',1,1)+
+    fld('o2','ผู้รับของเข้า',done?(d.sign['สโตร์รับของเข้า']||'').split(' · ')[0]:me().n,1)+
+    fld('o2','ที่เก็บในคลัง (Location)',d.loc||'',!own)+
+    fld('o2','ขนส่ง / เลขพัสดุที่ส่งกลับมา',d.trk||'',!own)+
+    fld('oa','สถานะ',done?'รับเข้าคลังแล้ว — แจ้ง QC แล้ว':'ยังไม่รับเข้า',1)+
+    '</div>';
+  t+='<div style="overflow-x:auto;margin-top:11px"><table class="wide" style="min-width:860px"><thead><tr>'+
+    '<th style="width:32px">#</th><th style="width:180px">ชื่อสินค้า</th>'+
+    '<th style="width:70px">สั่งเคลม</th><th style="width:90px">จำนวนที่มาถึง</th>'+
+    '<th style="width:110px">รูปตอนแกะกล่อง</th>'+
+    '<th style="width:200px">หมายเหตุตอนรับเข้า</th>'+
+    '<th style="width:120px">ครบไหม</th></tr></thead><tbody>';
+  d.items.forEach(function(o,i){
+    var gq=o.gq||(done?o.qty:'');
+    t+='<tr><td class="rowno">'+(i+1)+'</td><td>'+esc(o.nm)+'</td>'+
+      '<td class="c">'+esc(o.qty)+' '+esc(o.unit)+'</td>'+
+      (own?'<td class="in"><input value="'+esc(gq)+'" style="text-align:center"></td>'
+          :'<td class="c locked">'+esc(gq||'—')+'</td>')+
+      '<td><div class="ph">'+ph(done?1:0)+'</div></td>'+
+      (own?'<td class="in"><input placeholder="กล่องบุบ / ของครบ ฯลฯ"></td>'
+          :'<td class="locked">'+esc(o.gnote||'')+'</td>')+
+      '<td class="c">'+(done?(String(gq)===String(o.qty)?'<span class="pill g">ครบ</span>'
+        :'<span class="pill r">ไม่ครบ</span>'):'<span class="pill y">รอรับเข้า</span>')+'</td></tr>';
+  });
+  t+='</tbody></table></div>';
+  if(own) t+='<div class="warn" style="margin-top:11px">🔔 กดปุ่ม <b>"รับของเข้าคลัง + แจ้ง QC มาตรวจ"</b> ด้านบน '+
+    'ระบบจะออก<b>เลขที่รับของเข้าคลัง + วันที่</b> ให้ แล้วเด้ง LINE เรียก QC มาตรวจที่คลังทันที</div>';
+  else if(done) t+='<div class="okbox" style="margin-top:11px">✅ รับเข้าคลังแล้ว <b>'+esc(d.grNo)+'</b> · '+
+    esc(d.grDate)+' — แจ้ง QC ให้มาตรวจเรียบร้อย</div>';
+  return t+'</div>';
+}
+
+/* ── ขั้น 8 · สโตร์เบิกออกให้หน้างาน ── */
+function issueSide(d){
+  var own=isOwner(d)&&d.stage==='ISSUE', done=!!d.isNo;
+  var t='<div class="card" style="border-color:#bcd9f0"><div class="hd">'+
+    '<span class="pill" style="border-color:#2f7de1;color:#1558b0;background:#f2f8ff">กล่องงานที่ 2 · สโตร์</span>'+
+    '<h2>📤 เบิกของออกให้หน้างาน</h2>'+
+    '<span class="sub">QC ตรวจผ่านแล้ว สโตร์ถึงจ่ายของออกได้</span></div>';
+  t+='<div class="grid">'+
+    fld('oa','เลขที่ใบเบิก',d.isNo||'ระบบออกให้ตอนกดเบิกออก',1,1)+
+    fld('oa','วันที่เบิกออก',d.isDate||'—',1,1)+
+    fld('o2','ผู้จ่ายของ (สโตร์)',done?(d.sign['สโตร์เบิกออก']||'').split(' · ')[0]:me().n,1)+
+    fld('o2','ผู้รับของ (หน้างาน)',d.isTo||'',!own,1)+
+    fld('o2','แผนกที่เบิกไปใช้',d.isDept||'',!own,1)+
+    fld('oa','อ้างอิงใบตรวจรับ',d.rcvNo||'—',1)+
+    '</div>';
+  t+='<div style="overflow-x:auto;margin-top:11px"><table class="wide" style="min-width:760px"><thead><tr>'+
+    '<th style="width:32px">#</th><th style="width:200px">ชื่อสินค้า</th>'+
+    '<th style="width:90px">รับเข้า</th><th style="width:100px">จ่ายออก</th>'+
+    '<th style="width:100px">คงเหลือในคลัง</th>'+
+    '<th style="width:200px">หมายเหตุ</th></tr></thead><tbody>';
+  d.items.forEach(function(o,i){
+    var gq=Number(o.gq||o.qty)||0, iq=Number(o.iq||(done?o.qty:0))||0;
+    t+='<tr><td class="rowno">'+(i+1)+'</td><td>'+esc(o.nm)+'</td>'+
+      '<td class="c">'+gq+' '+esc(o.unit)+'</td>'+
+      (own?'<td class="in"><input value="'+iq+'" style="text-align:center"></td>'
+          :'<td class="c locked">'+(done?iq:'—')+'</td>')+
+      '<td class="c">'+(done?(gq-iq):'—')+'</td>'+
+      (own?'<td class="in"><input placeholder="เบิกไปติดตั้งที่รถคันไหน"></td>'
+          :'<td class="locked">'+esc(o.inote||'')+'</td>')+'</tr>';
+  });
+  t+='</tbody></table></div>';
+  if(done) t+='<div class="okbox" style="margin-top:11px">✅ เบิกออกแล้ว <b>'+esc(d.isNo)+'</b> · '+esc(d.isDate)+
+    ' — ของถึงมือหน้างานเรียบร้อย</div>';
+  return t+'</div>';
+}
+
+/* ── ขั้น 7 · QC ตรวจรับของกลับ = Inspection สินค้าของงานนั้น มีเลขที่ + วันที่ ── */
+function recvSide(d){
+  var own=isOwner(d)&&d.stage==='RECV', done=!!d.rcvNo;
+  var t='<div class="card" style="border-color:#f0c675"><div class="hd">'+
+    '<span class="pill" style="border-color:#E2231A;color:#a3231b;background:#fff5f4">กล่องงานที่ 1 · QC</span>'+
+    '<h2>🔍 ใบตรวจรับของกลับ — Inspection สินค้าของงานนี้</h2>'+
+    '<span class="sub">สโตร์แจ้งมาแล้ว · QC มาตรวจที่คลัง ถ่ายรูปทุกชิ้น ติ๊ก Accept / ไม่ Accept</span></div>'+
+    '<div class="grid">'+
+      fld('oa','เลขที่ใบตรวจรับของกลับ',d.rcvNo||'ระบบออกให้ตอนกดตรวจเสร็จ',1,1)+
+      fld('oa','วันที่ตรวจ',d.rcvDate||'—',1,1)+
+      fld('oa','ผู้ตรวจ',done?d.rcvBy:(me().n+' · '+me().p),1)+
+      fld('oa','อ้างอิงใบรับเข้าคลัง',d.grNo?(d.grNo+' · '+d.grDate):'—',1)+
+      fld('oa','เลขที่ JOB',d.job,1)+
+      fld('oa','สถานะการตรวจ',done?'ตรวจสอบเสร็จแล้ว':'ยังตรวจไม่เสร็จ',1)+
+    '</div>'+
+    '<div class="warn" style="margin-top:11px">↩ <b>ถ้าไม่ Accept = วนกลับเป็นเคลมรอบใหม่</b> ใบเดิม เลขเดิม แต่ขึ้นรอบใหม่ '+
+    'ลายเซ็นรอบ 2 ล้างให้ กลับไปหาจัดซื้อคุยกับ Supplier ต่อ</div>'+
+    '<div style="overflow-x:auto"><table class="wide" style="min-width:1180px"><thead><tr>'+
+    '<th style="width:34px">#</th><th style="width:150px">ชื่อสินค้า</th>'+
+    '<th style="width:190px">สิ่งที่เคลมไป</th>'+
+    '<th style="width:104px">วันที่รับกลับ<span class="opt">เว้นว่าง = วันนี้</span></th>'+
+    '<th style="width:76px">จำนวนที่รับ</th>'+
+    '<th style="width:124px">รูปของที่ได้กลับมา<span class="opt">ถ่ายก่อนกด Accept</span></th>'+
+    '<th style="width:150px">ผลตรวจรับ</th>'+
+    '<th style="width:180px">หมายเหตุ<span class="opt">สภาพของที่ได้กลับมา</span></th>'+
+    '<th style="width:120px">ผู้ตรวจ</th></tr></thead><tbody>';
+  d.items.forEach(function(o,i){
+    t+='<tr><td class="rowno">'+(i+1)+'</td><td>'+esc(o.nm)+'</td><td>'+esc(o.th)+'</td>'+
+      (own?'<td class="in"><input type="date"></td><td class="in"><input value="'+esc(o.qty)+'" style="text-align:center"></td>'
+          :'<td class="c locked">'+esc(o.bdate||'—')+'</td><td class="c locked">'+esc(o.bqty||'—')+'</td>')+
+      '<td><div class="ph">'+ph(o.back==='ACC'?2:1)+'</div></td>'+
+      '<td class="c">'+(own
+        ? '<select onchange="accItem(\''+d.no+'\','+i+',this.value)" style="width:auto">'+
+          '<option value="">— ยังไม่ตรวจ —</option>'+
+          '<option value="ACC"'+(o.back==='ACC'?' selected':'')+'>✅ Accept</option>'+
+          '<option value="NO"'+(o.back==='NO'?' selected':'')+'>❌ ไม่ Accept</option></select>'
+        : (o.back==='ACC'?'<span class="pill g">✅ Accept</span>'
+          :o.back==='NO'?'<span class="pill r">❌ ไม่ Accept</span>':'<span class="pill y">ยังไม่ตรวจ</span>'))+
+      '</td>'+
+      (own?'<td class="in"><input placeholder="สภาพของที่ได้กลับมา"></td>':'<td class="locked">'+esc(o.bnote||'')+'</td>')+
+      '<td class="c'+(own?'':' locked')+'">'+esc(own?me().n:(o.bby||'—'))+'</td></tr>';
+  });
+  t+='</tbody></table></div>';
+  if(own) t+='<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
+    '<button class="btn" onclick="noAcc(\''+d.no+'\')">↩ ไม่ Accept — วนกลับเป็นเคลมรอบใหม่</button>'+
+    '<span class="sub">ตรวจครบทุกข้อแล้วกด <b>"ตรวจเสร็จ + ออกใบตรวจรับของกลับ"</b> ด้านบน '+
+    'ระบบจะออกเลขที่ + วันที่ให้ แล้วส่งกลับสโตร์ไปเบิกออก</span></div>';
+  else if(done) t+='<div class="okbox" style="margin-top:11px">✅ ตรวจสอบเสร็จแล้ว <b>'+esc(d.rcvNo)+
+    '</b> · '+esc(d.rcvDate)+' โดย '+esc(d.rcvBy||'')+
+    ' <button class="btn" style="margin-left:8px" onclick="prn(\''+d.no+'\',\'rcv\',0)">🖨️ พิมพ์ใบตรวจรับของกลับ</button></div>';
+  return t+'</div>';
+}
+
+/* ── ช. ตัวอย่างกระดาษที่จะปริ้นจริง ── */
+function prn(no,kind,gi){
+  var d=doc(no), gs=bySup(d), g=gs[gi]||gs[0], R=RESULTS[d.result];
+  var isNotice=(kind==='notice'), isDebit=(kind==='debit'), isSum=(kind==='sum');
+  if(kind==='ins'){ alert('ใบ ④ ใบตรวจรับแท็งค์ อยู่ที่ใบ Inspection '+d.from+'\n(เปิดจากใบนั้นแล้วสั่งพิมพ์)'); return; }
+  var isRcv=(kind==='rcv');
+  var ttl = isNotice?'ใบแจ้งเคลมสินค้า · CLAIM NOTICE'
+          : isDebit ?'ใบเรียกเก็บค่าเคลม · CLAIM DEBIT NOTE'
+          : isRcv   ?'ใบตรวจรับของกลับ · GOODS RETURN INSPECTION'
+          :          'ใบสรุปงานเคลม (ภายใน)';
+  if(isRcv) return prnRcv(d);
+  var rate=Number(d.rate)||36.5, B=billOf(d), cost=B.cost, lab=B.lab, mgn=B.mgn, bill=B.total,
+      chG=B.chargeGoods;
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › '+
+    '<a onclick="openDoc(\''+no+'\')">'+esc(no)+'</a> › ตัวอย่างก่อนพิมพ์</div>';
+  t+='<div class="card"><div class="hd"><h2>ตัวอย่างก่อนพิมพ์ — '+esc(ttl)+'</h2>'+
+    '<span class="sub">'+(isSum?'ภายในบริษัทเท่านั้น':'ส่งให้ '+esc(g.sup))+'</span></div>'+
+    (isNotice?'<div class="okbox">✅ <b>ฉบับนี้ไม่มียอดราคาใด ๆ ทั้งสิ้น</b> — เป็นใบแจ้งให้ Supplier รู้ว่าของมีปัญหาอะไร '+
+      'ราคาไปอยู่ในใบ ② ทีหลัง</div>':'')+
+    (isSum?'<div class="rej">🔒 <b>ห้ามออกนอกบริษัท</b> — ฉบับนี้มีต้นทุนและกำไร ใช้ภายในเท่านั้น</div>':'')+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'+
+      '<button class="btn p">🖨️ พิมพ์ / บันทึกเป็น PDF</button>'+
+      (isNotice||isDebit?'<button class="btn">🇬🇧 พิมพ์อังกฤษล้วน</button>':'')+
+      '<button class="btn" onclick="openDoc(\''+no+'\')">← กลับไปใบเคลม</button></div>';
+  /* กระดาษ A4 */
+  t+='<div class="a4"><div class="a4hd"><div><div class="a4co">SUTEE TANKERS &amp; SPECIAL TRUCK CO., LTD.</div>'+
+    '<div class="a4sub">บริษัท สุธี แท็งเกอร์ แอนด์ สเปเชียลทรัค จำกัด</div></div>'+
+    '<div class="a4no"><div><b>'+esc(d.no)+'</b></div><div>'+esc(d.date)+'</div>'+
+    '<div>'+(d.ctype==='after'?'After-Sales':'Pre-Delivery')+'</div></div></div>'+
+    '<h3 class="a4t">'+esc(ttl)+'</h3>'+
+    '<table class="a4i"><tr><td>ถึง (Supplier)</td><td><b>'+esc(g.sup)+'</b></td>'+
+      '<td>เลขที่ JOB</td><td>'+esc(d.job)+'</td></tr>'+
+    '<tr><td>MODEL</td><td>'+esc(d.model)+'</td><td>CHASSIS NO.</td><td>'+esc(d.cm||d.cs||'—')+'</td></tr></table>'+
+    '<table class="a4tb"><thead><tr><th style="width:28px">#</th><th style="width:150px">ชื่อสินค้า</th>'+
+    '<th>รายละเอียด'+(d.area==='for'?' / Description':'')+'</th>'+
+    '<th style="width:44px">จน.</th><th style="width:48px">หน่วย</th>'+
+    (isNotice?'':'<th style="width:88px">ราคา/หน่วย</th><th style="width:104px">รวม</th>')+
+    (isSum?'<th style="width:88px">ต้นทุน</th>':'')+
+    (isSum?'':'<th style="width:132px">รูปถ่าย / Photo</th>')+
+    '</tr></thead><tbody>';
+  g.rows.forEach(function(r,i){
+    var o=r.o, c=Number(String(o.cost||'').replace(/,/g,''))||0, unit=c/(Number(o.qty)||1);
+    t+='<tr><td class="c">'+(i+1)+'</td><td>'+esc(o.nm)+'</td>'+
+      '<td>'+esc(o.th)+(d.area==='for'&&o.en?'<br><i style="color:#555">'+esc(o.en)+'</i>':'')+'</td>'+
+      '<td class="c">'+esc(o.qty)+'</td><td class="c">'+esc(o.unit)+'</td>'+
+      (isNotice?''
+        :isDebit&&!chG?'<td class="c" colspan="2" style="color:#666">ไม่คิดค่าของ / No charge</td>'
+        :'<td class="r">'+money(unit)+'</td><td class="r">'+money(c)+'</td>')+
+      (isSum?'<td class="r">'+money(c)+'</td>':'')+
+      (isSum?'':'<td class="c"><div class="pph">'+pph(o.ph)+'</div>'+
+        '<div class="pphn">รูปที่ '+(i*3+1)+'–'+(i*3+o.ph)+'</div></td>')+'</tr>';
+  });
+  t+='</tbody></table>';
+  if(isNotice) t+='<div class="a4nt">** เอกสารฉบับนี้เป็นการแจ้งปัญหาสินค้าเท่านั้น '+
+    'ยังไม่มีการเรียกเก็บค่าใช้จ่าย / This document is a claim notice only, no charges included **</div>';
+  if(isDebit) t+='<table class="a4sm">'+
+    (chG?'<tr><td>ค่าของ</td><td class="r">'+money(B.goods)+' บาท</td>'+
+         '<td class="r">USD '+money(B.goods/rate)+'</td></tr>'
+        :'<tr><td>ค่าของ — <b>Supplier ส่งของใหม่มาให้ จึงไม่เรียกเก็บ</b></td>'+
+         '<td class="r">— ไม่คิด —</td><td class="r">—</td></tr>')+
+    '<tr><td>ค่าแรง (จากรายการข้อ 1, 2)</td>'+
+    '<td class="r">'+money(B.labor)+' บาท</td><td class="r">USD '+money(B.labor/rate)+'</td></tr>'+
+    '<tr class="tot"><td>ยอดเรียกเก็บรวม (ไม่มี VAT)</td><td class="r">'+money(bill)+' บาท</td>'+
+    '<td class="r">USD '+money(bill/rate)+'</td></tr></table>'+
+    '<div class="a4nt">เรทที่ใช้ล็อกกับเอกสารฉบับนี้ถาวร — ไม่แสดงต้นทุนและกำไรในเอกสารที่ส่ง Supplier</div>';
+  if(isSum) t+='<table class="a4sm"><tr><td>ต้นทุนของ (ภายใน)</td><td class="r">'+money(cost)+' บาท</td></tr>'+
+    '<tr><td>ค่าแรง</td><td class="r">'+money(lab)+' บาท</td></tr>'+
+    '<tr><td>เรียกเก็บจาก Supplier ได้</td><td class="r">'+money(bill)+' บาท</td></tr>'+
+    '<tr><td>กำไร '+mgn+'%</td><td class="r">'+money(B.profit)+' บาท</td></tr>'+
+    '<tr class="tot"><td>ผูกกับ JMC '+esc(d.jmc||'— ยังไม่ผูก —')+'</td>'+
+    '<td class="r">'+money(bill)+' บาท</td></tr></table>';
+  t+='<div class="a4sg"><div><i>ผู้ออกเอกสาร</i><b>'+esc(me().n)+' · '+esc(me().p)+'</b></div>'+
+    '<div><i>'+(isSum?'ผู้บริหารอนุมัติ':'Supplier ลงนามรับทราบ')+'</i><b>&nbsp;</b></div></div>'+
+    '<div class="a4ft">FM-WH-03 · Rev.00 · หน้า 1/'+(isSum?1:2)+'</div></div>';
+  if(!isSum) t+=phSheet(d,g,2,2);
+  t+='</div>';
+  $('view').innerHTML=t;
+  tip(isNotice
+    ? '<b>ใบ ① ที่ส่ง Supplier ครั้งแรก — ไม่มีราคาเลยสักช่อง</b> · ระบบแยกใบให้ทีละเจ้า เจ้านี้เห็นแค่รายการของตัวเอง'
+    : isDebit ? '<b>ใบ ② เรียกเก็บเงิน</b> — โชว์เฉพาะยอดที่เรียกเก็บ ไม่โชว์ต้นทุน/กำไร/เรทที่ใช้'
+              : '<b>ใบ ③ ภายใน</b> — มีต้นทุน กำไร JMC ครบ ห้ามออกนอกบริษัท');
+}
+/* รูปบนกระดาษที่จะปริ้น (เบียร์: "ใบแจ้งเคลมทำไมไม่มีรูปเลย จะส่งหา Sup ยังไง") */
+function pph(n){ var t=''; for(var i=0;i<n;i++) t+='<span class="pth">🖼️</span>';
+  return t||'<span class="sub" style="font-size:10px">— ไม่มีรูป —</span>'; }
+function phSheet(d,g,pageNo,pageTot,opt){
+  opt=opt||{};
+  var t='<div class="a4" style="margin-top:16px"><div class="a4hd">'+
+    '<div><div class="a4co">SUTEE TANKERS &amp; SPECIAL TRUCK CO., LTD.</div>'+
+    '<div class="a4sub">'+esc(opt.sub||'แผ่นรูปประกอบใบแจ้งเคลม / Photo attachment')+'</div></div>'+
+    '<div class="a4no"><div><b>'+esc(opt.no||d.no)+'</b></div><div>'+esc(opt.date||d.date)+'</div>'+
+    '<div>'+esc(g.sup)+'</div></div></div>';
+  t+='<div class="phgrid">';
+  var k=0;
+  g.rows.forEach(function(r){
+    for(var i=0;i<r.o.ph;i++){ k++;
+      t+='<figure class="phbox"><div class="phimg">🖼️</div>'+
+         '<figcaption>รูปที่ '+k+' — ข้อ '+r.n+' '+esc(r.o.nm)+'<br>'+
+         '<i>'+esc(opt.cap==='back'
+            ? ('ของที่ได้กลับมา · '+(r.o.back==='ACC'?'Accept':r.o.back==='NO'?'ไม่ Accept':'ยังไม่ตรวจ'))
+            : r.o.th)+'</i></figcaption></figure>';
+    }
+  });
+  if(!k) t+='<div class="empty" style="grid-column:1/-1">ใบนี้ยังไม่มีรูป — <b>ส่งให้ Supplier ไม่ได้</b></div>';
+  t+='</div><div class="a4ft">FM-WH-03 · Rev.00 · หน้า '+pageNo+'/'+pageTot+'</div></div>';
+  return t;
+}
+/* ใบตรวจรับของกลับ — เลขที่ + วันที่ + รูปสินค้า เหมือน Inspection สินค้าของงานนั้น */
+function prnRcv(d){
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › '+
+    '<a onclick="openDoc(\''+d.no+'\')">'+esc(d.no)+'</a> › ใบตรวจรับของกลับ</div>'+
+    '<div class="card"><div class="hd"><h2>ตัวอย่างก่อนพิมพ์ — ใบตรวจรับของกลับ</h2>'+
+    '<span class="sub">'+esc(d.rcvNo)+' · '+esc(d.rcvDate)+'</span></div>'+
+    '<div class="okbox">✅ <b>ยืนยันว่าตรวจสอบเสร็จแล้ว</b> — มีเลขที่เอกสาร วันที่ ผู้ตรวจ และรูปสินค้าครบ '+
+    'ใช้เป็นหลักฐานให้สโตร์เบิกออก และแนบเข้าแฟ้มงานของจ๊อบนี้</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'+
+    '<button class="btn p">🖨️ พิมพ์ / บันทึกเป็น PDF</button>'+
+    '<button class="btn" onclick="openDoc(\''+d.no+'\')">← กลับไปใบเคลม</button></div>';
+  t+='<div class="a4"><div class="a4hd"><div>'+
+    '<div class="a4co">SUTEE TANKERS &amp; SPECIAL TRUCK CO., LTD.</div>'+
+    '<div class="a4sub">บริษัท สุธี แท็งเกอร์ แอนด์ สเปเชียลทรัค จำกัด</div></div>'+
+    '<div class="a4no"><div><b>'+esc(d.rcvNo)+'</b></div><div>'+esc(d.rcvDate)+'</div>'+
+    '<div>ตรวจรับของกลับ</div></div></div>'+
+    '<h3 class="a4t">ใบตรวจรับของกลับ · GOODS RETURN INSPECTION</h3>'+
+    '<table class="a4i"><tr><td>อ้างอิงใบเคลม</td><td><b>'+esc(d.no)+'</b></td>'+
+      '<td>เลขที่ JOB</td><td>'+esc(d.job)+'</td></tr>'+
+    '<tr><td>ใบรับเข้าคลัง</td><td>'+esc(d.grNo||'—')+' · '+esc(d.grDate||'—')+'</td>'+
+      '<td>Supplier</td><td>'+esc((d.items[0]||{}).sup||'—')+'</td></tr>'+
+    '<tr><td>MODEL</td><td>'+esc(d.model)+'</td><td>ผู้ตรวจ</td><td>'+esc(d.rcvBy||'—')+'</td></tr></table>'+
+    '<table class="a4tb"><thead><tr><th style="width:28px">#</th><th style="width:150px">ชื่อสินค้า</th>'+
+    '<th>สิ่งที่เคลมไป</th><th style="width:52px">จน.</th>'+
+    '<th style="width:80px">ผลตรวจ</th><th style="width:120px">รูปของที่ได้กลับมา</th></tr></thead><tbody>';
+  d.items.forEach(function(o,i){
+    t+='<tr><td class="c">'+(i+1)+'</td><td>'+esc(o.nm)+'</td><td>'+esc(o.th)+'</td>'+
+      '<td class="c">'+esc(o.qty)+'</td>'+
+      '<td class="c"><b>'+(o.back==='ACC'?'Accept':o.back==='NO'?'ไม่ Accept':'—')+'</b></td>'+
+      '<td class="c"><div class="pph">'+pph(o.back==='ACC'?2:1)+'</div></td></tr>';
+  });
+  t+='</tbody></table>'+
+    '<div class="a4nt">** ตรวจรับที่คลังสินค้า ต่อหน้าเจ้าหน้าที่สโตร์ · '+
+    'ของที่ Accept แล้วเท่านั้นจึงเบิกออกไปใช้งานได้ **</div>'+
+    '<div class="a4sg"><div><i>ผู้ตรวจ (QC / Production)</i><b>'+esc(d.rcvBy||'')+'</b></div>'+
+    '<div><i>เจ้าหน้าที่สโตร์</i><b>'+esc((d.sign['สโตร์รับของเข้า']||'').split(' · ')[0]||'')+'</b></div></div>'+
+    '<div class="a4ft">FM-WH-03 · Rev.00 · หน้า 1/2</div></div>';
+  t+=phSheet(d,{sup:(d.items[0]||{}).sup||'—',rows:d.items.map(function(o,i){return {o:o,n:i+1};})},2,2,
+    {sub:'แผ่นรูปของที่ได้กลับมา / Returned goods photo attachment',
+     no:d.rcvNo,date:d.rcvDate,cap:'back'});
+  t+='</div>';
+  $('view').innerHTML=t;
+  tip('<b>ใบตรวจรับของกลับ</b> — มีเลขที่เอกสาร วันที่ ผู้ตรวจ ผลตรวจรายข้อ และรูปสินค้า '+
+      'เหมือนใบ Inspection สินค้าของงานนั้น · สโตร์ใช้ใบนี้เป็นหลักฐานก่อนเบิกออก');
+}
+function copyPh(no){
+  var d=doc(no), n=0; d.items.forEach(function(o){ n+=o.ph; });
+  alert('🖼️ คัดลอกรูปส่ง Supplier — '+no+'\n\n'+
+    'รูปทั้งหมด '+n+' รูป (เลือกเฉพาะบางรูปได้)\n\n'+
+    '① คัดลอกลิงก์ Drive ของโฟลเดอร์ '+d.job+' / '+no+'\n'+
+    '② ดาวน์โหลดเป็นไฟล์ ZIP ก้อนเดียว\n'+
+    '③ แนบเข้าเมล / ไลน์ ได้เลย\n\n'+
+    'วิดีโอไฟล์ใหญ่ (50–150 MB) ให้กด "เปิดโฟลเดอร์ใน Drive" แล้วส่งลิงก์แทน');
+}
+
+/* ═══ ส่งต่อ / ตีกลับ ═══ */
+function pass(no){
+  var d=doc(no), s=stg(d), m=missing(d);
+  if(m.length){ alert('ยังส่งต่อไม่ได้\n\n· '+m.join('\n· ')); return; }
+  d.sign[s.sign]=me().n+' · '+me().p+' · '+now();
+  d.rej='';
+  var today=now().split(' ')[0];
+  if(s===ST.SIN  && !d.grNo ){ d.grNo =newNo('GR');  d.grDate =today; }
+  if(s===ST.RECV && !d.rcvNo){ d.rcvNo=newNo('RCV'); d.rcvDate=today; d.rcvBy=me().n+' · '+me().p; }
+  if(s===ST.ISSUE&& !d.isNo ){ d.isNo =newNo('IS');  d.isDate =today; }
+  var wasIns=(d.kind==='INS'), tk=wasIns?d.items.filter(function(o){return o.toClaim;}):[];
+  d.stage = (s===ST.RESULT) ? afterResult(d) : s.next;   /* ไม่มีของกลับ → ข้ามขั้น QC ตรวจรับ */
+  var msg='';
+  if(s===ST.SIN)   msg='\n\nเลขที่รับของเข้าคลัง '+d.grNo+' · '+d.grDate+
+                       '\nเด้ง LINE แจ้ง QC ให้มาตรวจรับของแล้ว';
+  if(s===ST.RECV)  msg='\n\nออกใบตรวจรับของกลับ '+d.rcvNo+' · '+d.rcvDate+
+                       '\nตรวจเสร็จแล้ว ส่งกลับให้สโตร์เบิกออกให้หน้างาน';
+  if(s===ST.ISSUE) msg='\n\nเลขที่ใบเบิก '+d.isNo+' · '+d.isDate+
+                       '\nของถึงมือหน้างานแล้ว ส่งให้ผู้บริหารอนุมัติปิด';
+  if(s===ST.RESULT){
+    var r=RESULTS[d.result];
+    msg='\n\nผลการเคลม: '+r.t+
+        '\nค่าของ '+r.goods+' · ค่าแรง '+r.labor+
+        (r.bill?'\n→ ต้องออก ② ใบเรียกเก็บค่าเคลม':'\n→ ไม่ต้องออกใบเรียกเก็บ ปิดจบที่ใบ ③ ภายใน')+
+        (r.back?'\n→ มีของกลับมา — ของเข้าสโตร์ก่อน สโตร์แจ้ง QC มาตรวจ แล้วค่อยเบิกออก'
+               :'\n→ ไม่มีของกลับมา ข้ามขั้นสโตร์/QC ไปขอผู้บริหารปิดเลย');
+  }
+  if(wasIns&&d.stage==='DONE'&&tk.length){
+    var nn='CLM-69/'+String(DOCS.filter(function(x){return x.kind==='CLM';}).length+1).padStart(4,'0');
+    DOCS.push({no:nn,kind:'CLM',stage:'DRAFT',job:d.job,cust:d.cust,model:d.model,date:now().split(' ')[0],
+      by:d.by,dept:d.dept,area:d.area,ctype:'pre',from:d.no,dn:'',want:'',rej:'',
+      sign:{'ผู้เปิดใบ':d.sign['ผู้ตรวจ']||''},
+      items:tk.map(function(o){return {code:'',nm:o.t,th:o.found,qty:'1',unit:'',po:'',sup:'',ph:o.ph,cost:''};})});
+    msg='\n\n☑️ สร้างใบเคลม '+nn+' จากข้อที่ติ๊กไว้ '+tk.length+' ข้อ ให้อัตโนมัติแล้ว\nรายละเอียดและรูปตามไปด้วย';
+  }
+  var ns=stg(d);
+  openDoc(no);
+  setTimeout(function(){
+    alert('✓ '+s.act.replace(/^[^ ]+ /,'')+' เรียบร้อย\n\n'+
+      (ns.roles.length?('เอกสารวิ่งไปหา '+ns.who+'\nโผล่ในกล่องงานที่ '+ns.box+' · เด้ง LINE แจ้งให้เอง')
+                      :'ปิดจบเรียบร้อย')+msg);
+  },60);
+}
+/* สเปคข้อ 4.5 — ของกลับมา ถ้า QC ไม่ Accept → วนกลับเป็นเคลมรอบใหม่ */
+function noAcc(no){
+  var d=doc(no);
+  var w=prompt('ไม่ Accept ของที่ Supplier ส่งกลับมา — '+no+'\n\nไม่ Accept เพราะอะไร:');
+  if(w===null) return;
+  if(!String(w).trim()){ alert('ต้องบอกเหตุผลครับ'); return; }
+  d.round=(d.round||1)+1;
+  d.rej='ของที่ส่งกลับมา QC ไม่ Accept — '+esc(w)+' (โดย '+me().n+' · '+now()+')';
+  SIGN_R2.forEach(function(k){ d.sign[k]=''; });
+  d.result=''; d.grNo=''; d.grDate=''; d.rcvNo=''; d.rcvDate=''; d.isNo=''; d.isDate='';
+  d.stage='BUY';
+  openDoc(no);
+  setTimeout(function(){ alert('↩ ไม่ Accept — วนกลับเป็นเคลมรอบใหม่\n\n'+
+    'ใบเดิม เลขเดิม แต่ขึ้นเป็น "รอบที่ '+d.round+'"\n'+
+    'กลับไปหาจัดซื้อให้ไปคุยกับ Supplier ใหม่ · ลายเซ็นรอบ 2 ล้างให้แล้ว'); },60);
+}
+function setResult(no,v){ doc(no).result=v; openDoc(no); }
+function setBlame(no,v){
+  var d=doc(no); d.blame=v;
+  if(v==='EMP'&&!d.blameWho){
+    d.blameWho=prompt('ใครเป็นคนทำเสียหาย (ชื่อพนักงาน):')||'';
+    d.blameDept=prompt('แผนกของคนนั้น:')||'';
+  }
+  openDoc(no);
+}
+function accItem(no,i,v){ doc(no).items[i].back=v; openDoc(no); }
+
+/* เบียร์: "ทะเบียนเอกสาร สามารถกดยกเลิกใบเคลมได้ จากเบียร์เท่านั้น" */
+function killDoc(no){
+  if(ROLE!=='ADMIN'){ alert('ยกเลิกใบเอกสารได้เฉพาะผู้บริหารเท่านั้น'); return; }
+  var d=doc(no);
+  var w=prompt('ยกเลิก '+no+'\n\nยกเลิกเพราะอะไร (เก็บไว้ในประวัติ):');
+  if(w===null) return;
+  if(!String(w).trim()){ alert('ต้องบอกเหตุผลครับ'); return; }
+  d.cancel=esc(w); d.cancelBy=me().n+' · '+now();
+  LOGS.unshift({t:now(),u:me().n+' · '+me().p,a:'ยกเลิกใบ — '+esc(w),n:no});
+  go('reg');
+  setTimeout(function(){ alert('✕ ยกเลิก '+no+' แล้ว\n\n'+
+    'ใบยังอยู่ในทะเบียน (ไม่ได้ลบทิ้ง) แต่ขึ้นว่า "ยกเลิกแล้ว"\n'+
+    'ไม่ถูกดึงไปรวมยอดเรียกเก็บ ไม่ขึ้นในรายงานบัญชี\n'+
+    'บันทึกคนยกเลิกและเหตุผลไว้ใน LOG แล้ว'); },60);
+}
+function kick(no){
+  var d=doc(no), s=stg(d);
+  var w=prompt('ตีกลับ '+no+'\n\nบอกเหตุผลว่าต้องแก้อะไร:');
+  if(w===null) return;
+  if(!String(w).trim()){ alert('ต้องบอกเหตุผลครับ'); return; }
+  d.rej=esc(w)+' — โดย '+me().n+' · '+now();
+  d.stage=s.rej;
+  openDoc(no);
+  setTimeout(function(){ alert('↩ ตีกลับแล้ว\n\nเอกสารวิ่งกลับไปหา '+stg(d).who+'\nเด้ง LINE พร้อมเหตุผลให้เอง'); },60);
+}
+
+/* เบียร์: "🔎 ตรวจคำแปล อยากให้เป็นแบบ POP Up เล็กๆ ด้านข้างเลย ไม่ต้องเปิดหน้าจอใหญ่" */
+function tx(el){
+  var old=document.getElementById('txpop'); if(old) old.remove();
+  var td=el.parentNode, tr=td.parentNode,
+      th=(td.previousElementSibling?td.previousElementSibling.textContent:'').trim(),
+      en=td.textContent.replace('🔎','').trim(), r=el.getBoundingClientRect();
+  var p=document.createElement('div'); p.id='txpop';
+  p.innerHTML='<span class="x" onclick="this.parentNode.remove()">✕</span>'+
+    '<h4>🔎 ตรวจคำแปล — รายการที่ '+tr.cells[0].textContent+'</h4>'+
+    '<div style="color:#666;margin-bottom:5px">ไทย: '+esc(th)+'</div>'+
+    '<textarea rows="3">'+esc(en)+'</textarea>'+
+    '<div style="margin-top:6px;text-align:right"><button class="btn p" style="padding:3px 10px;font-size:11px" '+
+    'onclick="this.closest(\'#txpop\').remove()">ใช้คำแปลนี้</button></div>';
+  document.body.appendChild(p);
+  p.style.top=Math.min(r.top,window.innerHeight-190)+'px';
+  p.style.left=Math.max(8,Math.min(r.left+18,window.innerWidth-262))+'px';
+}
+
+/* เบียร์: "ชนิด Inspection * ถ้าเป็นสินค้า จะไม่มีรูป Standard" */
+function insType(v){
+  var std=document.querySelectorAll('.stdcol');
+  for(var i=0;i<std.length;i++) std[i].style.display=(v==='TANKER')?'':'none';
+  tip(v==='TANKER'
+    ? '<b>① Inspection Tankers</b> — มีรูป STD ประจำรุ่น ให้เทียบทีละจุด'
+    : '<b>② Inspection สินค้า</b> — <b>ไม่มีรูป STD</b> ถ่ายรูปของที่ได้มาแล้วติ๊ก Acc / Un-Acc');
+}
+
+/* เบียร์: "เปลี่ยนเป็นต่างประเทศ มันไม่มีช่องแปลภาษามาให้ด้วย ข้อมูลมันไม่ล้อกัน"
+   + "ถ้าต่างประเทศ ต้องมี CHASSIS ผู้ผลิต บังคับใส่ CHASSIS STT ด้วย" */
+function newArea(v){
+  var isFor=(v==='for');
+  var sel=document.getElementById('selarea'); if(sel&&sel.value!==v) sel.value=v;
+  /* ① ชนิดงานต่างประเทศ โผล่เฉพาะงานนอก */
+  var fk=$('fk'); if(fk) fk.style.display=isFor?'':'none';
+  /* ② คอลัมน์ EN โผล่คู่กับคอลัมน์ไทย — ล้อกันแถวต่อแถว */
+  var en=document.querySelectorAll('.encol');
+  for(var i=0;i<en.length;i++) en[i].style.display=isFor?'':'none';
+  /* ③ CHASSIS ทั้งสองช่องกลายเป็นบังคับ */
+  ['fcs','fcm'].forEach(function(id){
+    var f=$(id); if(!f) return;
+    var star=f.querySelector('.rq'); if(star) star.style.display=isFor?'':'none';
+    var inp=f.querySelector('input'); if(inp) inp.style.borderColor=isFor?'#E2231A':'';
+  });
+  tip(isFor
+    ? '<b>งานต่างประเทศ</b> — บังคับ CHASSIS ทั้ง 2 ช่อง · คอลัมน์ EN โผล่คู่ช่องไทย พิมพ์ไทยแล้วแปลให้ '+
+      '<b>กดตรวจคำแปลได้ที่ป๊อปอัพเล็กข้างช่อง</b> ไม่ต้องเปิดหน้าใหม่'
+    : '<b>งานในประเทศ</b> — ไม่ต้องมี CHASSIS ผู้ผลิต ไม่ต้องแปลภาษา');
+}
+
+/* ═══ เปิดเอกสารใหม่ ═══ */
+function newDoc(kind){
+  var isIns=kind==='INS';
+  var t='<div class="crumb"><a onclick="go(\'home\')">หน้าหลัก</a> › '+
+    (isIns?'เปิดใบ Inspection':'เปิดใบเคลมสินค้า')+'</div>'+
+    '<div class="card"><div class="hd"><span class="pill '+(isIns?'ins':'clm')+'">'+
+    (isIns?'ใบ Inspection':'ใบเคลมสินค้า')+'</span><h2>'+(isIns?'เปิดใบ Inspection ใหม่':'เปิดใบเคลมใหม่')+'</h2>'+
+    '<span class="sub">ผู้เปิด: '+esc(me().n)+' · '+esc(me().p)+'</span></div>'+
+    '<div class="warn">📝 กรอกของตัวเองให้ครบ + แนบรูป · <b>บันทึกร่างไว้ก่อนได้</b> '+
+    'สโตร์กับจัดซื้อยังไม่เห็น · ครบแล้วกด <b>ส่งขออนุมัติ</b> ไปที่ผู้บังคับบัญชา</div>'+key()+
+    '<div class="grid">'+
+    '<div class="f o1"><label>ประเภทงาน <span class="rq">*</span></label>'+
+      '<select><option>JT — งานประกอบใหม่</option><option>JM — งานซ่อม</option>'+
+      '<option>JMC — งานเคลม</option><option>JMS — งานบริการ</option></select></div>'+
+    fld('o1','เลขที่ JOB','',0,1)+fld('oa','ชื่อลูกค้า','ขึ้นเองจากเลขจ๊อบ',1)+
+    fld('oa','MODEL','ขึ้นเองจากเลขจ๊อบ',1)+
+    '<div class="f o1"><label>สถานที่ผลิต <span class="rq">*</span></label>'+
+      '<select id="selarea" onchange="newArea(this.value)"><option value="dom">ในประเทศ</option>'+
+      '<option value="for">ต่างประเทศ</option></select></div>'+
+    '<div class="f o1" id="fk" style="display:none"><label>ชนิดงานต่างประเทศ <span class="rq">*</span></label>'+
+      '<select><option>อุปกรณ์ (ผ่านสโตร์)</option><option>Tankers (ไม่ผ่านสโตร์)</option></select></div>'+
+    '<div class="f o1" id="fcs"><label>CHASSIS NO. (STT) <span class="rq" style="display:none">*</span>'+
+      '</label><input placeholder="เลขตัวถังที่ STT ออกให้"></div>'+
+    '<div class="f o1" id="fcm"><label>CHASSIS NO. (ผู้ผลิต) <span class="rq" style="display:none">*</span>'+
+      '</label><input placeholder="เลขตัวถังจากโรงงานผู้ผลิต"></div>'+
+    fld('o1','SERIAL NO.','',0)+
+    (isIns
+      ? '<div class="f o1"><label>ชนิด Inspection <span class="rq">*</span></label>'+
+        '<select id="selitype" onchange="insType(this.value)">'+
+        '<option value="TANKER">① Inspection Tankers — มีรูป STD ประจำรุ่น</option>'+
+        '<option value="GOODS">② Inspection สินค้า — ไม่มี STD ถ่ายรูปของที่ได้มา</option></select></div>'+
+        fld('o1','ผู้ตรวจ',me().n,1)
+      : '<div class="f o1"><label>ประเภทการเคลม <span class="rq">*</span></label>'+
+        '<select><option>Pre-Delivery (ก่อนส่งมอบ)</option><option>After-Sales (หลังส่งมอบ)</option></select></div>'+
+        fld('o1','JMC ที่ผูก','',0)+fld('o1','วันที่ต้องการของ','',0,1))+
+    fld('oa','ผู้ขอเคลม',me().n,1)+fld('oa','แผนกที่ขอ',me().p,1)+
+    '</div></div>';
+
+  /* ═══ ตารางรายการ — ต้องกรอกตั้งแต่ตอนเปิดใบ (เบียร์: "ต้องใส่ตั้งแต่แรกเลยไม่ใช่หรอ") ═══ */
+  if(isIns){
+    t+='<div class="card"><div class="hd"><h2>รายการตรวจ</h2>'+
+      '<span class="sub">เลือกแม่แบบแล้วหัวข้อขึ้นให้เอง · เพิ่ม/ลบหัวข้อเองได้ · ถ่ายรูปทุกข้อ</span></div>'+
+      '<div class="warn">📷 <b>ถ่ายรูปหน้างานก่อนได้เลย</b> แล้วค่อยกลับมากรอกผลตรวจทีหลัง — กด "บันทึกร่าง" เก็บไว้ก่อน</div>'+
+      '<div style="overflow-x:auto"><table class="wide" style="min-width:1120px"><thead><tr>'+
+      '<th style="width:32px">#</th>'+
+      '<th class="own1" style="width:104px">หมวด<span class="opt">มาจากแม่แบบ</span></th>'+
+      '<th class="own1">หัวข้อตรวจ</th>'+
+      '<th class="own1 encol" style="width:150px;display:none">หัวข้อ (EN)</th>'+
+      '<th class="stdcol" style="width:90px">รูป STD<span class="opt">เฉพาะ Tankers</span></th>'+
+      '<th class="own1" style="width:92px">ผลตรวจ</th>'+
+      '<th class="own1" style="width:190px">สิ่งที่พบ (ไทย)</th>'+
+      '<th class="own1 encol" style="width:190px;display:none">Finding (EN)'+
+        '<span class="opt">งานต่างประเทศ</span></th>'+
+      '<th class="own1" style="width:50px">จน.<span class="opt">ถ้าไม่ผ่าน</span></th>'+
+      '<th class="own1" style="width:56px">หน่วย<span class="opt">ถ้าไม่ผ่าน</span></th>'+
+      '<th class="own1" style="width:108px">รูปของจริง<span class="opt">สูงสุด 5 รูป</span></th>'+
+      '<th style="width:118px">ส่งไปสร้างใบเคลม</th></tr></thead><tbody>';
+    var ROWI=[['ตัวถัง','สภาพผิวนอกตัวถัง — รอยบุบ รอยขีด สนิม'],
+              ['อุปกรณ์บนถัง','แมนโฮลปิดสนิท บานพับปกติ'],
+              ['ทดสอบ','ทดสอบแรงดัน (Pressure test)']];
+    ROWI.forEach(function(r,i){
+      t+='<tr><td class="rowno">'+(i+1)+'</td><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td>'+
+        '<td class="encol" style="display:none">—</td>'+
+        '<td class="c stdcol"><div class="thumb std">📐</div></td>'+
+        '<td class="in"><select><option>—</option><option>Acc</option><option>Un-Acc</option></select></td>'+
+        '<td class="in"><input placeholder="พบอะไร"></td>'+
+        '<td class="in encol" style="display:none"><input placeholder="แปลอัตโนมัติ"></td>'+
+        '<td class="in"><input placeholder="จน."></td><td class="in"><input placeholder="หน่วย"></td>'+
+        '<td><div class="ph">'+ph(0)+'</div></td>'+
+        '<td class="c"><input type="checkbox" class="tick" disabled title="ติ๊กได้เมื่อเลือก Un-Acc"></td></tr>';
+    });
+    t+='</tbody></table></div>'+
+      '<div style="margin-top:9px"><button class="btn">+ เพิ่มหัวข้อ</button> '+
+      '<span class="sub">ข้อที่ Un-Acc ต้องมีรูป ถึงจะส่งขออนุมัติได้</span></div></div>';
+  } else {
+    t+='<div class="card"><div class="hd"><h2>รายการที่เคลม</h2>'+
+      '<span class="sub">ก๊อปจาก Google Sheets มาวางได้เลย (Ctrl+V)</span></div>'+
+      '<div class="warn" style="background:#fff5f5;border-color:#f0c2c2;color:#b3261e">'+
+      '📌 <b>อย่างน้อยต้องมีรหัสสินค้า หรือ ชื่อสินค้า</b> อย่างใดอย่างหนึ่ง · '+
+      '<b>ทุกแถวต้องมีรูปอย่างน้อย 1 รูป สูงสุด 5 รูป — ไม่มีรูปบันทึกไม่ได้</b> '+
+      'เพราะใบแจ้งเคลมที่ส่ง Supplier ต้องมีรูปไปด้วย</div>'+
+      '<div class="warn">📷 <b>ถ่ายรูปหน้างานก่อนได้เลย</b> แล้วค่อยกลับมากรอกรายละเอียดทีหลัง — กด "บันทึกร่าง" เก็บไว้ก่อน</div>'+
+      '<div style="overflow-x:auto"><table class="wide"><thead><tr><th style="width:32px">#</th>'+
+      '<th class="own1" style="width:88px">รหัสสินค้า<span class="opt">ใส่แล้วชื่อ+หน่วยขึ้นเอง</span></th>'+
+      '<th class="own1" style="width:132px">ชื่อสินค้า <span class="rq">*</span></th>'+
+      '<th class="own1" style="width:230px">รายละเอียดการเคลม (ไทย) <span class="rq">*</span></th>'+
+      '<th class="own1 encol" style="width:190px;display:none">Claim description (EN)'+
+        '<span class="opt">งานต่างประเทศ · แปลให้ ตรวจได้</span></th>'+
+      '<th class="own1" style="width:56px">จน. <span class="rq">*</span></th>'+
+      '<th class="own1" style="width:60px">หน่วย</th>'+
+      '<th class="own1" style="width:112px">วันรับสินค้า<span class="opt">เด้งจาก PO · แก้ทับได้</span></th>'+
+      '<th class="own2" style="width:92px">PO<span class="opt">สโตร์ใส่ทีหลัง</span></th>'+
+      '<th class="own2" style="width:104px">Supplier<span class="opt">สโตร์ใส่ทีหลัง</span></th>'+
+      '<th class="own1" style="width:106px">รูป <span class="rq">*</span>'+
+      '<span class="opt">อย่างน้อย 1 · สูงสุด 5</span></th></tr></thead><tbody>';
+    for(var r=1;r<=2;r++){
+      t+='<tr><td class="rowno">'+r+'</td>'+
+        '<td class="in"><input placeholder="เช่น VLV-3040"></td>'+
+        '<td class="in"><input></td><td class="in"><input></td>'+
+        '<td class="in encol" style="display:none"><input placeholder="แปลอัตโนมัติ"></td>'+
+        '<td class="in"><input></td><td class="in"><input></td>'+
+        '<td class="in"><input type="date"></td>'+
+        '<td class="locked"></td><td class="locked"></td>'+
+        '<td><div class="ph">'+ph(0)+'</div></td></tr>';
+    }
+    t+='</tbody></table></div>'+
+      '<div style="margin-top:9px"><button class="btn">+ เพิ่มแถว</button> '+
+      '<span class="sub">ช่องสีเทา = <b>สโตร์เป็นคนใส่ทีหลัง</b> คุณไม่ต้องกรอก</span></div></div>';
+  }
+
+  t+='<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
+    '<button class="btn" onclick="alert(\'บันทึกร่างแล้ว — ไปดูที่เมนู ✏️ เอกสารร่างของฉัน\\nสโตร์กับจัดซื้อยังไม่เห็นใบนี้\')">💾 บันทึกร่าง</button>'+
+    '<button class="btn p" onclick="alert(\'ตัวอย่างการตรวจก่อนส่งอนุมัติ:\\n\\nยังไม่ได้กรอก: เลขที่ JOB'+
+      (isIns?'':' · วันที่ต้องการของ')+'\\n'+
+      (isIns?'ข้อ 1, 2, 3 ยังไม่ได้ติ๊กผลตรวจ':'รายการที่ 1, 2 ยังไม่ใส่ชื่อสินค้า/รายละเอียด')+
+      '\\n'+(isIns?'ข้อที่ Un-Acc ยังไม่มีรูป':'รายการที่ 1, 2 ยังไม่มีรูป')+
+      '\\n\\n→ บอกครบทีเดียว พร้อมกรอบแดงที่ช่องนั้น\')">📤 ส่งขออนุมัติ</button>'+
+    '<span class="sub">บันทึกร่าง = ข้อมูลไม่ครบก็เก็บไว้ได้ · ส่งขออนุมัติ = ต้องครบทุกช่องที่มีดาวแดง</span>'+
+    '</div></div>';
+
+  $('view').innerHTML=t;
+  tip(isIns
+    ? '<b>ใบ Inspection</b> — ตรวจของตอนมาถึง · ข้อที่ Un-Acc <b>ติ๊กช่อง “ส่งไปสร้างใบเคลม”</b> พออนุมัติ ระบบสร้างใบเคลมให้เอง'
+    : '<b>ใบเคลม</b> — เปิดตรงได้เลย ไม่ต้องผ่านใบตรวจ (เคลมหลังส่งมอบ / อุปกรณ์ในประเทศ)');
+}
+
+go('home');
+</script>
+</body>
+</html>
