@@ -256,6 +256,15 @@ function drawInspGrid(c, docNo){
     photoSub: INSTANKER ? 'ถ่ายตอนตรวจ · ข้อที่ไม่ผ่านต้องมี' : 'ถ่ายตอนของมาถึง · ข้อที่ไม่ผ่านต้องมี',
     trFrom: INSFOREIGN ? 'th' : '', trTo: INSFOREIGN ? 'en' : '',
     onDraw: function(g){ paintAccCells(g); },
+    /* ระบบเติมคำแปลให้ ต้องบันทึกลงชีตด้วย ไม่งั้นรีเฟรชแล้วหาย */
+    onFill: function(rowsFilled, g, key){
+      key = key || 'titleEn';
+      for (var i = 0; i < rowsFilled.length; i++){
+        var rr = rowsFilled[i], sq = g.rows[rr]._seq;
+        if (!sq) continue;
+        google.script.run.saveInspItemField(CURDOC, sq, key, g.rows[rr][key], AUTH);
+      }
+    },
     onChange: function(r, k, v, g){
       var seq = g.rows[r]._seq; if (!seq) return;
       if (k === 'acc') v = String(v || '').toUpperCase();

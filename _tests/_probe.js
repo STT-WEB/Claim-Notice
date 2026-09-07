@@ -506,7 +506,6 @@ T('ทุกขั้นในสายงาน ต้องมีแท็บ�
   const stages=call('stageList',[]).map(s=>s.key).filter(k=>k!=='CANCELLED');
   const TS=vm.runInContext('JSON.stringify(TAB_STAGES)', sandbox);
   const tabs=JSON.parse(TS), covered={};
-  delete tabs.reject;                       // 'reject' เป็นตัวกรอง ไม่ใช่ขั้นในสายงาน
   Object.keys(tabs).forEach(t=>(tabs[t]||[]).forEach(k=>covered[k]=t));
   const miss=stages.filter(k=>!covered[k]);
   if(miss.length) throw new Error('ขั้นที่ไม่มีแท็บรองรับ: '+miss.join(', ')+' → ใบจะหายจากหน้าแรก');
@@ -742,156 +741,39 @@ T('ทะเบียนเอกสารที่ส่ง Supplier — ขึ
   if(!row.sentAt || !row.sentBy) throw new Error('ไม่ได้บันทึกว่าออกเมื่อไหร่ / ใครออก');
   return row.docNo+' → '+row.supplier+' · '+row.sentBy+' · '+row.sentAt; });
 
-console.log('\n⑫ ตีกลับ · ช่องใหม่ · ปุ่มที่กดไม่ได้');
-T('ตีกลับแล้วต้องไปอยู่กล่อง "เอกสารตีกลับ" ไม่ใช่กล่องสโตร์', ()=>{
-  const n=mkClaim_();                                  // เดินถึงขั้นจัดซื้อแล้ว
-  call('rejectClaim',[n,'REQUEST','รูปข้อ 1 ถ่ายไม่ชัด',BUY]);
-  const w=call('workQueues',[AUTH]);
-  const inRj=(w.tabs.reject.rows||[]).some(r=>r.docNo===n);
-  const inOpen=(w.tabs.open.rows||[]).some(r=>r.docNo===n);
-  const inStore=(w.tabs.store.rows||[]).some(r=>r.docNo===n);
-  if(!inRj) throw new Error('ใบที่ถูกตีกลับไม่โผล่ในกล่องเอกสารตีกลับ');
-  if(inOpen) throw new Error('ยังไปปนอยู่ในกล่องเอกสารร่าง — นับซ้ำสองที่');
-  if(inStore) throw new Error('ไปโผล่กล่องสโตร์ ทั้งที่ตีกลับหาคนเปิดใบ');
-  const row=w.tabs.reject.rows.find(r=>r.docNo===n);
-  if(!row.rejectNote) throw new Error('ไม่ได้ส่งเหตุผลตีกลับมาให้หน้าจอ');
-  return n+' → กล่องตีกลับ · เหตุผล: '+row.rejectNote+' · โดย '+row.rejectBy; });
-
-T('แก้เสร็จแล้วส่งต่อ ใบต้องออกจากกล่องตีกลับ ไม่ค้างตลอดกาล', ()=>{
-  const n=mkClaim_();
-  call('rejectClaim',[n,'REQUEST','ขาดรูป',BUY]);
-  if(!call('workQueues',[AUTH]).tabs.reject.rows.some(r=>r.docNo===n))
-    throw new Error('ตีกลับแล้วยังไม่เข้ากล่อง');
-  call('advanceClaim',[n,QC]);                         // แก้เสร็จ ส่งต่ออีกครั้ง
-  const w=call('workQueues',[AUTH]);
-  if(w.tabs.reject.rows.some(r=>r.docNo===n))
-    throw new Error('ส่งต่อแล้วยังค้างในกล่องตีกลับ — ธงตีกลับไม่ถูกล้าง');
-  return n+' ออกจากกล่องตีกลับแล้ว'; });
-
-T('ช่อง E. No. บันทึกได้และอ่านกลับได้', ()=>{
-  /* E. No. เป็นช่องของขั้นร่าง — ต้องกรอกตอนใบยังเป็นร่าง */
-  const dft='DRAFT-E'+Math.floor(Math.random()*9999);
-  call('savePhoto',[dft,'JT-69/0001','r1',px,'x.jpg',QC]);
-  const n=call('createClaimWithPhotos',[{claimType:'pre',area:'dom',jobNo:'JT-69/0001',
-    jobName:'ทดสอบ E.No',dept:'QC',
-    items:[{code:'X1',name:'ของ',th:'พัง',qty:'1',unit:'PCS',_rid:'r1'}]}, dft,{r1:1},QC]).docNo;
-  call('saveClaimField',[n,'eNo','ENG-77-0912',QC]);
-  const h=call('getClaim',[n,AUTH]).head;
-  if(h['E. No.']!=='ENG-77-0912') throw new Error('บันทึก E. No. แล้วอ่านกลับไม่ตรง ได้ '+JSON.stringify(h['E. No.']));
-  return 'E. No. = '+h['E. No.']; });
-
-T('ห้ามแทรกคอลัมน์กลางตาราง — เพิ่มได้เฉพาะต่อท้าย', ()=>{
-  /* ⚠️ ensureCols_ เขียนทับหัวตารางให้ตรงกับโค้ด แต่ไม่ย้ายข้อมูลตาม
-     แทรกคอลัมน์กลาง = ข้อมูลเดิมทั้งชีตเลื่อน หัวไม่ตรงกับของข้างล่าง = พังทั้งระบบ
-     ตัวนี้ล็อกลำดับ 29 คอลัมน์แรกไว้ ใครสลับ/แทรก บิลด์ไม่ผ่านทันที */
-  const BASE=['เลขที่เอกสาร','ชนิดเอกสาร','วันที่','ประเภทการเคลม','สถานที่ผลิต','ชนิดงานต่างประเทศ',
-    'เลขที่ JOB','ชื่อลูกค้า','MODEL','CHASSIS NO. (STT)','CHASSIS NO. (ผู้ผลิต)','SERIAL NO.',
-    'JMC ที่ผูก','เลขใบส่งมอบ','ผู้ขอเคลม','แผนก','วันที่ต้องการของ',
-    'สกุลเงิน','อัตราแลกเปลี่ยน','เรท ณ วันที่','กรณีเรียกเก็บ',
-    'สถานะ','ผลการเคลม','รายละเอียดผลการเคลม','หมายเหตุจาก Supplier',
-    'โฟลเดอร์รูป','สร้างโดย','สร้างเมื่อ','แก้ไขล่าสุด'];
-  const cur=JSON.parse(vm.runInContext('JSON.stringify(HDR_CLAIM)', sandbox));
-  for(let i=0;i<BASE.length;i++){
-    if(cur[i]!==BASE[i])
-      throw new Error('คอลัมน์ที่ '+(i+1)+' เปลี่ยนจาก "'+BASE[i]+'" เป็น "'+cur[i]+'" — ข้อมูลเดิมจะเลื่อนทั้งชีต');
-  }
-  return 'ลำดับ '+BASE.length+' คอลัมน์แรกยังเหมือนเดิม · เพิ่มใหม่ต่อท้ายได้ '+(cur.length-BASE.length)+' คอลัมน์'; });
-
-T('ปริ้นส่ง Supplier — เฉพาะจัดซื้อ และเฉพาะเมื่อใบถึงขั้นจัดซื้อแล้ว', ()=>{
-  /* เบียร์ 7 ก.ย. ข้อ 6+10: ทุกแผนก Preview ได้ · ปุ่มปริ้นจริงเป็นของจัดซื้อ */
-  const dft='DRAFT-PR'+Math.floor(Math.random()*9999);
-  call('savePhoto',[dft,'JT-69/0001','r1',px,'x.jpg',QC]);
-  const n=call('createClaimWithPhotos',[{claimType:'pre',area:'dom',jobNo:'JT-69/0001',
-    jobName:'ทดสอบสิทธิ์ปริ้น',dept:'QC',
-    items:[{code:'X1',name:'ของ',th:'พัง',qty:'1',unit:'PCS',_rid:'r1'}]}, dft,{r1:1},QC]).docNo;
-
-  if(call('claimFlow',[n,BUY]).canPrint) throw new Error('ใบยังเป็นร่าง แต่จัดซื้อปริ้นได้แล้ว');
-  if(call('claimFlow',[n,QC]).canPrint)  throw new Error('QC ไม่ควรปริ้นส่ง Supplier ได้');
-
-  call('advanceClaim',[n,QC]); call('advanceClaim',[n,BOSS]);      // → STORE
-  call('receiveClaim',[n,STORE]);
-  call('saveClaimField',[n,'deliveryNote','DN-P',STORE]);
-  call('saveItemField',[n,1,'po','PO-P',STORE]);
-  call('saveItemField',[n,1,'supplier','เจ้าทดสอบ',STORE]);
-  call('advanceClaim',[n,STORE]);                                   // → PURCHASE
-  const fb=call('claimFlow',[n,BUY]), fq=call('claimFlow',[n,QC]);
-  if(!fb.canPrint) throw new Error('ถึงขั้นจัดซื้อแล้ว แต่จัดซื้อยังปริ้นไม่ได้: '+fb.printWhy);
-  if(fq.canPrint)  throw new Error('QC ปริ้นส่ง Supplier ได้ ทั้งที่ไม่ใช่หน้าที่');
-  if(!fq.printWhy) throw new Error('ไม่ได้บอกเหตุผลให้คนที่ปริ้นไม่ได้');
-  return 'จัดซื้อปริ้นได้ · QC ได้แต่ดูตัวอย่าง ("'+fq.printWhy.slice(0,40)+'…")'; });
-
-T('พิมพ์เลขจ๊อบไม่ตรงรูปแบบ ก็ต้องหาเจอ (บั๊กที่พนักงานเจอ)', ()=>{
-  const want='JT-69/0001';
-  const forms=['JT-69/0001','jt-69/0001','JT-69/1','JT 69/0001','jt69/1','JT-69/01'];
-  const bad=[];
-  for(const f of forms){ if(!call('lookupJob',[f]).found) bad.push(f); }
-  if(bad.length) throw new Error('พิมพ์แบบนี้แล้วหาไม่เจอ: '+bad.join(' · '));
-  const miss=call('lookupJob',['JT-69/9999']);
-  if(miss.found) throw new Error('จ๊อบที่ไม่มีจริง ดันหาเจอ');
-  if(!miss.total) throw new Error('ไม่ได้บอกว่าในทะเบียนมีกี่จ๊อบ');
-  return 'พิมพ์ได้ '+forms.length+' แบบ หาเจอหมด → '+want; });
-
-T('เลือกได้ว่ารูปไหนขึ้นบนเอกสาร — รูปที่ไม่ติ๊กยังอยู่ในระบบ', ()=>{
-  const n=mkClaim_();
-  const before=call('listPhotos',[n,AUTH]);
-  const seq=Object.keys(before)[0];
-  const ph=before[seq][0];
-  if(ph.doc!==true) throw new Error('รูปใหม่ควรตั้งต้นเป็น "ขึ้นเอกสาร"');
-  call('setPhotoInDoc',[n, ph.id, 0, BUY]);
-  const after=call('listPhotos',[n,AUTH]);
-  const same=after[seq].find(x=>x.id===ph.id);
-  if(!same) throw new Error('ติ๊กไม่ขึ้นเอกสารแล้วรูปหายไปจากระบบ — ต้องยังอยู่');
-  if(same.doc!==false) throw new Error('ติ๊กแล้วธงไม่เปลี่ยน');
-  call('setPhotoInDoc',[n, ph.id, 1, BUY]);
-  if(call('listPhotos',[n,AUTH])[seq].find(x=>x.id===ph.id).doc!==true)
-    throw new Error('ติ๊กกลับแล้วไม่คืนค่า');
-  return 'ข้อ '+seq+' · ปิด/เปิดรูปบนเอกสารได้ · รูปยังอยู่ในระบบครบ'; });
-
-console.log('\n⑬ ค่าใช้จ่ายอื่น ๆ · งานซ่อมที่ไม่มีอะไหล่');
-T('ค่าของ · ค่าแรง · ค่าใช้จ่ายอื่น ๆ แยกกันคนละตาราง', ()=>{
-  const n=mkClaim_();
-  call('saveLabour',[n,[{th:'ค่าแรงช่าง 2 คน 3 วัน', amount:'9000', supplier:'เจ้าทดสอบ'}],BUY]);
-  call('saveExpense',[n,[
-    {kind:'ค่าเดินทาง', th:'รถตู้ไป-กลับ ระยอง-ชลบุรี', amount:'3500', supplier:'เจ้าทดสอบ'},
-    {kind:'ค่าที่พัก',  th:'ที่พักช่าง 2 คืน',           amount:'2400', supplier:'เจ้าทดสอบ'}],BUY]);
-  const ex=call('listExpense',[n,AUTH]);
-  if(ex.length!==2) throw new Error('บันทึกค่าใช้จ่ายอื่นแล้วอ่านกลับได้ '+ex.length+' บรรทัด');
-  if(ex[0].kind!=='ค่าเดินทาง') throw new Error('ประเภทค่าใช้จ่ายไม่ถูกเก็บ');
-  const lab=call('listLabour',[n,AUTH]);
-  if(lab.length!==1) throw new Error('ค่าแรงถูกปนกับค่าใช้จ่ายอื่น');
-  const full=call('getClaimFull',[n,AUTH]);
-  if(!full.expense || full.expense.length!==2) throw new Error('เปิดใบแล้วไม่ได้ค่าใช้จ่ายอื่นมาด้วย');
-  return 'ค่าแรง '+lab.length+' บรรทัด · ค่าใช้จ่ายอื่น '+ex.length+' บรรทัด (รวม '+
-         (Number(ex[0].amount)+Number(ex[1].amount))+' บาท) แยกตารางกันจริง'; });
-
-T('ค่าใช้จ่ายอื่น ๆ ต้องเข้าไปอยู่ในยอดเรียกเก็บและสรุปต้นทุน', ()=>{
-  const n=mkClaim_();
-  call('saveItemField',[n,1,'price','1000',BUY]);
-  call('saveClaimField',[n,'result','BUYSELF',BUY]);       // เรียกเก็บทั้งของและค่าแรง
-  call('saveLabour',[n,[{th:'ค่าแรง', amount:'5000'}],BUY]);
-  call('saveExpense',[n,[{kind:'ค่าเดินทาง', th:'ไปหน้างาน', amount:'2000'}],BUY]);
-  const rows=call('reportCost',[AUTH]).rows.filter(x=>x.docNo===n);
-  if(!rows.length) throw new Error('ใบนี้ไม่ขึ้นในสรุปต้นทุน');
-  if(Number(rows[0].expense)!==2000) throw new Error('สรุปต้นทุนไม่นับค่าใช้จ่ายอื่น ได้ '+rows[0].expense);
-  const want=Number(rows[0].items)+Number(rows[0].labour)+Number(rows[0].expense);
-  if(Number(rows[0].thb)!==want) throw new Error('ยอดรวมไม่ตรง ('+rows[0].thb+' ควรเป็น '+want+')');
-  return 'ค่าของ '+rows[0].items+' + ค่าแรง '+rows[0].labour+' + ค่าใช้จ่ายอื่น '+rows[0].expense+' = '+rows[0].thb; });
-
-T('งานซ่อม/ฝีมือ ไม่มีอะไหล่ — เปิดใบได้โดยไม่ต้องมีรายการของ', ()=>{
-  const r=call('createClaim',[{claimType:'after', area:'dom', jobNo:'JT-69/0001',
-    jobName:'งานซ่อมนอกสถานที่', dept:'QC', items:[]}, QC]);
+/* ── โพรบชั่วคราว: ทำไมใบร่างแก้ไม่ได้ ── */
+(function(){
+  const SALES={emp:'6406031',pin:'666666'};   // สุขุมาล — Sales / Approve
+  const dft='DRAFT-P'+Math.floor(Math.random()*9999);
+  call('savePhoto',[dft,'JT-69/0001','r1',px,'x.jpg',SALES]);
+  const r=call('createClaimWithPhotos',[{claimType:'pre',area:'dom',jobNo:'JT-69/0001',
+    jobName:'โพรบร่าง',dept:'ขาย',wantDate:'30/09/2569',
+    items:[{code:'X1',name:'ของ',th:'พัง',qty:'1',unit:'PCS',_rid:'r1'}]}, dft,{r1:1},SALES]);
   const n=r.docNo;
-  call('saveClaimField',[n,'workKind','LABOUR',QC]);
-  let f=call('claimFlow',[n,QC]);
-  if(!f.missing.length) throw new Error('ยังไม่มีค่าแรงเลย แต่ระบบบอกว่าส่งต่อได้');
-  if(!/ค่าแรงหรือค่าใช้จ่าย/.test(f.missing.join(' ')))
-    throw new Error('ข้อความบอกไม่ตรง: '+f.missing.join(' · '));
-  call('saveLabour',[n,[{th:'ค่าแรงซ่อมหน้างาน', amount:'12000'}],QC]);
-  call('saveExpense',[n,[{kind:'ค่าเช่าสถานที่', th:'เช่าลานซ่อม 1 วัน', amount:'4000'}],QC]);
-  f=call('claimFlow',[n,QC]);
-  if(f.missing.length) throw new Error('ใส่ค่าแรงแล้วยังส่งต่อไม่ได้: '+f.missing.join(' · '));
-  const a=call('advanceClaim',[n,QC]);
-  return n+' → ส่งขออนุมัติได้โดยไม่มีรายการของ (ขั้น '+a.stage+')'; });
+  const f=call('claimFlow',[n,SALES]);
+  console.log('\n=== โพรบใบร่าง '+n+' (เปิดโดย Sales) ===');
+  console.log('stage      :', f.stage, '| isOwner:', f.isOwner, '| isDraft:', f.isDraft);
+  console.log('needReceive:', f.needReceive, '| received:', f.received);
+  console.log('missing    :', JSON.stringify(f.missing));
+  console.log('ช่องที่ถูกล็อก:');
+  Object.keys(f.lock).forEach(k=>console.log('   ', k.padEnd(16), '→', f.lock[k].slice(0,70)));
+  console.log('\n--- ADMIN (เบียร์) เปิดใบร่างของคนอื่น ---');
+  const f2=call('claimFlow',[n,AUTH]);
+  console.log('isOwner:',f2.isOwner,'| ล็อก',Object.keys(f2.lock).length,'ช่อง');
+  Object.keys(f2.lock).slice(0,6).forEach(k=>console.log('   ', k.padEnd(16), '→', f2.lock[k].slice(0,70)));
+  console.log('\n--- ลองส่งขออนุมัติ ---');
+  try { const a=call('advanceClaim',[n,SALES]); console.log('ส่งได้ → ',a.stage); }
+  catch(e){ console.log('ส่งไม่ได้ →', e.message); }
+  console.log('\n--- ใบตรวจ: ร่างแก้ได้ไหม ---');
+  const ins=call('createInspection',[{area:'dom',kind:'tanker',jobNo:'JT-69/0001',
+    jobName:'โพรบตรวจ',supplier:'x',inspector:'คุณสมชาย',tpl:''},QC]);
+  const fi=call('inspFlow',[ins.docNo,QC]);
+  console.log('stage:',fi.stage,'| isOwner:',fi.isOwner,'| canEdit:',fi.canEdit,'| missing:',JSON.stringify(fi.missing));
+  try { call('saveInspItemField',[ins.docNo,1,'acc','ACC',QC]); console.log('QC แก้ช่องได้'); }
+  catch(e){ console.log('QC แก้ไม่ได้ →', e.message); }
+  try { call('saveInspItemField',[ins.docNo,1,'acc','ACC',AUTH]); console.log('ADMIN แก้ช่องได้'); }
+  catch(e){ console.log('ADMIN แก้ไม่ได้ →', e.message); }
+})();
 
 console.log('\n──────────────────────────────');
 console.log('ผ่าน '+pass+' · ไม่ผ่าน '+fail);

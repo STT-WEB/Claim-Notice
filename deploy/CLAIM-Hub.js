@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v1.2.4';
+var VERSION = 'v1.2.5';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -358,7 +358,8 @@ function wipRows_(){
       loc     : norm_(iLoc   >= 0 ? v[iLoc]   : '')
     });
   }
-  cachePut_('CLAIM_WIP', JSON.stringify(out), 600);
+  /* 2 นาที — ของเดิม 10 นาที ทำให้จ๊อบที่เพิ่งเพิ่มในชีต หาไม่เจอนานเกินไป */
+  cachePut_('CLAIM_WIP', JSON.stringify(out), 120);
   _WIP = out;
   return out;
 }
@@ -369,12 +370,24 @@ function typeFromJobNo_(job){
 }
 
 /** ใส่เลขจ๊อบแล้วเด้งข้อมูลรถให้อัตโนมัติ */
+/** ทำเลขจ๊อบให้เป็นรูปแบบเดียวกันก่อนเทียบ
+ *  พนักงานพิมพ์ jt-69/9 · JT 69/0009 · JT-69/09 → ต้องเจอ JT-69/0009 ให้หมด
+ *  ⚠️ เบียร์ 7 ก.ย.: "พนักงานบอกว่าพิมพ์เลขจ๊อบแล้ว ตอนแรกมันบอกว่าหาไม่เจอ" */
+function normJob_(j){
+  var t = norm_(j).toUpperCase().replace(/\s+/g, '');
+  var m = t.match(/^([A-Z]{1,4})[-\/]?(\d{2})[\/-](\d+)$/);
+  if (!m) return t;
+  var n = m[3].replace(/^0+/, '');
+  while (n.length < 4) n = '0' + n;
+  return m[1] + '-' + m[2] + '/' + n;
+}
+
 function lookupJob(jobNo){
-  var job = norm_(jobNo).toUpperCase();
+  var job = normJob_(jobNo);
   if (!job) return { found:false };
   var all = wipRows_();
   for (var i = 0; i < all.length; i++){
-    if (all[i].jobNo.toUpperCase() === job){
+    if (normJob_(all[i].jobNo) === job){
       var w = all[i];
       return {
         found:true, jobNo:w.jobNo, jobName:w.jobName, due:w.due, type:w.type,
@@ -382,7 +395,19 @@ function lookupJob(jobNo){
       };
     }
   }
-  return { found:false, type:typeFromJobNo_(job) };
+  /* หาไม่เจอ — ช่วยหาตัวที่ใกล้เคียงให้ แล้วบอกด้วยว่าอาจเป็นเพราะรายชื่อจ๊อบยังไม่อัปเดต */
+  var near = [];
+  for (var k = 0; k < all.length && near.length < 6; k++){
+    if (normJob_(all[k].jobNo).indexOf(job.replace(/^[A-Z]+-/, '')) >= 0) near.push(all[k].jobNo);
+  }
+  return { found:false, type:typeFromJobNo_(job), asked:job, near:near, total:all.length };
+}
+
+/** ล้างเฉพาะรายชื่อจ๊อบ — ใช้ตอนเพิ่งเพิ่มจ๊อบใหม่ในชีตแล้วยังหาไม่เจอ */
+function refreshJobs(){
+  try { CacheService.getScriptCache().remove('CLAIM_WIP'); } catch(e){}
+  _WIP = null;
+  return { ok:true, n:wipRows_().length };
 }
 
 /** รายชื่อจ๊อบสำหรับ dropdown (กรองตามประเภทงานได้) */
@@ -431,6 +456,15 @@ var HDR_ITEM = ['เลขที่เอกสาร','ลำดับ','รห
   'จำนวน','หน่วย','PO','Supplier','วันรับสินค้า','ต้นทุน/หน่วย','กำไร','ราคาเรียกเก็บ/หน่วย','ผลตรวจ','หมายเหตุ'];
 
 var HDR_LAB  = ['เลขที่เอกสาร','ลำดับ','รายละเอียด (ไทย)','รายละเอียด (EN)','มาจากข้อ','Supplier','จำนวนเงิน'];
+
+/* ค่าใช้จ่ายอื่น ๆ — เบียร์ 7 ก.ย.: "มันต้องแยกออกมาเลย ว่าค่าใช้จ่ายอื่น ๆ ประกอบด้วยอะไรบ้าง
+   พิมพ์รายละเอียดข้อมูลเพิ่มเติมได้เลย เหมือนของ · เพราะงั้นมันจะเป็น ค่าของ · ค่าแรง · ค่าใช้จ่ายอื่น ๆ"
+   ใช้กับงานที่ออกไปซ่อมนอกสถานที่ — ค่าเดินทาง ค่าที่พัก ค่าเช่าสถานที่ ค่าขนส่ง ฯลฯ
+   กรอกได้ตั้งแต่เปิดใบ เพราะคนที่รู้คือคนที่ไปหน้างาน ไม่ใช่จัดซื้อ */
+var HDR_EXP  = ['เลขที่เอกสาร','ลำดับ','ประเภทค่าใช้จ่าย','รายละเอียด (ไทย)','รายละเอียด (EN)',
+  'มาจากข้อ','Supplier','จำนวนเงิน'];
+var EXP_KINDS = ['ค่าเดินทาง','ค่าที่พัก','ค่าเช่าสถานที่','ค่าขนส่ง','ค่าเครื่องมือ/อุปกรณ์สิ้นเปลือง','อื่น ๆ'];
+function expKinds(){ return EXP_KINDS; }
 
 var HDR_ACK  = ['เลขที่เอกสาร','ขั้น','บทบาท','ชื่อผู้ลงนาม','ตำแหน่ง','วันเวลา','หมายเหตุ'];
 
@@ -511,6 +545,7 @@ function dbY_(be, create){
     claims : ensureCols_(ensureTab_(ss, 'CLAIMS_' + be, claimHdr_()), claimHdr_()),
     items  : ensureTab_(ss, 'ITEMS_'  + be, HDR_ITEM),
     labour : ensureTab_(ss, 'LABOUR_' + be, HDR_LAB),
+    exp    : ensureCols_(ensureTab_(ss, 'EXPENSE_' + be, HDR_EXP), HDR_EXP),
     ack    : ensureTab_(ss, 'ACK_'    + be, HDR_ACK),
     log    : ensureTab_(ss, 'LOG',          HDR_LOG)
   };
@@ -675,6 +710,9 @@ function createClaim(h, auth){
   var nr = findClaimRow_(d.claims, docNo);
   setStage_(d.claims, nr, 'REQUEST', me, 'เปิดใบ');
   signStage_(d.claims, nr, 'REQUEST', me);      // ลายเซ็นผู้เปิดใบ ขึ้นตั้งแต่วินาทีแรก
+  /* ช่องที่อยู่ท้ายตาราง (นอก HDR_CLAIM) ต้องเขียนด้วยชื่อหัวตาราง ไม่ใช่ put() */
+  var cE = colOf_('E. No.');            if (cE > 0 && norm_(h.eNo))      d.claims.getRange(nr, cE).setValue(norm_(h.eNo));
+  var cW = colOf_('ลักษณะงานเคลม');      if (cW > 0) d.claims.getRange(nr, cW).setValue(norm_(h.workKind) || 'PART');
   saveItems_(d, docNo, h.items || []);
   log_('createClaim', docNo, norm_(h.jobNo));
   return { ok:true, docNo:docNo };
@@ -726,6 +764,7 @@ function saveClaim(docNo, h, auth){
   put('CHASSIS NO. (STT)', norm_(h.chassisStt));
   put('CHASSIS NO. (ผู้ผลิต)', norm_(h.chassisMaker));
   put('SERIAL NO.', norm_(h.serialNo));
+
   put('JMC ที่ผูก', norm_(h.jmc));
   put('เลขใบส่งมอบ', norm_(h.deliveryNote));
   put('แผนก', norm_(h.dept));
@@ -746,10 +785,15 @@ function getClaim(docNo, auth){
   docNo = norm_(docNo);
   var d = dbOf_(docNo);
   var lr = d.claims.getLastRow(); if (lr < 2) return null;
-  var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
+  /* อ่านหัวตาราง "เต็มความยาว" — คอลัมน์ที่เพิ่มทีหลังอยู่ท้ายตาราง (E. No. ฯลฯ)
+     ⚠️ ถ้าอ่านแค่ HDR_CLAIM ช่องใหม่จะเป็น undefined บนหน้าจอแบบไม่มีใครรู้ */
+  var full = claimHdr_();
+  var hdr = d.claims.getRange(1,1,1,full.length).getDisplayValues()[0];
   var r = findClaimRow_(d.claims, docNo);
   if (r < 0) return null;
-  var head = claimRowObj_(hdr, d.claims.getRange(r,1,1,HDR_CLAIM.length).getDisplayValues()[0]);
+  var row = d.claims.getRange(r,1,1,full.length).getDisplayValues()[0];
+  var head = {};
+  for (var hc = 0; hc < hdr.length; hc++) if (hdr[hc]) head[hdr[hc]] = norm_(row[hc]);
 
   var items = [];
   var ilr = d.items.getLastRow();
@@ -797,11 +841,13 @@ function listClaims(filter, auth){
 }
 
 function listClaimsYear_(d, lr, full, filter, meL, pho, out){
-  var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
+  /* อ่านหัวตารางเต็มความยาว — ต้องได้คอลัมน์ฝั่งสายงานด้วย (เหตุผลที่ตีกลับ ฯลฯ) */
+  var hdr = d.claims.getRange(1,1,1,full.length).getDisplayValues()[0];
   var rows = d.claims.getRange(2,1,lr-1,full.length).getDisplayValues();
   var iStage = colOf_('ขั้นตอน') - 1;
   for (var i = rows.length - 1; i >= 0; i--){      // ใหม่อยู่บน
-    var o = claimRowObj_(hdr, rows[i]);
+    var o = {};
+    for (var c = 0; c < hdr.length; c++) if (hdr[c]) o[hdr[c]] = norm_(rows[i][c]);
     var stg = norm_(rows[i][iStage]) || 'REQUEST';
     /* ใบร่างยังไม่ให้สโตร์/จัดซื้อเห็น — เห็นเฉพาะคนเปิด แผนกเดียวกัน ผู้บังคับบัญชา ผู้บริหาร */
     if (stageDef_(stg).draft && !canSeeDraft_(meL, o['สร้างโดย'], o['แผนก'])) continue;
@@ -820,6 +866,9 @@ function listClaimsYear_(d, lr, full, filter, meL, pho, out){
       status:o['สถานะ'], by:o['สร้างโดย'],
       stage:stg, stageNo:stageDef_(stg).no, stageName:stageDef_(stg).name,
       waitWho:stageDef_(stg).who,
+      /* ใบที่ถูกตีกลับ ต้องแยกออกมาให้เห็น ไม่ปนกับใบร่างปกติ */
+      rejected: !!o['เหตุผลที่ตีกลับ'],
+      rejectNote:o['เหตุผลที่ตีกลับ'] || '', rejectBy:o['ตีกลับโดย'] || '', rejectAt:o['ตีกลับเมื่อ'] || '',
       nItem: (pho.item[o['เลขที่เอกสาร']] || 0),
       nPhoto:(pho.photo[o['เลขที่เอกสาร']] || 0),
       nNoPhoto:(pho.noPhoto[o['เลขที่เอกสาร']] === undefined
@@ -862,7 +911,11 @@ function getDbLink(auth){
    (ใช้วิธีเดียวกับ saveConsignPhoto ของ NOVA ที่ใช้งานจริงมาแล้ว)
    ═══════════════════════════════════════════════════════════════ */
 
-var HDR_PHOTO = ['เลขที่เอกสาร','รายการที่','ลำดับรูป','ชื่อไฟล์','file id','ลิงก์รูป','ลิงก์เปิดเต็ม','ใช้งาน','โดย','เมื่อ'];
+/* ⚠️ เพิ่มคอลัมน์ใหม่ "ต่อท้ายเท่านั้น" เหมือนตารางอื่น
+   'ขึ้นในเอกสาร' — เบียร์ 7 ก.ย.: "เราสามารถเลือกรูปที่จะให้ไปโชว์ใน PDF ได้ด้วย"
+   ค่าว่าง = ขึ้น (รูปเก่าทั้งหมดจึงยังขึ้นเหมือนเดิม) · 'N' = ไม่ขึ้น */
+var HDR_PHOTO = ['เลขที่เอกสาร','รายการที่','ลำดับรูป','ชื่อไฟล์','file id','ลิงก์รูป','ลิงก์เปิดเต็ม','ใช้งาน','โดย','เมื่อ',
+  'ขึ้นในเอกสาร'];
 
 /** แท็บรูปของปีที่ระบุ — รูปต้องอยู่ปีเดียวกับใบเสมอ
  *  ⚠️ ของเดิมใช้ปีปัจจุบันตายตัว → ขึ้นปีใหม่แล้วเปิดใบเก่า รูปหายหมด */
@@ -987,6 +1040,7 @@ function zipPhotos(docNo, auth){
 
 function photosOf_(docNo){
   docNo = norm_(docNo);
+  ensureCols_(photoTabOf_(docNo), HDR_PHOTO);
   var sh = photoTabOf_(docNo), lr = sh.getLastRow();
   var out = {};
   if (lr < 2) return out;
@@ -996,12 +1050,34 @@ function photosOf_(docNo){
     if (norm_(v[i][7]).toUpperCase() === 'N') continue;          // ถูกเอาออกแล้ว
     var s = norm_(v[i][1]);            // เก็บเป็นข้อความ ใช้ได้ทั้ง "1" และ "r1" ของใบร่าง
     if (!out[s]) out[s] = [];
-    out[s].push({ id:v[i][4], thumb:v[i][5], view:v[i][6], name:v[i][3], by:v[i][8], at:v[i][9] });
+    /* doc = รูปนี้ขึ้นบนเอกสารที่ปริ้นไหม · ค่าว่าง = ขึ้น (รูปเก่าไม่เปลี่ยนพฤติกรรม) */
+    out[s].push({ id:v[i][4], thumb:v[i][5], view:v[i][6], name:v[i][3], by:v[i][8], at:v[i][9],
+                  doc: norm_(v[i][10]).toUpperCase() !== 'N' });
   }
   return out;
 }
 
 /** เอารูปออกจากใบ — ไม่ลบไฟล์ทิ้ง แค่ปิดใช้งาน (ข้อมูลห้ามหาย) */
+/** ติ๊ก/ไม่ติ๊ก ว่ารูปนี้จะขึ้นบนเอกสารที่ปริ้นหรือไม่
+ *  เบียร์ 7 ก.ย.: "เราสามารถเลือกรูปที่จะให้ไปโชว์ใน PDF ได้ด้วย"
+ *  รูปที่ไม่ติ๊ก **ยังอยู่ในระบบ** แค่ไม่ออกเอกสาร ไม่ได้ลบทิ้ง */
+function setPhotoInDoc(docNo, fileId, on, auth){
+  var me = requireLogin_(auth);
+  docNo = norm_(docNo); fileId = norm_(fileId);
+  var sh = photoTabOf_(docNo);
+  ensureCols_(sh, HDR_PHOTO);
+  var lr = sh.getLastRow(); if (lr < 2) return { ok:false };
+  var v = sh.getRange(2,1,lr-1,HDR_PHOTO.length).getDisplayValues();
+  for (var i = 0; i < v.length; i++){
+    if (norm_(v[i][0]) === docNo && norm_(v[i][4]) === fileId){
+      sh.getRange(i + 2, 11).setValue(on ? '' : 'N');
+      log_('setPhotoInDoc', docNo, fileId + ' → ' + (on ? 'ขึ้นเอกสาร' : 'ไม่ขึ้นเอกสาร'));
+      return { ok:true, on:!!on };
+    }
+  }
+  return { ok:false };
+}
+
 function removePhoto(docNo, fileId, auth){
   var me = requireLogin_(auth);
   docNo = norm_(docNo); fileId = norm_(fileId);

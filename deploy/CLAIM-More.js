@@ -36,6 +36,8 @@ var CLAIM_FIELD_COL = {
 /* ช่องที่เพิ่มทีหลัง อยู่ในกลุ่มคอลัมน์ท้ายตาราง (HDR_FLOW)
    ห้ามใส่เลขคอลัมน์ตายตัว เพราะพอเพิ่มคอลัมน์ใหม่ตัวเลขจะเลื่อนไปทับกัน — ใช้ชื่อหัวตารางแทน */
 var CLAIM_FIELD_HDR = {
+  eNo:'E. No.',
+  workKind:'ลักษณะงานเคลม',           // PART / LABOUR / BOTH                       // เบียร์ 7 ก.ย. — ต่อจาก CHASSIS ผู้ผลิต บนหน้าจอ
   storeLoc:'ที่เก็บในคลัง', storeTrk:'ขนส่ง/เลขพัสดุ',
   issueTo:'ผู้รับของหน้างาน', issueDept:'แผนกที่เบิกไปใช้',
   blame:'ความรับผิดชอบ', blameWho:'ชื่อผู้ทำเสียหาย', blameDept:'แผนกผู้ทำเสียหาย'
@@ -227,6 +229,57 @@ function saveLabour(docNo, rows, auth){
   return { ok:true, n:out.length };
 }
 
+/* ═══════════ ค่าใช้จ่ายอื่น ๆ — ตารางของตัวเอง (v1.2.5) ═══════════
+ * เบียร์ 7 ก.ย.: "ค่าของ · ค่าแรง · ค่าใช้จ่ายอื่น ๆ" แยกกันคนละตาราง
+ * พิมพ์รายละเอียดได้เหมือนตารางของ ไม่ใช่ยัดรวมกับค่าแรง               */
+function listExpense(docNo, auth){
+  requireLogin_(auth);
+  var d = dbOf_(docNo), lr = d.exp.getLastRow(); if (lr < 2) return [];
+  var v = d.exp.getRange(2,1,lr-1,HDR_EXP.length).getDisplayValues(), out = [];
+  for (var i = 0; i < v.length; i++){
+    if (norm_(v[i][0]) !== norm_(docNo)) continue;
+    out.push({ seq:norm_(v[i][1]), kind:norm_(v[i][2]), th:norm_(v[i][3]), en:norm_(v[i][4]),
+               covers:norm_(v[i][5]), supplier:norm_(v[i][6]), amount:norm_(v[i][7]) });
+  }
+  return out;
+}
+
+/** ค่าใช้จ่ายอื่นมีไม่กี่บรรทัดต่อใบ — เขียนทับทั้งชุดปลอดภัยกว่าไล่ merge
+ *  เปิดให้กรอกตั้งแต่ขั้นร่าง เพราะคนที่รู้ว่ามีค่าเดินทาง/ค่าที่พัก คือคนที่ไปหน้างาน */
+function saveExpense(docNo, rows, auth){
+  requireAny_(auth, ['PRODUCTION','QC','DESIGN','SALES','STORE','PURCHASE','APPROVER']);
+  docNo = norm_(docNo);
+  var d = dbOf_(docNo), lr = d.exp.getLastRow();
+  if (lr > 1){
+    var col = d.exp.getRange(2,1,lr-1,1).getDisplayValues();
+    for (var i = col.length - 1; i >= 0; i--) if (norm_(col[i][0]) === docNo) d.exp.deleteRow(i + 2);
+  }
+  rows = rows || [];
+  var out = [];
+  for (var k = 0; k < rows.length; k++){
+    var x = rows[k] || {};
+    if (!norm_(x.th) && !norm_(x.kind) && !norm_(x.amount)) continue;
+    out.push([docNo, out.length + 1, norm_(x.kind), norm_(x.th), norm_(x.en),
+              norm_(x.covers), norm_(x.supplier),
+              norm_(x.amount) === '' ? '' : money_(x.amount)]);
+  }
+  if (out.length) d.exp.getRange(d.exp.getLastRow()+1, 1, out.length, HDR_EXP.length).setValues(out);
+  log_('saveExpense', docNo, out.length + ' รายการ');
+  return { ok:true, n:out.length };
+}
+
+/** ยอดค่าใช้จ่ายอื่นของใบนี้ (กรองตาม Supplier ได้) */
+function expenseTotal_(d, docNo, sup){
+  var lr = d.exp.getLastRow(); if (lr < 2) return 0;
+  var v = d.exp.getRange(2,1,lr-1,HDR_EXP.length).getDisplayValues(), t = 0;
+  for (var i = 0; i < v.length; i++){
+    if (norm_(v[i][0]) !== norm_(docNo)) continue;
+    if (sup != null && norm_(v[i][6]) && norm_(v[i][6]) !== sup) continue;
+    t += num_(v[i][7]);
+  }
+  return money_(t);
+}
+
 /** ยอดรวมใบเรียกเก็บ — แยกตาม Supplier เพราะ 1 ใบเคลมมีได้หลายเจ้า */
 function claimTotals(docNo, auth){
   requireLogin_(auth);
@@ -390,7 +443,7 @@ function reportCost(auth){
 
   /* อ่านรายการและค่าแรงทีละปี แล้วรวมยอดในหน่วยความจำ (เร็วกว่าไล่ทีละใบ)
      ⚠️ ต้องรวมทุกปี — ใบปีก่อนที่เพิ่งปิดจบ ก็ต้องอยู่ในสรุปต้นทุนด้วย */
-  var sumItem = {}, sumLab = {};
+  var sumItem = {}, sumLab = {}, sumExp = {};
   eachYear_(function(d){
     var lrI = d.items.getLastRow();
     if (lrI > 1){
@@ -408,18 +461,28 @@ function reportCost(auth){
         sumLab[dl] = (sumLab[dl] || 0) + num_(vl[k][6]);
       }
     }
+    /* ค่าใช้จ่ายอื่น ๆ เป็นต้นทุนจริงของงานเคลม ต้องอยู่ในสรุปต้นทุนด้วย */
+    var lrE = d.exp.getLastRow();
+    if (lrE > 1){
+      var ve = d.exp.getRange(2,1,lrE-1,HDR_EXP.length).getDisplayValues();
+      for (var e = 0; e < ve.length; e++){
+        var de = norm_(ve[e][0]); if (!de) continue;
+        sumExp[de] = (sumExp[de] || 0) + num_(ve[e][7]);
+      }
+    }
   });
 
   var out = [], grand = 0;
   eachClaim_(function(o){
     var dn2 = o['เลขที่เอกสาร'];
-    var it = money_(sumItem[dn2] || 0), lb = money_(sumLab[dn2] || 0), tot = money_(it + lb);
+    var it = money_(sumItem[dn2] || 0), lb = money_(sumLab[dn2] || 0),
+        ex = money_(sumExp[dn2] || 0), tot = money_(it + lb + ex);
     if (!tot) return;                                     // ยังไม่มีเงิน = ยังไม่ออกใบเรียกเก็บ
     grand += tot;
     var rate = num_(o['อัตราแลกเปลี่ยน']);
     out.push({ docNo:dn2, date:o['วันที่'], jobNo:o['เลขที่ JOB'], jobName:o['ชื่อลูกค้า'],
       jmc:o['JMC ที่ผูก'], currency:o['สกุลเงิน'], rate:o['อัตราแลกเปลี่ยน'],
-      items:it, labour:lb, thb:tot, foreign: rate > 0 ? money_(tot / rate) : '',
+      items:it, labour:lb, expense:ex, thb:tot, foreign: rate > 0 ? money_(tot / rate) : '',
       status:o['สถานะ'] });
   });
   out.sort(function(x,y){ return x.docNo < y.docNo ? 1 : -1; });   // ใหม่อยู่บน
@@ -455,9 +518,13 @@ function billOfClaim_(d, docNo, head){
       var sp = norm_(vl[k][5]); if (sp) supLab[sp] = (supLab[sp] || 0) + num_(vl[k][6]);
     }
   }
+  /* ค่าใช้จ่ายอื่น ๆ คิดตามกติกาเดียวกับค่าแรง — เป็นเงินที่ STT ออกไปก่อน
+     เบียร์: "ถึงมีอุปกรณ์ ถ้าไปนอกสถานที่ มันก็มีอยู่แล้ว ค่าใช้จ่ายอื่น ๆ" */
+  var exp = expenseTotal_(d, docNo, null);
   var chargeGoods = (R.goods === 'เรียกเก็บ');
-  var total = (chargeGoods ? goods : 0) + (R.labor === 'เรียกเก็บ' ? lab : 0);
-  return { goods:money_(goods), labour:money_(lab), chargeGoods:chargeGoods,
+  var chargeLab = (R.labor === 'เรียกเก็บ');
+  var total = (chargeGoods ? goods : 0) + (chargeLab ? lab : 0) + (chargeLab ? exp : 0);
+  return { goods:money_(goods), labour:money_(lab), expense:money_(exp), chargeGoods:chargeGoods,
            total:money_(total), bill:!!R.bill, resultText:R.t || '', supLab:supLab };
 }
 
@@ -554,19 +621,20 @@ function reportHR(auth){
 /** 3.7 · ข้อมูลส่งบัญชี — ใบที่จบขั้นตอนแล้ว บัญชีรับอย่างเดียว ไม่ต้องกดอะไร */
 function reportAccounting(auth){
   requireAny_(auth, ['APPROVER','PURCHASE']);
-  var out = [], sg = 0, sl = 0, sb = 0;
+  var out = [], sg = 0, sl = 0, se = 0, sb = 0;
   /* ต้องกวาดทุกปี — บัญชีปิดงบข้ามปี ต้องเห็นใบที่จบไปแล้วของปีก่อนด้วย */
   eachClaim_(function(o, stage, d){
     if (['CLOSE_WAIT','CLOSED'].indexOf(stage) < 0) return;
     var B = billOfClaim_(d, o['เลขที่เอกสาร'], o);
-    sg = money_(sg + num_(B.goods)); sl = money_(sl + num_(B.labour)); sb = money_(sb + num_(B.total));
+    sg = money_(sg + num_(B.goods)); sl = money_(sl + num_(B.labour));
+    se = money_(se + num_(B.expense)); sb = money_(sb + num_(B.total));
     out.push({ docNo:o['เลขที่เอกสาร'], jobNo:o['เลขที่ JOB'], jmc:o['JMC ที่ผูก'],
       supplier:mainSupplier_(d, o['เลขที่เอกสาร']),
-      goods:B.goods, labour:B.labour, bill:B.total,
+      goods:B.goods, labour:B.labour, expense:B.expense, bill:B.total,
       blame:o['ความรับผิดชอบ'] || '', cdn:o['เลขที่ใบเรียกเก็บรวม'] || '',
       status:o['สถานะ'] });
   });
-  return { rows:out, sum:{ goods:sg, labour:sl, bill:sb } };
+  return { rows:out, sum:{ goods:sg, labour:sl, expense:se, bill:sb } };
 }
 
 /** 3.9 · ทะเบียนเอกสารที่ส่ง Supplier
@@ -769,6 +837,7 @@ function getClaimFull(docNo, auth){
   var c = getClaim(docNo, auth);
   if (!c) return null;
   c.labour  = listLabour(docNo, auth);
+  c.expense = listExpense(docNo, auth);      // ค่าใช้จ่ายอื่น ๆ (แยกตารางจากค่าแรง)
   c.returns = listReturns(docNo, auth);
   c.vendors = listVendors();
   c.flow    = claimFlow(docNo, auth);
@@ -939,7 +1008,11 @@ function createClaimWithPhotos(h, draftId, seqMap, auth, submit){
 /* v1.1.0 — สายงานเป็น 10 ขั้น แท็บต้องครอบให้ครบทุกขั้น
    ⚠️ ของเดิมแท็บ close ชี้ไปขั้น 'RETURN' ที่ยกเลิกไปแล้ว
       ใบที่อยู่ขั้นสโตร์รับเข้า / QC ตรวจรับ / เบิกออก จะไม่โผล่ในแท็บไหนเลย = ใบหายจากหน้าแรก */
+/* ⚠️ 'reject' ไม่ใช่ "ขั้น" — เป็นตัวกรองพิเศษ: ใบที่ยังมีเหตุผลตีกลับค้างอยู่
+   เบียร์ 7 ก.ย.: "ตีกลับ มันควรจะต้องไปเด้งใน Tab ของเอกสารตีกลับ"
+   ของเดิมใบที่ถูกตีกลับไปปนอยู่ในกล่อง "เอกสารร่างของฉัน" แบบไม่มีอะไรบอกว่าโดนตีกลับ */
 var TAB_STAGES = {
+  reject : ['REQUEST','STORE'],          // + ต้องมีเหตุผลตีกลับค้าง (กรองเพิ่มใน workQueues)
   open   : ['REQUEST'],
   approve: ['APPROVAL'],
   store  : ['STORE'],
@@ -951,6 +1024,7 @@ var TAB_STAGES = {
   close  : ['CLOSE_WAIT','CLOSED']
 };
 var TAB_ROLES = {
+  reject : ['PRODUCTION','SALES','QC','DESIGN','STORE','PURCHASE','APPROVER'],
   open   : ['PRODUCTION','SALES','QC','DESIGN'],
   approve: ['APPROVER'],
   store  : ['STORE','PURCHASE'],
@@ -963,6 +1037,37 @@ var TAB_ROLES = {
 };
 
 /** ใบที่ค้างอยู่ในแต่ละแท็บ — คำสั่งเดียวได้ครบทั้ง 5 แท็บ ไม่ต้องยิงทีละแท็บ */
+/** ตัวเช็คเบา ๆ ว่ามีอะไรใหม่ไหม — หน้าเว็บถามทุก 30 วินาที
+ *  เบียร์ 7 ก.ย.: "พนักงานกดเซฟมา ของเบียร์หรือคนอื่น ๆ ก็จะเห็นเลยว่ามีเอกสารใหม่มาแล้ว"
+ *  ⚠️ ห้ามหนักเด็ดขาด ตัวนี้ถูกเรียกทุก 30 วิ ต่อคนที่เปิดจออยู่
+ *     จึงอ่านแค่คอลัมน์เลขที่เอกสารกับขั้นตอน ไม่แตะรูป ไม่แตะรายการ ไม่นับเงิน */
+function pulse(auth){
+  var me = requireLogin_(auth);
+  var n = 0, last = '', sig = [];
+  eachYear_(function(d){
+    var lr = d.claims.getLastRow(); if (lr < 2) return;
+    var c1 = d.claims.getRange(2, 1, lr - 1, 1).getDisplayValues();
+    var cs = colOf_('ขั้นตอน');
+    var st = cs > 0 ? d.claims.getRange(2, cs, lr - 1, 1).getDisplayValues() : [];
+    for (var i = 0; i < c1.length; i++){
+      var dn = norm_(c1[i][0]); if (!dn) continue;
+      n++;
+      if (dn > last) last = dn;
+      sig.push(dn + ':' + norm_((st[i] || [''])[0]));
+    }
+  });
+  var ins = 0;
+  eachInspYear_(function(di){
+    var lr = di.head.getLastRow(); if (lr < 2) return;
+    var v = di.head.getRange(2, 1, lr - 1, 1).getDisplayValues();
+    for (var k = 0; k < v.length; k++) if (norm_(v[k][0])) ins++;
+  });
+  /* ลายเซ็นย่อของสถานะทั้งระบบ — เปลี่ยนเมื่อไหร่ = มีอะไรขยับ */
+  var h = 0, str = sig.sort().join('|');
+  for (var x = 0; x < str.length; x++){ h = ((h << 5) - h + str.charCodeAt(x)) | 0; }
+  return { nClaim:n, nInsp:ins, last:last, sig:String(h), at:nowStamp_() };
+}
+
 function workQueues(auth){
   var me = requireLogin_(auth);
   var rows = listClaims({}, auth);            // listClaims ซ่อนใบร่างของคนอื่นให้แล้ว
@@ -974,6 +1079,10 @@ function workQueues(auth){
     var list = [];
     for (var i = 0; i < rows.length; i++){
       if (TAB_STAGES[t].indexOf(rows[i].stage) < 0) continue;
+      /* กล่อง "เอกสารตีกลับ" = เฉพาะใบที่ยังมีเหตุผลตีกลับค้างอยู่
+         กล่องอื่น ๆ ไม่เอาใบที่ถูกตีกลับมาปน จะได้ไม่นับซ้ำสองที่ */
+      if (t === 'reject' && !rows[i].rejected) continue;
+      if (t !== 'reject' && rows[i].rejected) continue;
       list.push(rows[i]);
     }
     var can = isAdmin;

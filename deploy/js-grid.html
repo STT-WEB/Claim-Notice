@@ -112,11 +112,15 @@ function bindGrid(id){
   for (var i = 0; i < els.length; i++){
     els[i].addEventListener('keydown', function(e){ gridKey(id, e, this); });
     els[i].addEventListener('paste',   function(e){ gridPaste(id, e, this); });
+    /* จำค่าก่อนแก้ไว้ ใช้ตัดสินว่า "ต้นทางเปลี่ยนไหม" ตอนแปลอัตโนมัติ */
+    els[i].addEventListener('focus', function(){ this.setAttribute('data-was', this.value); });
     els[i].addEventListener('change',  function(){
       var r = +this.getAttribute('data-r'), c = +this.getAttribute('data-c');
+      var was = this.getAttribute('data-was');
       g.rows[r][g.cols[c].k] = this.value;
       if (g.opt.onChange) g.opt.onChange(r, g.cols[c].k, this.value, g);
-      if (g.opt.trFrom && g.cols[c].k === g.opt.trFrom) gridTranslate(id, r);
+      /* แปลอัตโนมัติ 2 ทาง — พิมพ์ไทยได้อังกฤษ · พิมพ์อังกฤษได้ไทย */
+      gridAutoTr(id, r, g.cols[c].k, was);
       gridGrowIfNeeded(id, r);
     });
   }
@@ -229,9 +233,17 @@ function gridPhotoStrip(g, rid, soft){
   var list = PHOTOS[rid] || [];
   var h = '<div class="phwrap sm">';
   for (var k = 0; k < list.length; k++){
-    h += '<div class="phcell xs"><img src="' + list[k].thumb + '" ' +
+    var inDoc = list[k].doc !== false;
+    /* เบียร์ 7 ก.ย. ข้อ 7 — เอาเมาส์ชี้แล้วรูปขยายเอง (ไม่ต้องทำรูปใหญ่ถาวรให้เปลืองที่)
+       ข้อ 8 — ติ๊กเลือกได้ว่ารูปไหนขึ้นบนเอกสารที่ปริ้น */
+    h += '<div class="phcell xs' + (inDoc ? '' : ' nodoc') + '" data-big="' + esc(list[k].thumb) + '">' +
+         '<img src="' + list[k].thumb + '" ' +
          'onclick="zoomPhoto(\'' + list[k].view + '\',\'' + list[k].thumb + '\')" ' +
          'onerror="this.parentNode.classList.add(\'bad\')">' +
+         '<button class="phdoc' + (inDoc ? ' on' : '') + '" ' +
+           'title="' + (inDoc ? 'รูปนี้จะขึ้นบนเอกสารที่ปริ้น — กดเพื่อไม่ให้ขึ้น' : 'รูปนี้ไม่ขึ้นบนเอกสาร — กดเพื่อให้ขึ้น') + '" ' +
+           'onclick="togglePhotoDoc(\'' + g.id + '\',\'' + rid + '\',\'' + list[k].id + '\',' + (inDoc ? 'false' : 'true') + ')">' +
+           (inDoc ? '🖨' : '🚫') + '</button>' +
          '<button class="phdel" title="เอาออก" onclick="gridDelPhoto(\'' + g.id + '\',\'' + rid + '\',\'' + list[k].id + '\')">&#10005;</button></div>';
   }
   if (list.length < max){
@@ -270,6 +282,16 @@ function gridPickPhotos(gid, rid, cam){
   };
   inp.click();
 }
+/** ติ๊ก/ไม่ติ๊ก ว่ารูปนี้ขึ้นบนเอกสารที่ปริ้นไหม — รูปไม่ได้ถูกลบ แค่ไม่ออกกระดาษ */
+function togglePhotoDoc(gid, rid, fileId, on){
+  srv('setPhotoInDoc', [CURDOC, fileId, on ? 1 : 0, AUTH], function(){
+    var list = PHOTOS[rid] || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === fileId) list[i].doc = !!on;
+    gridDrawPhotos(gid);
+    if (typeof drawAllPhotos === 'function') drawAllPhotos();
+  }, function(m){ alert(m); });
+}
+
 function gridDelPhoto(gid, rid, fileId){
   if (!confirm('เอารูปนี้ออก?\n(ไฟล์ยังอยู่ใน Drive ไม่ได้ลบทิ้ง)')) return;
   srv('removePhoto', [CURDOC, fileId, AUTH], function(){
@@ -306,33 +328,61 @@ function gridFilledRows(id){
 
 /* ─── แปลไทย → EN ───
    เติมให้เฉพาะช่องที่ยังว่าง — ถ้าเบียร์พิมพ์อังกฤษเองไว้แล้ว ระบบไม่ทับของเดิม */
-function gridTranslate(id, onlyRow){
+/* ═══ แปลอัตโนมัติ 2 ทาง (v1.2.5) ═══════════════════════════════
+ * เบียร์ 7 ก.ย.: "มันไม่แปลภาษาให้อัตโนมัติ หรือลบข้อมูลใส่ใหม่ มันก็ไม่แปลให้
+ *                 และไม่มีตัวแปลที่แปลภาษาไทยด้วย"
+ * แก้ 3 อย่าง:
+ *   ① พิมพ์ไทยเสร็จแล้วออกจากช่อง → เติมอังกฤษให้เอง (ไม่ต้องรอกดปุ่ม)
+ *   ② พิมพ์อังกฤษเสร็จแล้วออกจากช่อง → เติม **ไทย** ให้เอง (ของเดิมแปลทางเดียว)
+ *   ③ ลบข้อความเก่าแล้วพิมพ์ใหม่ → แปลใหม่ให้ (ของเดิมข้ามช่องที่ "มีค่าอยู่แล้ว"
+ *      พอลบฝั่งหนึ่งแล้วพิมพ์ใหม่ อีกฝั่งยังเป็นคำแปลเก่า = เอกสารผิดแบบเงียบ ๆ) */
+function gridTranslate(id, onlyRow, dir){
   var g = GRIDS[id];
   if (!g.opt.trFrom || !g.opt.trTo) return;
   syncGrid(id);
+  /* dir = 'back' คือแปลจากช่องอังกฤษกลับมาเป็นไทย */
+  var from = (dir === 'back') ? g.opt.trTo   : g.opt.trFrom;
+  var to   = (dir === 'back') ? g.opt.trFrom : g.opt.trTo;
+  var fLang = (dir === 'back') ? 'en' : 'th';
+  var tLang = (dir === 'back') ? 'th' : 'en';
+
   var idx = [], texts = [];
   for (var r = 0; r < g.rows.length; r++){
     if (onlyRow != null && r !== onlyRow) continue;
-    var src = String(g.rows[r][g.opt.trFrom] || '').trim();
-    var dst = String(g.rows[r][g.opt.trTo]   || '').trim();
+    var src = String(g.rows[r][from] || '').trim();
+    var dst = String(g.rows[r][to]   || '').trim();
     if (src && !dst){ idx.push(r); texts.push(src); }
   }
   if (!texts.length){
-    if (onlyRow == null) setTrMsg('ไม่มีช่องที่ต้องแปล — ช่องที่พิมพ์อังกฤษไว้แล้วระบบไม่ทับให้', '');
+    if (onlyRow == null) setTrMsg('ไม่มีช่องที่ต้องแปล — ช่องที่มีคำแปลอยู่แล้วระบบไม่ทับให้', '');
     return;
   }
   if (onlyRow == null) setTrMsg('กำลังแปล ' + texts.length + ' ช่อง…', 'wait');
-  srv('translateBatch', [texts, 'th', 'en', AUTH], function(res){
+  srv('translateBatch', [texts, fLang, tLang, AUTH], function(res){
     var n = 0, filled = [];
     for (var i = 0; i < idx.length; i++){
-      if (res && res[i]){ g.rows[idx[i]][g.opt.trTo] = res[i]; filled.push(idx[i]); n++; }
+      if (res && res[i]){ g.rows[idx[i]][to] = res[i]; filled.push(idx[i]); n++; }
     }
-    if (n){ drawGrid(id); if (g.opt.onFill) g.opt.onFill(filled, g); }
+    if (n){ drawGrid(id); if (g.opt.onFill) g.opt.onFill(filled, g, to); }
     if (onlyRow == null){
       setTrMsg(n ? ('แปลให้แล้ว ' + n + ' ช่อง — อ่านทวนก่อนส่ง Supplier นะครับ ศัพท์ช่างบางคำแปลไม่เนียน')
                  : 'แปลไม่สำเร็จ ลองใหม่อีกครั้ง', n ? 'good' : 'bad');
     }
   }, function(m){ if (onlyRow == null) setTrMsg(m, 'bad'); });
+}
+
+/** พิมพ์เสร็จออกจากช่องเมื่อไหร่ ให้แปลแถวนั้นทันที — ทั้งไทย→EN และ EN→ไทย
+ *  ⚠️ ลบคำแปลฝั่งตรงข้ามทิ้งก่อน ถ้าต้นทางถูกแก้ ไม่งั้นคำแปลเก่าจะค้าง */
+function gridAutoTr(id, r, key, oldSrc){
+  var g = GRIDS[id];
+  if (!g.opt.trFrom || !g.opt.trTo) return;
+  var back = (key === g.opt.trTo);
+  if (key !== g.opt.trFrom && !back) return;
+  var pair = back ? g.opt.trFrom : g.opt.trTo;
+  var now = String(g.rows[r][key] || '').trim();
+  if (!now) return;
+  if (String(oldSrc || '').trim() !== now) g.rows[r][pair] = '';   // ต้นทางเปลี่ยน = คำแปลเก่าใช้ไม่ได้
+  gridTranslate(id, r, back ? 'back' : '');
 }
 function setTrMsg(msg, cls){
   var el = $('trmsg'); if (!el) return;

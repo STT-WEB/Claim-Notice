@@ -111,7 +111,7 @@ function stageDef_(key){
  * '*' = ใครก็ได้ที่ล็อกอิน                                                       */
 var FIELD_STAGE = {
   claimType:'REQUEST', area:'REQUEST', foreignKind:'REQUEST',
-  jobNo:'REQUEST', jobName:'REQUEST', model:'REQUEST',
+  jobNo:'REQUEST', jobName:'REQUEST', model:'REQUEST', eNo:'REQUEST', workKind:'ALWAYS:REQUEST',
   chassisStt:'REQUEST', chassisMaker:'REQUEST', serialNo:'REQUEST',
   dept:'REQUEST', wantDate:'REQUEST',
   jmc:'ALWAYS:REQUEST',
@@ -201,6 +201,14 @@ var HDR_FLOW = ['ขั้นตอน','รอใครทำ','เหตุผ
   'เลขที่รับของเข้าคลัง','วันที่รับของเข้าคลัง','ที่เก็บในคลัง','ขนส่ง/เลขพัสดุ',
   'เลขที่ใบตรวจรับของกลับ','วันที่ตรวจรับของกลับ','ผู้ตรวจรับของกลับ',
   'เลขที่ใบเบิกออก','วันที่เบิกออก','ผู้รับของหน้างาน','แผนกที่เบิกไปใช้',
+  /* ⚠️ คอลัมน์ที่เพิ่มทีหลัง "ต่อท้ายเท่านั้น" ห้ามแทรกกลางตารางเด็ดขาด
+     ensureCols_ เขียนทับหัวตารางให้ตรงกับโค้ด แต่ไม่ย้ายข้อมูลตาม
+     แทรกกลาง = ข้อมูลเดิมทั้งชีตเลื่อนคอลัมน์ ชื่อหัวไม่ตรงกับของข้างล่าง = พังทั้งระบบ
+     ตำแหน่งบน "หน้าจอ" จัดยังไงก็ได้ ไม่ต้องตรงกับลำดับคอลัมน์ในชีต */
+  'E. No.',
+  /* เบียร์ 7 ก.ย.: "งานเคลมที่เป็นงานฝีมือ ที่แบบไปซ่อม แต่มีแต่ค่าแรง แต่ไม่มีอุปกรณ์"
+     PART = มีอะไหล่ (ค่าเริ่มต้น) · LABOUR = งานซ่อม/ฝีมือ ไม่มีอะไหล่ · BOTH = มีทั้งสองอย่าง */
+  'ลักษณะงานเคลม',
   /* ปิดจบ ต้นทุนไปทางไหน + ใบเรียกเก็บรวม */
   'ความรับผิดชอบ','ชื่อผู้ทำเสียหาย','แผนกผู้ทำเสียหาย','รอบเคลม',
   'เลขที่ใบเรียกเก็บรวม','วันที่ใบเรียกเก็บรวม'];
@@ -217,6 +225,24 @@ var SIGN_R2 = ['ลายเซ็น จัดซื้อ ผลเคลม',
                'ลายเซ็น สโตร์เบิกออก','ลายเซ็น ผู้ปิดงาน'];
 
 /** ครบลายเซ็นรอบ 1 ทั้ง 4 ช่องหรือยัง — ปุ่มพิมพ์ใบส่ง Supplier ใช้ตัวนี้ตัดสิน */
+/** ใบเดินมาถึงจัดซื้อแล้วหรือยัง — ขั้น 4 เป็นต้นไป (จัดซื้อรับเอกสาร) */
+var PRINT_OK_STAGES = ['PURCHASE','SUPPLIER','STORE_IN','QC_RECV','STORE_OUT','CLOSE_WAIT','CLOSED'];
+
+/** ใครกดปริ้นฉบับส่ง Supplier ได้บ้าง — จัดซื้อ (และผู้บริหาร) หลังใบถึงขั้นจัดซื้อแล้ว */
+function canPrintOut_(stageKey, me){
+  var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
+  var isBuyer = mine.indexOf('PURCHASE') >= 0 || mine.indexOf('ADMIN') >= 0;
+  return isBuyer && PRINT_OK_STAGES.indexOf(norm_(stageKey)) >= 0;
+}
+function printBlockWhy_(stageKey, me){
+  var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
+  if (mine.indexOf('PURCHASE') < 0 && mine.indexOf('ADMIN') < 0)
+    return 'เอกสารที่ส่งออกนอกบริษัท ให้จัดซื้อเป็นคนพิมพ์ — คุณดูตัวอย่างได้ทุกหน้า';
+  var st = stageDef_(stageKey);
+  return 'ใบนี้ยังอยู่ขั้นที่ ' + st.no + ' (' + st.name + ') ยังไม่ถึงจัดซื้อ — ' +
+         'พิมพ์ส่ง Supplier ได้เมื่อใบเดินมาถึงขั้นจัดซื้อแล้ว';
+}
+
 function round1Done_(sh, row){
   for (var i = 0; i < SIGN_R1.length; i++){
     if (!norm_(sh.getRange(row, colOf_(SIGN_R1[i])).getDisplayValue())) return false;
@@ -378,6 +404,10 @@ function claimFlow(docNo, auth){
     canReject: (['APPROVAL','STORE','PURCHASE','SUPPLIER'].indexOf(key) >= 0) && isOwner,
     canRejectReturn: (key === 'QC_RECV') && isOwner,
     round1Done: round1Done_(d.claims, r),
+    /* เบียร์ 7 ก.ย.: "PDF จะปริ้นได้ตอนที่จัดซื้อจะส่งให้ Sup เท่านั้น แต่แผนกอื่น ๆ Preview เฉย ๆ ได้"
+       canPrint = สิทธิ์กดปริ้นจริง · ทุกคนดูตัวอย่างได้เสมอ ไม่ต้องเช็คอะไร */
+    canPrint: canPrintOut_(key, me),
+    printWhy: canPrintOut_(key, me) ? '' : printBlockWhy_(key, me),
     results: resultList(),
     docNos: { gr:norm_(d.claims.getRange(r, colOf_('เลขที่รับของเข้าคลัง')).getDisplayValue()),
               grDate:norm_(d.claims.getRange(r, colOf_('วันที่รับของเข้าคลัง')).getDisplayValue()),
@@ -560,6 +590,14 @@ function advanceClaim(docNo, auth){
 
   var goTo = nextStage_(d.claims, r, key);   // ขั้น SUPPLIER แยกทางตามคำตอบ Supplier
   signStage_(d.claims, r, key, me);          // เซ็นชื่อขั้นที่เพิ่งทำเสร็จ
+  /* ส่งต่อสำเร็จ = แก้ตามที่ถูกตีกลับเรียบร้อยแล้ว → ล้างธงตีกลับ
+     ⚠️ ถ้าไม่ล้าง ใบจะค้างอยู่ในกล่อง "เอกสารตีกลับ" ตลอดกาล ทั้งที่แก้ไปแล้ว */
+  var cRj = colOf_('เหตุผลที่ตีกลับ');
+  if (cRj > 0 && norm_(d.claims.getRange(r, cRj).getDisplayValue())){
+    d.claims.getRange(r, cRj).setValue('');
+    d.claims.getRange(r, colOf_('ตีกลับโดย')).setValue('');
+    d.claims.getRange(r, colOf_('ตีกลับเมื่อ')).setValue('');
+  }
   setStage_(d.claims, r, goTo, me, emit ? ('ออกเลขที่ ' + emit) : '');
   d.claims.getRange(r, colOf_('เหตุผลที่ตีกลับ')).setValue('');    // ส่งต่อได้ = เคลียร์เหตุผลเดิม
 
@@ -631,19 +669,41 @@ function claimMissing_(d, docNo, stageKey){
   }
   var miss = [];
 
+  /* งานซ่อม/ฝีมือ ไม่มีอะไหล่ → ไม่บังคับตารางของ แต่ต้องมีค่าแรงหรือค่าใช้จ่ายอย่างน้อย 1 บรรทัด
+     ไม่งั้นจะเปิดใบเปล่า ๆ ที่ไม่มีอะไรให้เรียกเก็บเลย */
+  var cw = colOf_('ลักษณะงานเคลม');
+  var kind = (cw > 0 && r > 0) ? norm_(d.claims.getRange(r, cw).getDisplayValue()) : '';
+  var labourOnly = (kind === 'LABOUR');
+
   if (stageKey === 'REQUEST'){
     if (!norm_(h['เลขที่ JOB']))  miss.push('ยังไม่ใส่เลขที่ JOB');
-    if (!items.length)            miss.push('ยังไม่มีรายการที่เคลม');
-    var noPhoto = [];
-    var ph = photosOf_(docNo);   // ห้ามเรียก listPhotos ที่นี่ มันบังคับล็อกอิน
-    for (var k = 0; k < items.length; k++){
-      var sq = norm_(items[k][1]);
-      if (!ph[sq] || !ph[sq].length) noPhoto.push(sq);
+    if (labourOnly){
+      var nLab = 0, lrL = d.labour.getLastRow();
+      if (lrL > 1){
+        var vl2 = d.labour.getRange(2,1,lrL-1,HDR_LAB.length).getDisplayValues();
+        for (var q = 0; q < vl2.length; q++) if (norm_(vl2[q][0]) === docNo) nLab++;
+      }
+      var nExp = 0, lrE = d.exp.getLastRow();
+      if (lrE > 1){
+        var ve2 = d.exp.getRange(2,1,lrE-1,HDR_EXP.length).getDisplayValues();
+        for (var w = 0; w < ve2.length; w++) if (norm_(ve2[w][0]) === docNo) nExp++;
+      }
+      if (!nLab && !nExp) miss.push('งานซ่อม/ฝีมือ ต้องมีค่าแรงหรือค่าใช้จ่ายอื่นอย่างน้อย 1 บรรทัด');
+    } else {
+      if (!items.length)          miss.push('ยังไม่มีรายการที่เคลม');
+      var noPhoto = [];
+      var ph = photosOf_(docNo);   // ห้ามเรียก listPhotos ที่นี่ มันบังคับล็อกอิน
+      for (var k = 0; k < items.length; k++){
+        var sq = norm_(items[k][1]);
+        if (!ph[sq] || !ph[sq].length) noPhoto.push(sq);
+      }
+      if (noPhoto.length) miss.push('รายการที่ ' + noPhoto.join(', ') + ' ยังไม่มีรูป');
     }
-    if (noPhoto.length) miss.push('รายการที่ ' + noPhoto.join(', ') + ' ยังไม่มีรูป');
   }
 
-  if (stageKey === 'STORE'){
+  if (stageKey === 'STORE' && labourOnly){
+    if (!norm_(h['เลขใบส่งมอบ'])) miss.push('ยังไม่ใส่เลขใบส่งมอบ');
+  } else if (stageKey === 'STORE'){
     if (!norm_(h['เลขใบส่งมอบ'])) miss.push('ยังไม่ใส่เลขใบส่งมอบ');
     var noPo = [], noSup = [];
     for (var m = 0; m < items.length; m++){

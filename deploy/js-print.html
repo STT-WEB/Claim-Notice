@@ -45,7 +45,9 @@ function drawPrint(){
 
   var t = '<div class="card noprint"><div class="cardhd"><h3>ปริ้นเอกสาร ' + esc(h['เลขที่เอกสาร']) + '</h3>' +
     '<button class="btn" onclick="go(\'claim\',CURDOC)">← กลับใบเคลม</button>' +
-    '<button class="btn dark" onclick="doPrint()">🖨️ ปริ้น / บันทึกเป็น PDF</button></div>';
+    (FLOW && FLOW.canPrint === false
+      ? '<button class="btn ghost" onclick="doPrint()" title="' + esc(FLOW.printWhy || '') + '">👁 ดูตัวอย่างเท่านั้น</button>'
+      : '<button class="btn dark" onclick="doPrint()">🖨️ ปริ้น / บันทึกเป็น PDF</button>') + '</div>';
 
   t += '<div class="prbar">';
   t += '<div class="prgrp"><span>ฉบับ</span>' +
@@ -77,11 +79,10 @@ function drawPrint(){
   } else {
     t += '<div class="prnote ext">📤 <b>ฉบับส่ง Supplier</b> — ตัดชื่อลูกค้า ผู้ขอเคลม แผนก และ JMC ออกแล้ว ' +
          'เหลือแต่เลขจ๊อบไว้อ้างอิง' + (PR.kind === 'debit' ? ' · โชว์เฉพาะราคาเรียกเก็บ ไม่โชว์ต้นทุนกับเรท' : ' · ไม่มีราคาใด ๆ') + '</div>';
-    /* สเปคข้อ 7 — ครบลายเซ็นรอบ 1 ทั้ง 4 ช่อง ปุ่มพิมพ์ฉบับส่ง Supplier ถึงจะเปิด */
-    if (FLOW && FLOW.round1Done === false){
-      t += '<div class="prnote ext" style="border-color:#c0392b;color:#8e2b21">🔒 <b>ยังพิมพ์ส่ง Supplier ไม่ได้</b> — ' +
-           'ต้องครบลายเซ็นรอบที่ 1 ทั้ง 4 ช่องก่อน (ผู้เปิดใบ · ผู้อนุมัติ · สโตร์ · จัดซื้อ) ' +
-           'ตอนนี้ยังไม่ครบ · ดูตัวอย่างได้ แต่ปุ่มปริ้นยังล็อกอยู่</div>';
+    /* เบียร์ 7 ก.ย.: ทุกแผนกดูตัวอย่างได้ · ปุ่มปริ้นจริงเป็นของจัดซื้อ หลังใบถึงขั้นจัดซื้อแล้ว */
+    if (FLOW && FLOW.canPrint === false){
+      t += '<div class="prnote ext" style="border-color:#c0392b;color:#8e2b21">👁 <b>โหมดดูตัวอย่าง</b> — ' +
+           esc(FLOW.printWhy || '') + '</div>';
     }
   }
   t += '</div>';
@@ -94,9 +95,9 @@ function drawPrint(){
  *  เบียร์: "ปริ้นเอกสารแล้ว จะไม่สามารถเพิ่มรายการสินค้าได้ ต้องเปิดใบใหม่เท่านั้น" */
 function doPrint(){
   if (PR.kind === 'int' || PR.kind === 'rcv'){ window.print(); return; }   // ภายใน + ใบตรวจรับ ปริ้นได้ไม่จำกัด
-  if (FLOW && FLOW.round1Done === false){
-    alert('ยังพิมพ์ฉบับส่ง Supplier ไม่ได้\n\n' +
-          'ต้องครบลายเซ็นรอบที่ 1 ทั้ง 4 ช่องก่อน — ผู้เปิดใบ · ผู้อนุมัติ · สโตร์ · จัดซื้อ');
+  if (FLOW && FLOW.canPrint === false){
+    alert('พิมพ์ฉบับส่ง Supplier ไม่ได้\n\n' + (FLOW.printWhy || '') +
+          '\n\nดูตัวอย่างบนจอได้ตามปกติครับ');
     return;
   }
   var already = FLOW && FLOW.printedAt;
@@ -268,6 +269,15 @@ function blkItems(items, h){
 /** รายละเอียด + รูป ของแต่ละข้อ — 1 ข้อ = 1 ก้อน ไม่ถูกแบ่งครึ่งข้ามหน้า
  *  เบียร์: "รูปให้อยู่หน้าข้อนั้น ๆ เลย"
  *  ข้อไหนรูปเยอะเกิน 3 รูป ก้อนถัดไปขึ้นหัวว่า (ต่อ) จะได้รู้ว่ายังเป็นข้อเดิม */
+/** รูปที่ "ติ๊กให้ขึ้นเอกสาร" เท่านั้น — รูปที่ไม่ติ๊กยังอยู่ในระบบ แค่ไม่ออกกระดาษ
+ *  เบียร์ 7 ก.ย.: "เราสามารถเลือกรูปที่จะให้ไปโชว์ใน PDF ได้ด้วย" */
+function docPhotos_(key){
+  var all = PHOTOS[key] || [];
+  var out = [];
+  for (var i = 0; i < all.length; i++) if (all[i].doc !== false) out.push(all[i]);
+  return out;
+}
+
 function blkItemDetails(items, h){
   var out = [];
   var docNo = h['เลขที่เอกสาร'] || '', jobNo = h['เลขที่ JOB'] || '';
@@ -275,7 +285,7 @@ function blkItemDetails(items, h){
 
   for (var i = 0; i < items.length; i++){
     var it = items[i], seq = String(it.seq);
-    var ph = PHOTOS[seq] || [];
+    var ph = docPhotos_(seq);
     var per = 3;
     var chunks = Math.max(1, Math.ceil(ph.length / per));
 
@@ -319,7 +329,13 @@ function blkTotals(items, h, sup){
     var ls = norm2(L[k].supplier) || '(ไม่ระบุ Supplier)';
     if (sup == null || ls === sup) lab += num2(L[k].amount);
   }
-  var grand = Math.round((thb + lab) * 100) / 100;
+  /* ค่าใช้จ่ายอื่น ๆ — ตารางแยกของตัวเอง (เบียร์ 7 ก.ย.) */
+  var exp = 0, X = CLAIM.expense || [];
+  for (var e = 0; e < X.length; e++){
+    var xs = norm2(X[e].supplier) || '(ไม่ระบุ Supplier)';
+    if (sup == null || !norm2(X[e].supplier) || xs === sup) exp += num2(X[e].amount);
+  }
+  var grand = Math.round((thb + lab + exp) * 100) / 100;
   var rate = num2(h['อัตราแลกเปลี่ยน']);
 
   var t = '<div class="blk">';
@@ -335,9 +351,25 @@ function blkTotals(items, h, sup){
     }
     t += '</tbody></table>';
   }
+  if (exp){
+    t += '<div class="sec" style="margin-top:6px"><div class="sech">ค่าใช้จ่ายอื่น ๆ<span>OTHER EXPENSES</span></div></div>' +
+         '<table class="g"><tbody>';
+    for (var n2 = 0; n2 < X.length; n2++){
+      var ns = norm2(X[n2].supplier) || '(ไม่ระบุ Supplier)';
+      if (sup != null && norm2(X[n2].supplier) && ns !== sup) continue;
+      t += '<tr><td style="width:26px" class="c">' + esc(X[n2].seq) + '</td>' +
+           '<td style="width:130px">' + esc(X[n2].kind || '') + '</td>' +
+           '<td>' + esc(X[n2].th) +
+           (X[n2].en ? '<span class="den">' + esc(X[n2].en) + '</span>' : '') +
+           (X[n2].covers ? '<div class="phcap">ครอบคลุมรายการที่ ' + esc(X[n2].covers) + '</div>' : '') + '</td>' +
+           '<td class="r" style="width:100px"><b>' + money(X[n2].amount) + '</b></td></tr>';
+    }
+    t += '</tbody></table>';
+  }
   t += '<div class="sum"><table>' +
-    '<tr><td>ค่าของ / Parts</td><td class="r">' + money(thb) + '</td></tr>' +
+    (thb ? '<tr><td>ค่าของ / Parts</td><td class="r">' + money(thb) + '</td></tr>' : '') +
     (lab ? '<tr><td>ค่าแรง / Labour</td><td class="r">' + money(lab) + '</td></tr>' : '') +
+    (exp ? '<tr><td>ค่าใช้จ่ายอื่น ๆ / Other expenses</td><td class="r">' + money(exp) + '</td></tr>' : '') +
     '<tr class="tot"><td>รวมทั้งสิ้น (บาท) / Total THB</td><td class="r">' + money(grand) + '</td></tr>';
   if (rate > 0 && h['สกุลเงิน']){
     t += '<tr class="fx"><td>รวม (' + esc(h['สกุลเงิน']) + ')</td><td class="r">' + money(grand / rate) + '</td></tr>';
@@ -415,7 +447,7 @@ function blkPhotos(items){
 
   for (var i = 0; i < items.length; i++){
     var it = items[i];
-    var seq = String(it.seq), ph = PHOTOS[seq] || [];
+    var seq = String(it.seq), ph = docPhotos_(seq);
     if (!ph.length) continue;
     any = true;
 
@@ -681,8 +713,8 @@ function blkInsPhotos(items, h){
 
   for (var i = 0; i < items.length; i++){
     var it = items[i], seq = String(it.seq);
-    var got = PHOTOS[seq] || [];
-    var std = (PHOTOS[stdKey_(seq)] || [])[0] || null;
+    var got = docPhotos_(seq);
+    var std = docPhotos_(stdKey_(seq))[0] || null;
     var a = String(it.acc || '').toUpperCase();
 
     /* ข้อที่ผ่านและไม่มีรูปอะไรเลย ไม่ต้องกินกระดาษ — สรุปอยู่ในตารางข้างบนแล้ว

@@ -59,9 +59,12 @@ function flowBar(f){
     t += '<button class="btn primary" onclick="doReceive()">' + esc(f.receiveLabel) + '</button>' +
          '<span class="fview">รับเรื่องก่อน แล้วช่องของคุณจะเปิดให้กรอก</span>';
   } else if (f.isOwner && f.next){
+    /* ⚠️ ของเดิมปุ่ม disabled เฉย ๆ — เบียร์กดแล้วไม่มีอะไรเกิดขึ้น
+       เลยดูเหมือน "บันทึกเป็นเอกสารไม่ได้ มันยังเป็นร่างอยู่"
+       ตอนนี้กดได้เสมอ ถ้ายังไม่ครบจะเด้งบอกว่าขาดอะไร แล้วเลื่อนจอไปที่บรรทัดนั้น */
     var can = !(f.missing && f.missing.length);
-    t += '<button class="btn primary" ' + (can ? '' : 'disabled ') +
-         'onclick="doAdvance()">' + esc(f.nextLabel) + '</button>';
+    t += '<button class="btn primary' + (can ? '' : ' notready') + '" ' +
+         'onclick="' + (can ? 'doAdvance()' : 'whyNotReady()') + '">' + esc(f.nextLabel) + '</button>';
   }
   if (f.canReject){
     t += '<button class="btn ghost" onclick="openReject()">↩ ตีกลับให้แก้ไข</button>';
@@ -93,8 +96,11 @@ function openReject(){
     '<span>เลือกว่าจะส่งกลับหาใคร แล้วบอกให้ชัดว่าต้องแก้อะไร — คนรับจะเห็นข้อความนี้บนหัวเอกสาร และเด้งเข้า LINE</span>' +
     '<button onclick="this.closest(\'.lightbox\').remove()">ปิด ✕</button></div>' +
     '<div class="frow"><label>ส่งกลับหา</label>' +
-      '<select id="rjTo"><option value="STORE">ขั้น 2 · สโตร์ (เลขใบส่งมอบ · PO · Supplier)</option>' +
-      '<option value="REQUEST">ต้นน้ำ · ทีมงานที่เปิดใบ (ข้อมูลรถ · รายการที่เคลม · รูป)</option></select></div>' +
+      /* ⚠️ ค่าเริ่มต้นต้องเป็น "ต้นน้ำ" — ของเดิมตั้งสโตร์ไว้เป็นตัวแรก
+         ใครไม่ได้กดเปลี่ยน ใบก็เด้งไปสโตร์หมด ทั้งที่ตั้งใจจะส่งกลับคนเปิดใบ (เบียร์เจอเอง 7 ก.ย.) */
+      '<select id="rjTo">' +
+      '<option value="REQUEST">↩ ต้นน้ำ · ทีมงานที่เปิดใบ (ข้อมูลรถ · รายการที่เคลม · รูป)</option>' +
+      '<option value="STORE">ขั้น 3 · สโตร์ (เลขใบส่งมอบ · PO · Supplier)</option></select></div>' +
     '<div class="frow"><label>ต้องแก้อะไร</label>' +
       '<textarea id="rjWhy" class="tall" placeholder="เช่น PO ของรายการที่ 2 ไม่ตรงกับ Supplier · รูปรายการที่ 3 ถ่ายไม่ชัด"></textarea></div>' +
     '<div id="rjMsg"></div>' +
@@ -103,6 +109,19 @@ function openReject(){
   d.onclick = function(e){ if (e.target === d) d.remove(); };
   document.body.appendChild(d);
 }
+/** กดปุ่มส่งต่อทั้งที่ยังไม่ครบ — บอกให้ชัดว่าขาดอะไร แล้วพาไปที่จุดนั้น */
+function whyNotReady(){
+  var m = (FLOW && FLOW.missing) || [];
+  var box = document.querySelector('.flowmiss');
+  if (box){
+    box.classList.add('blink');
+    box.scrollIntoView({ behavior:'smooth', block:'center' });
+    setTimeout(function(){ box.classList.remove('blink'); }, 2200);
+  }
+  alert('ยังส่งต่อไม่ได้ เพราะ:\n\n• ' + m.join('\n• ') +
+        '\n\nแก้ให้ครบก่อน แล้วปุ่มจะใช้งานได้เอง');
+}
+
 function doReject(){
   var to = $('rjTo').value, why = $('rjWhy').value.trim();
   if (!why){ $('rjMsg').innerHTML = '<div class="msg bad">ต้องบอกเหตุผล ไม่งั้นคนรับไม่รู้ว่าต้องแก้อะไร</div>'; return; }
