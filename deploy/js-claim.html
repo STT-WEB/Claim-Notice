@@ -516,6 +516,7 @@ function drawClaim(){
         .withFailureHandler(function(e){ fieldMark(el, 'bad', (e && e.message) || 'บันทึกไม่สำเร็จ'); })
         .saveItemField(CURDOC, seq, k, v, AUTH);
     },
+    onDel:function(seq){ delClaimRow(seq); },     // ลบแถวของใบที่บันทึกแล้ว = ลบในชีตจริง
     onPhoto:updatePhBar
   });
   drawAllPhotos();

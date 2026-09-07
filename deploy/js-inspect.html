@@ -193,15 +193,14 @@ function openInspection(docNo){
     }
     t += '</div><div id="insmsg"></div></div>';
 
-    /* หัวข้อตรวจ — ติ๊กแล้วบันทึกทันที ไม่มีปุ่ม Save */
-    t += '<div class="card"><div class="cardhd"><h3>หัวข้อตรวจ (' + c.items.length + ' ข้อ)</h3>' +
-         '<span class="sub">ติ๊กผลตรวจแล้วบันทึกเอง · ข้อที่ไม่ผ่านต้องมีรูป</span></div>';
-    var lastCat = null;
-    for (var k = 0; k < c.items.length; k++){
-      var it = c.items[k];
-      if (it.cat && it.cat !== lastCat){ t += '<div class="catline">' + esc(it.cat) + '</div>'; lastCat = it.cat; }
-      t += inspCard(it, docNo);
-    }
+    /* ⚠️ v1.2.4 — หัวข้อตรวจเป็น "ตาราง Excel" ชุดเดียวกับใบเคลม
+       เบียร์ (4 ก.ย.): "ตารางต้องเหมือน Excel ไม่เอาเป็นกล่อง ๆ มันดูยาก และก็เสียพื้นที่"
+       ผมแก้ให้ฝั่งใบเคลมไปแล้ว แต่ลืมฝั่งใบตรวจ → เบียร์: "ทำไมไม่เห็นเหมือนงานเคลมเลย"
+       ตอนนี้ใช้ makeGrid ตัวเดียวกัน = ก๊อปจาก Sheets มาวางได้ · Enter ลงล่าง · Tab ไปขวา */
+    t += '<div class="card tight"><div class="cardhd"><h3>หัวข้อตรวจ (' + c.items.length + ' ข้อ)</h3>' +
+         '<span class="sub">แก้ในตารางได้เลย บันทึกเอง · ก๊อปจาก Sheets มาวางได้</span>' +
+         '<span class="phbar" id="insphbar">—</span></div>';
+    t += '<div id="insGrid"></div>';
     if (!c.items.length){
       t += '<div class="empty">ใบนี้ยังไม่มีหัวข้อตรวจ<br><span>กด “+ เพิ่มหัวข้อตรวจ” ด้านบน</span></div>';
     }
@@ -210,7 +209,7 @@ function openInspection(docNo){
     $('view').innerHTML = t;
     fillVendorList();
     bindAll($('view'), docNo);
-    drawAllPhotos();
+    drawInspGrid(c, docNo);
   });
 }
 
@@ -223,109 +222,130 @@ function insBarText(n, acc, un, todo, noPhoto){
   return s;
 }
 
-function inspCard(it, docNo){
-  var s = String(it.seq);
-  var t = '<div class="itemcard ins ' + (it.acc === 'UNACC' ? 'un' : it.acc === 'ACC' ? 'ok' : '') + '" id="inscard_' + s + '">' +
-    '<div class="ihd"><span class="ino">' + esc(s) + '</span>' +
-    /* หมวด + หัวข้อ (EN) มาจากแม่แบบเช็คลิสต์ แก้ทับได้ — ไฟล์ "ช่องกรอกทั้งระบบ" ที่เบียร์เติมไว้ */
-    '<input class="icat" data-save="saveInspItemField" data-seq="' + s + '" data-f="cat" value="' +
-      esc(it.cat) + '" placeholder="หมวด" title="หมวด — มาจากแม่แบบ แก้ได้">' +
-    '<input class="ititle" data-save="saveInspItemField" data-seq="' + s + '" data-f="title" value="' + esc(it.title) + '" placeholder="หัวข้อที่ตรวจ">' +
-    '</div>' +
-    (INSFOREIGN ? ('<div class="ihd2">' +
-      '<input class="ititle en" data-save="saveInspItemField" data-seq="' + s + '" data-f="titleEn" value="' +
-      esc(it.titleEn) + '" placeholder="หัวข้อ (EN) — มาจากแม่แบบ"></div>') : '');
+/* ═══ ตารางหัวข้อตรวจ — ชุดเดียวกับตารางรายการของใบเคลม ═══════════
+ * คอลัมน์: หมวด · หัวข้อตรวจ (ไทย) · หัวข้อ (EN) · ผลตรวจ · คำอธิบาย · จำนวน · หน่วย
+ * งานแท็งค์เพิ่มคอลัมน์ "รูป STD" ไว้ซ้ายมือของ "ของที่ได้รับจริง" เทียบกันได้ในแถวเดียว
+ * ทุกช่องบันทึกทันทีที่พิมพ์เสร็จ ไม่มีปุ่ม Save (เหมือน Google Sheets ตามที่เบียร์สั่ง) */
+var INSGRID = null;
 
-  t += '<div class="accrow">' +
-    '<button class="accbtn ok'   + (it.acc === 'ACC'   ? ' on' : '') + '" onclick="setAcc(\'' + s + '\',\'ACC\')">✓ ผ่าน (Acc)</button>' +
-    '<button class="accbtn bad'  + (it.acc === 'UNACC' ? ' on' : '') + '" onclick="setAcc(\'' + s + '\',\'UNACC\')">✕ ไม่ผ่าน (Un-Acc)</button>' +
-    '<button class="accbtn"      onclick="setAcc(\'' + s + '\',\'\')">ล้าง</button>' +
-    '<span class="accnote" id="accnote_' + s + '"></span>' +
-    '<button class="rowbtn" style="margin-left:auto" title="ลบหัวข้อนี้" onclick="delInspRow(\'' + s + '\')">&#10005;</button>' +
-    '</div>';
+function inspCols(){
+  var c = [
+    { k:'cat',   label:'หมวด', w:120, ph:'เช่น ตัวถัง / วาล์ว' },
+    { k:'title', label:'หัวข้อตรวจ (ไทย)', type:'area' }
+  ];
+  if (INSFOREIGN) c.push({ k:'titleEn', label:'Check point (EN)', sub:'แปลให้อัตโนมัติ', type:'area' });
+  c.push({ k:'acc',   label:'ผลตรวจ', sub:'Acc / Un-Acc', w:104 });
+  c.push({ k:'found', label:'สิ่งที่พบ / ตรวจแล้วเป็นยังไง', sub:'ผ่านก็เขียนได้', type:'area' });
+  if (INSFOREIGN) c.push({ k:'foundEn', label:'Findings (EN)', type:'area' });
+  c.push({ k:'qty',  label:'จำนวน', w:62, type:'num' });
+  c.push({ k:'unit', label:'หน่วย', w:60 });
+  return c;
+}
 
-  /* ช่องบรรยายสิ่งที่พบ — โผล่เมื่อไม่ผ่าน (ข้อมูลนี้จะไหลไปเป็นรายละเอียดในใบเคลม)
-     ช่อง EN โผล่เฉพาะงานต่างประเทศ — เบียร์: "ถ้าเลือกเป็นในประเทศ ไม่ต้องมีตารางแปลงอังกฤษ" */
-  /* เบียร์ 7 ก.ย. 2569: "ถ้า ACC มีคอมเมนต์ด้วยว่ายังไง"
-     → ช่องคำอธิบายโผล่ทั้งข้อที่ผ่านและไม่ผ่าน · ข้อความนี้ขึ้นบนเอกสารที่ปริ้นทุกใบ
-       (ข้อที่ผ่านแล้วไม่เขียนอะไรเลย เอกสารจะบอกว่า "ยังไม่ได้เขียนคำอธิบาย") */
-  var accd = (it.acc === 'ACC' || it.acc === 'UNACC');
-  t += '<div class="unbox" id="unbox_' + s + '" style="display:' + (accd ? '' : 'none') + '">' +
-    '<div class="frow"><label>' + (it.acc === 'ACC' ? 'ตรวจแล้วเป็นยังไง' : 'สิ่งที่พบ (ไทย)') + '</label>' +
-      '<textarea data-save="saveInspItemField" data-seq="' + s + '" data-f="found" placeholder="' +
-        (it.acc === 'ACC' ? 'เช่น ตรงตาม STD ทุกจุด ไม่มีรอย · ข้อความนี้จะขึ้นบนเอกสารที่ปริ้น'
-                          : 'บรรยายให้ละเอียด ข้อความนี้จะไปอยู่ในใบเคลม') + '">' + esc(it.found) + '</textarea></div>' +
-    (INSFOREIGN ? ('<div class="frow"><label>Finding (EN)</label>' +
-      '<textarea data-save="saveInspItemField" data-seq="' + s + '" data-f="foundEn" placeholder="แปลให้อัตโนมัติ · ส่งให้ Supplier ต่างประเทศอ่าน">' + esc(it.foundEn) + '</textarea></div>') : '') +
-    '<div class="frow2"><label>จำนวน</label>' +
-      '<input class="r" data-save="saveInspItemField" data-seq="' + s + '" data-f="qty" value="' + esc(it.qty) + '">' +
-      '<label>หน่วย</label>' +
-      '<input data-save="saveInspItemField" data-seq="' + s + '" data-f="unit" value="' + esc(it.unit) + '"></div>' +
-    '</div>';
-
-  if (it.sentTo) t += '<div class="sentto">➜ ส่งไปใบเคลม <b>' + esc(it.sentTo) + '</b> แล้ว</div>';
-  /* ข้อที่ไม่ผ่านต้องมีรูปแน่นอน · ข้อที่ผ่านถ่ายไว้ก็ดี แต่ไม่บังคับ */
-  /* งานแท็งค์ต้องเทียบ "รูป STD ประจำรุ่น" กับ "รูปของที่ได้รับจริง"
-     รูป STD เก็บด้วยคีย์ S+ลำดับข้อ คนละชุดกับรูปตรวจ · ยังไม่มีก็เว้นไว้ ใส่ทีหลังได้
-     งานอุปกรณ์ไม่มี STD — มีแค่รูปตอนของมาถึงบริษัท */
-  if (INSTANKER){
-    t += '<div class="stdpair">' +
-         '<div><div class="stdlb">📐 รูปมาตรฐาน (STD) ของรุ่นนี้ <span>ไม่มีก็เว้นไว้ได้</span></div>' +
-           '<div data-phbox="S' + esc(s) + '" data-phreq="soft"></div></div>' +
-         '<div><div class="stdlb">📷 ของที่ได้รับจริง <span>' +
-           (it.acc === 'UNACC' ? 'ข้อที่ไม่ผ่าน ต้องมีรูป' : 'ถ่ายไว้ด้วยจะดีที่สุด') + '</span></div>' +
-           '<div data-phbox="' + esc(s) + '" data-phreq="' + (it.acc === 'UNACC' ? 'hard' : 'soft') + '"></div></div>' +
-         '</div></div>';
-  } else {
-    t += '<div data-phbox="' + esc(s) + '" data-phreq="' + (it.acc === 'UNACC' ? 'hard' : 'soft') + '"></div></div>';
+function drawInspGrid(c, docNo){
+  var rows = [];
+  for (var i = 0; i < c.items.length; i++){
+    var it = c.items[i];
+    rows.push({ _rid:String(it.seq), _seq:String(it.seq),
+      cat:it.cat, title:it.title, titleEn:it.titleEn, acc:it.acc,
+      found:it.found, foundEn:it.foundEn, qty:it.qty, unit:it.unit });
   }
-  return t;
+  var opt = {
+    photos:true, maxPhoto:5,
+    photoLabel:'📷 ของที่ได้รับจริง',
+    photoSub: INSTANKER ? 'ถ่ายตอนตรวจ · ข้อที่ไม่ผ่านต้องมี' : 'ถ่ายตอนของมาถึง · ข้อที่ไม่ผ่านต้องมี',
+    trFrom: INSFOREIGN ? 'th' : '', trTo: INSFOREIGN ? 'en' : '',
+    onDraw: function(g){ paintAccCells(g); },
+    onChange: function(r, k, v, g){
+      var seq = g.rows[r]._seq; if (!seq) return;
+      if (k === 'acc') v = String(v || '').toUpperCase();
+      var el = gridCell(g.id, r, colIdxIns(g, k));
+      fieldMark(el, 'wait');
+      google.script.run
+        .withSuccessHandler(function(){ fieldMark(el, 'ok'); if (k === 'acc'){ g.rows[r].acc = v; paintAccCells(g); updateInsPhBar(); } })
+        .withFailureHandler(function(e){ fieldMark(el, 'bad', (e && e.message) || 'บันทึกไม่สำเร็จ'); })
+        .saveInspItemField(CURDOC, seq, k, v, AUTH);
+    },
+    /* บังคับรูปเฉพาะข้อที่ติ๊ก "ไม่ผ่าน" — ข้อที่ผ่านถ่ายไว้ก็ดี แต่ไม่บังคับ */
+    photoNeed: function(rid, g){
+      for (var r = 0; r < g.rows.length; r++)
+        if (String(g.rows[r]._rid) === String(rid))
+          return String(g.rows[r].acc || '').toUpperCase() === 'UNACC';
+      return false;
+    },
+    onDel: function(seq){ delInspRow(seq); },     // ลบหัวข้อตรวจ = ลบในชีตจริง
+    onPhoto: updateInsPhBar
+  };
+  /* งานแท็งค์: คอลัมน์รูป STD ประจำรุ่น อยู่ก่อนคอลัมน์รูปของจริง เทียบได้ในแถวเดียว
+     งานอุปกรณ์ไม่มี STD — เบียร์: "กรณีที่เป็นอุปกรณ์ ไม่มีรูป STD" */
+  if (INSTANKER) opt.photos2 = { key:'S', label:'📐 รูป STD ประจำรุ่น', sub:'ไม่มีก็เว้นไว้ได้' };
+
+  INSGRID = makeGrid('insGrid', inspCols(), rows, opt);
+  drawAllPhotos();
+  updateInsPhBar();
 }
 
-/** ติ๊กผลตรวจ — บันทึกทันที และเปิด/ปิดช่องบรรยายโดยไม่วาดหน้าใหม่ (จอไม่เด้ง) */
-function setAcc(seq, val){
-  var card = $('inscard_' + seq), box = $('unbox_' + seq), note = $('accnote_' + seq);
-  var btns = card.querySelectorAll('.accbtn');
-  for (var i = 0; i < btns.length; i++) btns[i].classList.remove('on');
-  if (val === 'ACC')   { btns[0].classList.add('on'); card.className = 'itemcard ins ok'; }
-  if (val === 'UNACC') { btns[1].classList.add('on'); card.className = 'itemcard ins un'; }
-  if (!val)            { card.className = 'itemcard ins'; }
-  /* เบียร์: "ถ้า ACC มีคอมเมนต์ด้วยว่ายังไง" → ผ่านก็ต้องเขียนได้ ไม่ใช่เฉพาะข้อที่ไม่ผ่าน */
-  box.style.display = (val === 'ACC' || val === 'UNACC') ? '' : 'none';
-  var lb = box.querySelector('.frow label');
-  if (lb) lb.textContent = (val === 'ACC') ? 'ตรวจแล้วเป็นยังไง' : 'สิ่งที่พบ (ไทย)';
-
-  /* ติ๊กไม่ผ่าน → รูปกลายเป็นของบังคับ · วาดใหม่แค่แถบรูปของข้อนี้ ไม่แตะหน้าอื่น */
-  var pb = document.querySelector('[data-phbox="' + seq + '"]');
-  if (pb){ pb.setAttribute('data-phreq', val === 'UNACC' ? 'hard' : 'soft'); drawPhotoBox(pb); }
-
-  note.textContent = 'กำลังบันทึก…'; note.className = 'accnote wait';
-  google.script.run
-    .withSuccessHandler(function(){
-      note.textContent = '✓ บันทึกแล้ว'; note.className = 'accnote ok';
-      setTimeout(function(){ note.textContent = ''; }, 1400);
-      updateInsBar();
-    })
-    .withFailureHandler(function(e){ note.textContent = (e && e.message) || 'บันทึกไม่สำเร็จ'; note.className = 'accnote bad'; })
-    .saveInspItemField(CURDOC, seq, 'acc', val, AUTH);
+function colIdxIns(g, k){
+  for (var i = 0; i < g.cols.length; i++) if (g.cols[i].k === k) return i;
+  return 0;
 }
 
-/** อัปเดตแถบสรุปด้านบนจากสิ่งที่เห็นบนจอ — ไม่ต้องยิงเซิร์ฟเวอร์ ไม่ต้องวาดใหม่ */
-function updateInsBar(){
-  var cards = document.querySelectorAll('.itemcard.ins');
-  var n = cards.length, acc = 0, un = 0, todo = 0, noPhoto = [];
-  for (var i = 0; i < cards.length; i++){
-    var seq = cards[i].id.replace('inscard_','');
-    if (cards[i].classList.contains('ok')) acc++;
-    else if (cards[i].classList.contains('un')){
+/** ช่องผลตรวจ = ปุ่ม 2 ปุ่มในช่องตาราง (พิมพ์ ACC/UNACC เองก็ได้)
+ *  ทาสีทั้งแถวให้เห็นแต่ไกลว่าข้อไหนไม่ผ่าน */
+function paintAccCells(g){
+  var tb = $(g.id); if (!tb) return;
+  var ci = colIdxIns(g, 'acc');
+  for (var r = 0; r < g.rows.length; r++){
+    var el = gridCell(g.id, r, ci); if (!el) continue;
+    var v = String(g.rows[r].acc || '').toUpperCase();
+    el.value = v;
+    el.readOnly = true;
+    el.className = 'acccell ' + (v === 'ACC' ? 'ok' : v === 'UNACC' ? 'no' : '');
+    var td = el.parentNode;
+    if (!td.querySelector('.accbtns')){
+      var d = document.createElement('div');
+      d.className = 'accbtns';
+      d.innerHTML = '<button class="ab ok" title="ผ่าน" onclick="setAccCell(' + r + ',\'ACC\')">✓</button>' +
+                    '<button class="ab no" title="ไม่ผ่าน" onclick="setAccCell(' + r + ',\'UNACC\')">✕</button>' +
+                    '<button class="ab" title="ล้าง" onclick="setAccCell(' + r + ',\'\')">–</button>';
+      td.appendChild(d);
+    }
+    var tr = td.parentNode;
+    tr.className = (v === 'UNACC' ? 'unrow' : v === 'ACC' ? 'okrow' : '');
+  }
+}
+
+function setAccCell(r, v){
+  var g = INSGRID; if (!g) return;
+  g.rows[r].acc = v;
+  var el = gridCell(g.id, r, colIdxIns(g, 'acc'));
+  if (el) el.value = v;
+  paintAccCells(g);
+  g.opt.onChange(r, 'acc', v, g);
+}
+
+function updateInsPhBar(){
+  var bar = $('insphbar'), g = INSGRID; if (!bar || !g) return;
+  var n = g.rows.length, acc = 0, un = 0, todo = 0, noPhoto = [];
+  for (var r = 0; r < n; r++){
+    var v = String(g.rows[r].acc || '').toUpperCase(), sq = g.rows[r]._seq;
+    if (v === 'ACC') acc++;
+    else if (v === 'UNACC'){
       un++;
-      if (!PHOTOS[seq] || !PHOTOS[seq].length) noPhoto.push(seq);
+      if (!PHOTOS[sq] || !PHOTOS[sq].length) noPhoto.push(sq);
     } else todo++;
   }
-  var bar = $('insbar'); if (!bar) return;
-  bar.className = 'phbar ' + (un && !noPhoto.length ? 'good' : (noPhoto.length ? 'bad' : ''));
-  bar.innerHTML = insBarText(n, acc, un, todo, noPhoto);
+  bar.className = 'phbar ' + (noPhoto.length ? 'bad' : (un || acc ? 'good' : ''));
+  var msg = '📋 ตรวจแล้ว ' + (acc + un) + ' / ' + n + ' ข้อ · ผ่าน ' + acc + ' · ไม่ผ่าน ' + un;
+  if (todo) msg += ' · ยังไม่ตรวจ ' + todo;
+  if (noPhoto.length) msg += ' — <b>ข้อที่ไม่ผ่านยังไม่มีรูป: ข้อ ' + noPhoto.join(', ') + '</b>';
+  else if (un) msg += ' — 📷 รูปครบ พร้อมส่งเคลม';
+  bar.innerHTML = msg;
 }
+
+/* setAcc / updateInsBar / insBarText ของการ์ดแบบเก่า ถูกลบทิ้งตอน v1.2.4
+   ตารางแบบ Excel ใช้ setAccCell + updateInsPhBar แทนแล้ว
+   ⚠️ อย่าเอากลับมา — โค้ดสองชุดที่ทำเรื่องเดียวกัน คือต้นเหตุที่แก้ที่หนึ่งแล้วอีกที่ไม่เปลี่ยน */
 
 function addInspRow(){
   srv('addInspItem', [CURDOC, AUTH], function(){ go('ins', CURDOC); });
@@ -354,36 +374,13 @@ function sendToClaim(){
 }
 
 /** แปล "สิ่งที่พบ" ของทุกข้อที่ Un-Acc — เติมเฉพาะช่องที่ยังว่าง แล้วบันทึกลงชีตให้เลย */
+/** ปุ่ม "แปลไทย → EN" — ใช้ตัวแปลของตาราง (ตัวเดียวกับใบเคลม)
+ *  เติมเฉพาะช่องที่ยังว่าง แล้วบันทึกลงชีตให้เลย */
 function inspTranslate(){
-  var boxes = document.querySelectorAll('[id^="unbox_"]');
-  var seqs = [], texts = [], els = [];
-  for (var i = 0; i < boxes.length; i++){
-    var seq = boxes[i].id.replace('unbox_','');
-    var th = boxes[i].querySelector('[data-f="found"]');
-    var en = boxes[i].querySelector('[data-f="foundEn"]');
-    if (!th || !en) continue;
-    if (String(th.value).trim() && !String(en.value).trim()){
-      seqs.push(seq); texts.push(th.value); els.push(en);
-    }
-  }
-  if (!texts.length){ $('insmsg').innerHTML = '<div class="msg good">ไม่มีช่องที่ต้องแปล — ช่องที่พิมพ์อังกฤษไว้แล้วระบบไม่ทับให้</div>'; return; }
-  $('insmsg').innerHTML = '<div class="msg"><span class="spin"></span> กำลังแปล ' + texts.length + ' ช่อง…</div>';
-  srv('translateBatch', [texts, 'th', 'en', AUTH], function(res){
-    var n = 0;
-    for (var k = 0; k < els.length; k++){
-      if (res && res[k]){
-        els[k].value = res[k];
-        fieldMark(els[k], 'ok');
-        google.script.run.saveInspItemField(CURDOC, seqs[k], 'foundEn', res[k], AUTH);
-        n++;
-      }
-    }
-    $('insmsg').innerHTML = '<div class="msg good">แปลให้แล้ว ' + n + ' ช่อง — อ่านทวนก่อนส่ง Supplier นะครับ ศัพท์ช่างบางคำแปลไม่เนียน</div>';
-  }, function(m){ $('insmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; });
+  if (!INSGRID){ return; }
+  gridTranslate(INSGRID.id);
 }
 
-var INSFLOW = null;
-/** แถบขั้นตอนของใบตรวจ — ใช้ flowBar ตัวเดียวกับใบเคลม แต่ปุ่มคนละชุด */
 function insFlowBar(f){
   if (!f) return '';
   var t = flowBar(f);

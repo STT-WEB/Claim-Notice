@@ -48,7 +48,13 @@ function drawGrid(id){
     t += '<th style="' + (col.w ? 'width:' + col.w + 'px' : '') + '">' + col.label +
          (col.sub ? '<span>' + col.sub + '</span>' : '') + '</th>';
   }
-  if (g.opt.photos) t += '<th style="width:250px">รูป <span>อย่างน้อย 1 · มากสุด ' + (g.opt.maxPhoto || 5) + '</span></th>';
+  /* คอลัมน์รูปที่ 2 — ใบตรวจงานแท็งค์ต้องเทียบ "รูป STD ประจำรุ่น" กับ "ของที่ได้รับจริง"
+     opt.photos2 = { key:'S', label:'...' } · รูปเก็บด้วยคีย์ S+ลำดับแถว คนละชุดกับรูปปกติ */
+  if (g.opt.photos2) t += '<th style="width:150px">' + g.opt.photos2.label +
+       '<span>' + (g.opt.photos2.sub || '') + '</span></th>';
+  if (g.opt.photos) t += '<th style="width:' + (g.opt.photos2 ? 210 : 250) + 'px">' +
+       (g.opt.photoLabel || 'รูป') + ' <span>' +
+       (g.opt.photoSub || ('อย่างน้อย 1 · มากสุด ' + (g.opt.maxPhoto || 5))) + '</span></th>';
   t += '<th class="xdel"></th></tr></thead><tbody>';
 
   for (var r = 0; r < g.rows.length; r++){
@@ -79,6 +85,9 @@ function gridRowHtml(g, r){
            (col.ph ? ' placeholder="' + esc(col.ph) + '"' : '') +
            ' value="' + v + '"></td>';
     }
+  }
+  if (g.opt.photos2){
+    t += '<td class="xph"><div data-gph2="' + g.opt.photos2.key + row._rid + '"></div></td>';
   }
   if (g.opt.photos){
     t += '<td class="xph"><div data-gph="' + row._rid + '"></div></td>';
@@ -183,6 +192,11 @@ function gridAddRow(id, quiet){
 function gridDelRow(id, r){
   var g = GRIDS[id];
   syncGrid(id);
+  /* ⚠️ แถวของ "เอกสารที่บันทึกแล้ว" ต้องลบที่ชีตด้วย ไม่ใช่ลบแค่บนจอ
+     ของเดิมลบแล้วดูเหมือนหาย แต่พอรีเฟรชแถวกลับมาเหมือนเดิม (ทั้งใบเคลมและใบตรวจ)
+     _seq มีค่า = แถวนี้มีอยู่จริงในชีต → ให้เจ้าของตารางเป็นคนสั่งลบ */
+  var seq = g.rows[r] && g.rows[r]._seq;
+  if (seq && g.opt.onDel){ g.opt.onDel(seq, r, g); return; }
   g.rows.splice(r, 1);
   if (!g.rows.length) g.rows.push(blankRow(g));
   drawGrid(id);
@@ -204,9 +218,14 @@ function gridDrawPhotos(id){
     var rid = boxes[i].getAttribute('data-gph');
     boxes[i].innerHTML = gridPhotoStrip(g, rid);
   }
+  var b2 = $(g.host).querySelectorAll('[data-gph2]');
+  for (var k = 0; k < b2.length; k++){
+    var rid2 = b2[k].getAttribute('data-gph2');
+    b2[k].innerHTML = gridPhotoStrip(g, rid2, true);   // ช่องรูปที่ 2 ไม่บังคับ
+  }
 }
-function gridPhotoStrip(g, rid){
-  var max = g.opt.maxPhoto || 5;
+function gridPhotoStrip(g, rid, soft){
+  var max = soft ? 1 : (g.opt.maxPhoto || 5);
   var list = PHOTOS[rid] || [];
   var h = '<div class="phwrap sm">';
   for (var k = 0; k < list.length; k++){
@@ -221,13 +240,20 @@ function gridPhotoStrip(g, rid){
          'onclick="gridPickPhotos(\'' + g.id + '\',\'' + rid + '\',1)"><b>📷</b></div>';
   }
   h += '</div>';
-  if (!list.length) h += '<div class="phwarn sm">ต้องมีรูป</div>';
-  else if (list.length >= max) h += '<div class="hint">ครบ ' + max + ' รูปแล้ว</div>';
+  /* เตือน "ต้องมีรูป" เฉพาะแถวที่บังคับจริง ๆ
+     ⚠️ ของเดิมขึ้นทุกแถวที่ยังไม่มีรูป → ใบตรวจที่ผ่านหมดจะแดงเต็มจอทั้งที่ไม่ผิดอะไร
+     opt.photoNeed(rid, g) = ให้เจ้าของตารางตัดสินเอง (ใบตรวจ = เฉพาะข้อที่ Un-Acc) */
+  var need = soft ? false : (g.opt.photoNeed ? g.opt.photoNeed(rid, g) : true);
+  if (!list.length) h += need ? '<div class="phwarn sm">ต้องมีรูป</div>'
+                             : '<div class="hint sm">' + (soft ? 'ยังไม่มี · ใส่ทีหลังได้' : 'ยังไม่มีรูป') + '</div>';
+  else if (!soft && list.length >= max) h += '<div class="hint">ครบ ' + max + ' รูปแล้ว</div>';
   h += '<div class="phmsg" id="phmsg_' + rid + '"></div>';
   return h;
 }
 function gridPickPhotos(gid, rid, cam){
-  var g = GRIDS[gid], max = g.opt.maxPhoto || 5;
+  var g = GRIDS[gid];
+  var isStd = !!(g.opt.photos2 && String(rid).indexOf(g.opt.photos2.key) === 0);
+  var max = isStd ? 1 : (g.opt.maxPhoto || 5);
   var have = (PHOTOS[rid] || []).length;
   if (have >= max){ alert('แถวนี้ใส่ได้มากสุด ' + max + ' รูปครับ'); return; }
   var inp = document.createElement('input');
