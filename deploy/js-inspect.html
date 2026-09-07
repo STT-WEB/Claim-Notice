@@ -5,7 +5,8 @@
 
 var INSP = null;          // ใบตรวจที่เปิดอยู่ — หน้าปริ้นใช้ตัวนี้ (คู่กับ CLAIM ของใบเคลม)
 var INSTPL = null;
-var INSFOREIGN = false;   // งานในประเทศไม่ต้องมีช่องภาษาอังกฤษให้รก
+var INSFOREIGN = false;
+var INSTANKER = true;    // ใบนี้เป็นงานแท็งค์ไหม — แท็งค์ต้องมีช่องรูป STD เทียบ   // งานในประเทศไม่ต้องมีช่องภาษาอังกฤษให้รก
 
 /* ─────────── เปิดใบตรวจใหม่ ─────────── */
 function newInspForm(){
@@ -138,6 +139,7 @@ function openInspection(docNo){
     CURDOC = docNo; CURJOB = h['เลขที่ JOB'] || '';
     PHOTOS = c.photos || {};
     INSFOREIGN = (h['สถานที่ผลิต'] === 'for');
+    INSTANKER  = String(h['ชนิดงาน'] || '').indexOf('equip') < 0;
 
     var acc = 0, un = 0, todo = 0, unNoPhoto = [];
     for (var i = 0; i < c.items.length; i++){
@@ -244,9 +246,15 @@ function inspCard(it, docNo){
 
   /* ช่องบรรยายสิ่งที่พบ — โผล่เมื่อไม่ผ่าน (ข้อมูลนี้จะไหลไปเป็นรายละเอียดในใบเคลม)
      ช่อง EN โผล่เฉพาะงานต่างประเทศ — เบียร์: "ถ้าเลือกเป็นในประเทศ ไม่ต้องมีตารางแปลงอังกฤษ" */
-  t += '<div class="unbox" id="unbox_' + s + '" style="display:' + (it.acc === 'UNACC' ? '' : 'none') + '">' +
-    '<div class="frow"><label>สิ่งที่พบ (ไทย)</label>' +
-      '<textarea data-save="saveInspItemField" data-seq="' + s + '" data-f="found" placeholder="บรรยายให้ละเอียด ข้อความนี้จะไปอยู่ในใบเคลม">' + esc(it.found) + '</textarea></div>' +
+  /* เบียร์ 7 ก.ย. 2569: "ถ้า ACC มีคอมเมนต์ด้วยว่ายังไง"
+     → ช่องคำอธิบายโผล่ทั้งข้อที่ผ่านและไม่ผ่าน · ข้อความนี้ขึ้นบนเอกสารที่ปริ้นทุกใบ
+       (ข้อที่ผ่านแล้วไม่เขียนอะไรเลย เอกสารจะบอกว่า "ยังไม่ได้เขียนคำอธิบาย") */
+  var accd = (it.acc === 'ACC' || it.acc === 'UNACC');
+  t += '<div class="unbox" id="unbox_' + s + '" style="display:' + (accd ? '' : 'none') + '">' +
+    '<div class="frow"><label>' + (it.acc === 'ACC' ? 'ตรวจแล้วเป็นยังไง' : 'สิ่งที่พบ (ไทย)') + '</label>' +
+      '<textarea data-save="saveInspItemField" data-seq="' + s + '" data-f="found" placeholder="' +
+        (it.acc === 'ACC' ? 'เช่น ตรงตาม STD ทุกจุด ไม่มีรอย · ข้อความนี้จะขึ้นบนเอกสารที่ปริ้น'
+                          : 'บรรยายให้ละเอียด ข้อความนี้จะไปอยู่ในใบเคลม') + '">' + esc(it.found) + '</textarea></div>' +
     (INSFOREIGN ? ('<div class="frow"><label>Finding (EN)</label>' +
       '<textarea data-save="saveInspItemField" data-seq="' + s + '" data-f="foundEn" placeholder="แปลให้อัตโนมัติ · ส่งให้ Supplier ต่างประเทศอ่าน">' + esc(it.foundEn) + '</textarea></div>') : '') +
     '<div class="frow2"><label>จำนวน</label>' +
@@ -257,7 +265,20 @@ function inspCard(it, docNo){
 
   if (it.sentTo) t += '<div class="sentto">➜ ส่งไปใบเคลม <b>' + esc(it.sentTo) + '</b> แล้ว</div>';
   /* ข้อที่ไม่ผ่านต้องมีรูปแน่นอน · ข้อที่ผ่านถ่ายไว้ก็ดี แต่ไม่บังคับ */
-  t += '<div data-phbox="' + esc(s) + '" data-phreq="' + (it.acc === 'UNACC' ? 'hard' : 'soft') + '"></div></div>';
+  /* งานแท็งค์ต้องเทียบ "รูป STD ประจำรุ่น" กับ "รูปของที่ได้รับจริง"
+     รูป STD เก็บด้วยคีย์ S+ลำดับข้อ คนละชุดกับรูปตรวจ · ยังไม่มีก็เว้นไว้ ใส่ทีหลังได้
+     งานอุปกรณ์ไม่มี STD — มีแค่รูปตอนของมาถึงบริษัท */
+  if (INSTANKER){
+    t += '<div class="stdpair">' +
+         '<div><div class="stdlb">📐 รูปมาตรฐาน (STD) ของรุ่นนี้ <span>ไม่มีก็เว้นไว้ได้</span></div>' +
+           '<div data-phbox="S' + esc(s) + '" data-phreq="soft"></div></div>' +
+         '<div><div class="stdlb">📷 ของที่ได้รับจริง <span>' +
+           (it.acc === 'UNACC' ? 'ข้อที่ไม่ผ่าน ต้องมีรูป' : 'ถ่ายไว้ด้วยจะดีที่สุด') + '</span></div>' +
+           '<div data-phbox="' + esc(s) + '" data-phreq="' + (it.acc === 'UNACC' ? 'hard' : 'soft') + '"></div></div>' +
+         '</div></div>';
+  } else {
+    t += '<div data-phbox="' + esc(s) + '" data-phreq="' + (it.acc === 'UNACC' ? 'hard' : 'soft') + '"></div></div>';
+  }
   return t;
 }
 
@@ -269,7 +290,10 @@ function setAcc(seq, val){
   if (val === 'ACC')   { btns[0].classList.add('on'); card.className = 'itemcard ins ok'; }
   if (val === 'UNACC') { btns[1].classList.add('on'); card.className = 'itemcard ins un'; }
   if (!val)            { card.className = 'itemcard ins'; }
-  box.style.display = (val === 'UNACC') ? '' : 'none';
+  /* เบียร์: "ถ้า ACC มีคอมเมนต์ด้วยว่ายังไง" → ผ่านก็ต้องเขียนได้ ไม่ใช่เฉพาะข้อที่ไม่ผ่าน */
+  box.style.display = (val === 'ACC' || val === 'UNACC') ? '' : 'none';
+  var lb = box.querySelector('.frow label');
+  if (lb) lb.textContent = (val === 'ACC') ? 'ตรวจแล้วเป็นยังไง' : 'สิ่งที่พบ (ไทย)';
 
   /* ติ๊กไม่ผ่าน → รูปกลายเป็นของบังคับ · วาดใหม่แค่แถบรูปของข้อนี้ ไม่แตะหน้าอื่น */
   var pb = document.querySelector('[data-phbox="' + seq + '"]');

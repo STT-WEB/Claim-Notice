@@ -160,13 +160,18 @@ function buildOneDoc(sup){
   var blocks = [];
   blocks.push(blkJob(h, sup));
   if (isRcv()) blocks.push(blkRcvHead(h));
+
+  /* เบียร์ 7 ก.ย. 2569: "การเคลม รูปให้อยู่หน้าข้อนั้น ๆ เลยจะดีกว่า"
+     → เลิกกองรูปไว้ท้ายเล่ม · แต่ละข้อมี รายละเอียด + รูปของข้อนั้น ติดกันเป็นก้อนเดียว
+       คนอ่าน (โดยเฉพาะ Supplier) ไม่ต้องพลิกไปพลิกมาเทียบว่ารูปนี้ของข้อไหน
+     ตารางสรุปยังอยู่ข้างบนเหมือนเดิม เพื่อให้เห็นภาพรวมทั้งใบก่อน */
   blocks.push(blkItems(items, h));
+  blocks = blocks.concat(blkItemDetails(items, h));
+
   if (showMoney()) blocks.push(blkTotals(items, h, sup));
   if (isInternal() && h['หมายเหตุจาก Supplier']) blocks.push(blkReply(h));
   if (!isInternal()) blocks.push(blkReplyBox());
   blocks.push(blkSign(h));
-  /* รูปอยู่ในทุกฉบับ — Supplier ต้องเห็นหลักฐานถึงจะยอมรับเคลม */
-  blocks = blocks.concat(blkPhotos(items));
 
   return '<div class="docset" data-sup="' + esc(sup || '') + '">' + blocks.join('') + '</div>';
 }
@@ -251,11 +256,59 @@ function blkItems(items, h){
     if (hasMoney) t += '<td class="r">' + (price ? money(price) : '—') + '</td><td class="r"><b>' + (tot ? money(tot) : '—') + '</b></td>';
     if (fx)    t += '<td class="r">' + (tot ? money(tot / num2(h['อัตราแลกเปลี่ยน'])) : '—') + '</td>';
     t += '</tr>';
-    /* รายละเอียดยาว ๆ วางเต็มความกว้างใต้แถวข้อมูล — ถ้ายัดในช่องแคบ ๆ ตัวหนังสือจะล้นออกนอกหน้า */
-    t += '<tr class="dsc"><td></td><td colspan="' + (span - 1) + '"><div class="dth">' + esc(it.th) + '</div>' +
-         (bi && it.en ? '<span class="den">' + esc(it.en) + '</span>' : '') + '</td></tr>';
+    /* ⚠️ ไม่ต้องใส่รายละเอียดยาว ๆ ซ้ำในตารางแล้ว
+       ตั้งแต่ v1.2.2 แต่ละข้อมีบล็อกของตัวเองอยู่ใต้ตาราง (รายละเอียด + รูปของข้อนั้น)
+       ถ้าใส่ซ้ำอีกที่ คนอ่านต้องอ่านเรื่องเดียวกัน 2 รอบ และเปลืองกระดาษ
+       ตารางนี้ทำหน้าที่ "สารบัญ" ให้เห็นภาพรวมทั้งใบในหน้าเดียวพอ */
   }
+  var pos = span;                                   // กันตัวแปรที่ไม่ได้ใช้แล้ว ไม่ให้ linter บ่น
   return t + '</tbody></table></div>';
+}
+
+/** รายละเอียด + รูป ของแต่ละข้อ — 1 ข้อ = 1 ก้อน ไม่ถูกแบ่งครึ่งข้ามหน้า
+ *  เบียร์: "รูปให้อยู่หน้าข้อนั้น ๆ เลย"
+ *  ข้อไหนรูปเยอะเกิน 3 รูป ก้อนถัดไปขึ้นหัวว่า (ต่อ) จะได้รู้ว่ายังเป็นข้อเดิม */
+function blkItemDetails(items, h){
+  var out = [];
+  var docNo = h['เลขที่เอกสาร'] || '', jobNo = h['เลขที่ JOB'] || '';
+  var bi = !isInternal() || h['สถานที่ผลิต'] === 'for';
+
+  for (var i = 0; i < items.length; i++){
+    var it = items[i], seq = String(it.seq);
+    var ph = PHOTOS[seq] || [];
+    var per = 3;
+    var chunks = Math.max(1, Math.ceil(ph.length / per));
+
+    for (var c = 0; c < chunks; c++){
+      var part = ph.slice(c * per, c * per + per);
+      var t = '<div class="blk"><div class="capt">ข้อ ' + esc(seq) + ' · ' + esc(it.code ? it.code + ' · ' : '') + esc(it.name) +
+              '<span style="float:right;font-weight:400">' + esc(it.qty) + ' ' + esc(it.unit) +
+              (it.po ? ' · PO ' + esc(it.po) : '') + (it.recv ? ' · รับ ' + esc(it.recv) : '') +
+              (chunks > 1 ? ' · รูปชุดที่ ' + (c + 1) + '/' + chunks : '') + '</span></div>';
+
+      if (c === 0){
+        t += '<div class="dtl"><div class="dth">' + esc(it.th || '—') + '</div>' +
+             (bi && it.en ? '<span class="den">' + esc(it.en) + '</span>' : '') + '</div>';
+      }
+
+      t += '<div class="picbig">';
+      for (var k = 0; k < part.length; k++){
+        t += '<div><img src="' + bigPhoto(part[k].thumb) + '" alt="รูปที่ ' + (c * per + k + 1) + '"></div>';
+      }
+      for (var z = part.length; z < per; z++){
+        t += '<div class="none">' + (ph.length ? '— ไม่มีรูป —' : '— ยังไม่ได้แนบรูปข้อนี้ —') + '</div>';
+      }
+      t += '</div>';
+
+      if (c === chunks - 1){
+        t += '<div class="vd">🎬 วิดีโอและไฟล์เพิ่มเติมของข้อนี้ · 📁 ดูใน Google Drive → ' +
+             '<b>รูป-วิดีโอ / ' + esc(jobNo || 'ไม่ระบุจ๊อบ') + ' / ' + esc(docNo) + '</b></div>';
+      }
+      t += '</div>';
+      out.push(t);
+    }
+  }
+  return out;
 }
 
 function blkTotals(items, h, sup){
@@ -534,8 +587,8 @@ function buildInsDoc(){
   blocks.push(blkInsItems(items, h));
   if (isInternal() && h['หมายเหตุ']) blocks.push(blkInsNote(h));
   if (h['ใบเคลมที่ออกจากใบนี้']) blocks.push(blkInsClaimRef(h));
+  blocks = blocks.concat(blkInsPhotos(items, h));  // รูป STD เทียบกับรูปที่ได้รับจริง
   blocks.push(blkInsSign(h));
-  blocks = blocks.concat(blkPhotos(items));       // รูปหลักฐานชุดเดียวกับใบเคลม
   return '<div class="docset" data-sup="">' + blocks.join('') + '</div>';
 }
 
@@ -609,6 +662,101 @@ function blkInsItems(items, h){
   }
   t += '</tbody></table></div>';
   return t;
+}
+
+/* ═══ รูปตรวจรับ — กติกาที่เบียร์วางไว้ 7 ก.ย. 2569 ═══════════════
+ *  ① แท็งค์ (Tankers) : ต้องเห็น **รูป STD ประจำรุ่น** กับ **รูปที่ได้รับจริง** เทียบกันได้ทันที
+ *  ② แท็งค์ที่ยังไม่มีรูป STD : ช่อง STD ว่างไว้ แต่ **กรอบต้องอยู่เหมือนกันทุกใบ**
+ *     วันไหนมีรูป STD ของรุ่นนั้นแล้ว ใส่ลงช่องเดิมได้เลย เอกสารเก่า-ใหม่หน้าตาเหมือนกันตลอด
+ *  ③ อุปกรณ์ (ไม่มี STD) : ใช้รูปที่ถ่ายตอนของมาถึงบริษัทอย่างเดียว
+ *  ทุกกรณีต้องบอกผล Acc / Un-Acc + คำอธิบาย — **ACC ก็ต้องมีคอมเมนต์ว่าตรวจแล้วเป็นยังไง**
+ *  รูป STD เก็บด้วยคีย์ 'S' + ลำดับข้อ · รูปที่ตรวจจริงใช้ลำดับข้อเฉย ๆ (คนละชุด ไม่ปนกัน) */
+function insIsTanker(h){ return String(h['ชนิดงาน'] || '').indexOf('equip') < 0; }
+function stdKey_(seq){ return 'S' + seq; }
+
+function blkInsPhotos(items, h){
+  var out = [];
+  var tanker = insIsTanker(h);
+  var docNo = h['เลขที่เอกสาร'] || '', jobNo = h['เลขที่ JOB'] || '', model = h['MODEL'] || '';
+
+  for (var i = 0; i < items.length; i++){
+    var it = items[i], seq = String(it.seq);
+    var got = PHOTOS[seq] || [];
+    var std = (PHOTOS[stdKey_(seq)] || [])[0] || null;
+    var a = String(it.acc || '').toUpperCase();
+
+    /* ข้อที่ผ่านและไม่มีรูปอะไรเลย ไม่ต้องกินกระดาษ — สรุปอยู่ในตารางข้างบนแล้ว
+       แต่ข้อที่ไม่ผ่าน ต้องมีบล็อกเสมอ ถึงจะยังไม่ได้แนบรูป จะได้เห็นว่าขาดอะไร */
+    if (!got.length && !std && a !== 'UNACC') continue;
+
+    var cap = 'ข้อ ' + esc(seq) + ' · ' + esc(it.title || '') +
+              '<span style="float:right;font-weight:400">' +
+              (a === 'ACC' ? 'ผ่าน (Accepted)' : a === 'UNACC' ? 'ไม่ผ่าน (Un-Accepted)' : 'ยังไม่ตรวจ') + '</span>';
+
+    /* ── ผลตรวจ + คำอธิบาย · เบียร์: "ถ้า ACC ก็มีคอมเมนต์ด้วยว่ายังไง" ── */
+    var verdict = '<div class="verdict">ผลตรวจ : ' +
+        (a === 'ACC'   ? '<b class="ok">✓ ผ่าน (Accepted)</b>'
+       : a === 'UNACC' ? '<b class="no">✕ ไม่ผ่าน (Un-Accepted)</b>'
+       : '<b>— ยังไม่ตรวจ —</b>') +
+        ' &nbsp;·&nbsp; ' + (it.found ? esc(it.found) : '<span style="color:#999">(ยังไม่ได้เขียนคำอธิบาย)</span>') +
+        (it.foundEn ? '<span class="den">' + esc(it.foundEn) + '</span>' : '') + '</div>';
+    var vdline = '<div class="vd">🎬 วิดีโอและไฟล์เพิ่มเติมของข้อนี้ · 📁 ดูใน Google Drive → ' +
+        '<b>รูป-วิดีโอ / ' + esc(jobNo || 'ไม่ระบุจ๊อบ') + ' / ' + esc(docNo) + '</b></div>';
+
+    var extra = [];                     // รูปที่เหลือ หลังใช้รูปแรกไปเทียบกับ STD แล้ว
+
+    if (tanker){
+      /* ① แท็งค์ — STD ซ้าย · ของจริงขวา อยู่ในกรอบเดียวกัน เทียบได้ในสายตาเดียว
+         รูป STD ใส่ครั้งเดียวพอ ไม่ต้องซ้ำทุกรูป (เปลืองกระดาษเปล่า ๆ) */
+      var t = '<div class="blk"><div class="capt">' + cap + '</div><div class="cmp">';
+      t += '<div><div class="ch">รูปมาตรฐาน (STD)<span>' + esc(model || 'STANDARD') + '</span></div>' +
+           (std ? '<div class="cb"><img src="' + bigPhoto(std.thumb) + '" alt="รูป STD"></div>'
+                : '<div class="cb empty">— ยังไม่มีรูป STD ของรุ่นนี้ —<br>' +
+                  '<span style="font-size:10px">ใส่เพิ่มทีหลังได้ ช่องนี้เว้นไว้ให้แล้ว</span></div>') +
+           '</div>';
+      t += '<div><div class="ch">ของที่ได้รับจริง<span>AS RECEIVED</span></div>' +
+           (got[0] ? '<div class="cb"><img src="' + bigPhoto(got[0].thumb) + '" alt="ของที่ได้รับ"></div>'
+                   : '<div class="cb empty">— ยังไม่ได้ถ่ายรูปข้อนี้ —</div>') +
+           '</div></div>';
+      extra = got.slice(1);
+      if (!extra.length) t += verdict + vdline;
+      t += '</div>';
+      out.push(t);
+    } else {
+      /* ② อุปกรณ์ — ไม่มี STD · ใช้รูปที่ถ่ายตอนของมาถึงบริษัท 3 รูปต่อแถว */
+      extra = got.slice(0);
+      if (!extra.length){
+        out.push('<div class="blk"><div class="capt">' + cap + '</div>' +
+                 '<div class="picbig"><div class="none">— ยังไม่ได้ถ่ายรูปข้อนี้ —</div>' +
+                 '<div class="none"></div><div class="none"></div></div>' + verdict + vdline + '</div>');
+      }
+    }
+
+    /* รูปที่เหลือของข้อเดียวกัน — 3 รูปต่อแถว ต่อท้ายไปเรื่อย ๆ */
+    var per = 3;
+    for (var c = 0; c < extra.length; c += per){
+      var part = extra.slice(c, c + per);
+      var last = (c + per >= extra.length);
+      var t2 = '<div class="blk"><div class="capt">ข้อ ' + esc(seq) + ' · ' + esc(it.title || '') +
+               '<span style="float:right;font-weight:400">' +
+               (tanker ? 'รูปเพิ่มเติมของที่ได้รับ' : 'ของที่ได้รับ') +
+               ' ' + (c + 1) + '–' + Math.min(c + per, extra.length) + ' จาก ' + extra.length + '</span></div>';
+      t2 += '<div class="picbig">';
+      for (var k = 0; k < part.length; k++) t2 += '<div><img src="' + bigPhoto(part[k].thumb) + '" alt="รูปตรวจรับ"></div>';
+      for (var z = part.length; z < per; z++) t2 += '<div class="none">— ไม่มีรูป —</div>';
+      t2 += '</div>';
+      if (last) t2 += verdict + vdline;
+      t2 += '</div>';
+      out.push(t2);
+    }
+  }
+
+  if (!out.length){
+    out.push('<div class="blk"><div class="capt">รูปตรวจรับ</div>' +
+             '<div class="vd" style="border-top:1px solid #666">— ใบนี้ยังไม่มีรูปแนบ — ' +
+             'ข้อที่ไม่ผ่านต้องมีรูปทุกข้อ ไม่งั้นส่งไปเปิดใบเคลมไม่ได้</div></div>');
+  }
+  return out;
 }
 
 function blkInsNote(h){
