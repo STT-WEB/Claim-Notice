@@ -59,7 +59,7 @@
       <div class="sub">ใช้รหัสพนักงาน + PIN ลับส่วนตัวของคุณ (ชุดเดียวกับ STT NOVA)</div>
       <div class="lgtabs">
         <button class="lrole on" id="tabLogin" onclick="loginTab('login')">🔑 มี PIN แล้ว</button>
-        <button class="lrole" id="tabReg" onclick="loginTab('reg')">📝 ยังไม่มี PIN</button>
+        <button class="lrole" id="tabReg" onclick="loginTab('reg')">📝 ขอ PIN</button>
       </div>
       <div id="loginPin">
         <label class="lglabel">รหัสพนักงาน</label>
@@ -71,10 +71,10 @@
         <div class="muted" style="font-size:12px;margin-top:10px">ระบบจะจำว่าคุณคือใคร (บันทึกประวัติ) · ลืม PIN → ติดต่อผู้ดูแล</div>
       </div>
       <div id="loginReg" style="display:none">
-        <!-- เบียร์ 7 ก.ย. 2569: "คนที่ยังไม่มี PIN ทำไมต้องไป register ฝั่ง NOVA
-             ทำไมทำผ่านอันนี้เลยไม่ได้" → ตั้งที่นี่ได้เลยแล้ว
-             ช่อง PIN ในชีต USERS มีช่องเดียว ใช้ร่วมกันทั้ง NOVA และงานเคลม
-             ตั้งที่นี่ = ใช้เข้า NOVA ได้ด้วย ไม่ต้องตั้งสองที่ -->
+        <!-- เบียร์ 8 ก.ย. 2569: "ตอน NOVA คือ พอกดขอ PIN ก็จะโชว์ให้พนักงานเห็นในหน้านั้นเลย
+             แล้วเค้าก็จำกัน เพราะเบียร์จะไม่ให้ซ้ำ เพราะว่าแต่ละคนต้องจำของตัวเอง"
+             → พนักงานไม่ได้ตั้งเลขเอง ระบบสุ่มให้ แล้วโชว์ครั้งเดียวตรงนี้
+             ช่อง PIN ในชีต USERS มีช่องเดียว ใช้ร่วมกันทั้ง NOVA และงานเคลม -->
         <label class="lglabel">รหัสพนักงาน</label>
         <input type="text" id="rgEmp" class="pininput" placeholder="เช่น 6406013"
                onkeydown="if(event.key==='Enter')checkReg()">
@@ -82,18 +82,23 @@
         <div id="rgStep2" style="display:none;margin-top:12px">
           <div class="muted" style="font-size:12.5px;line-height:1.6" id="rgWho"></div>
           <label class="lglabel">ชื่อ-สกุลของคุณ</label>
-          <input type="text" id="rgName" class="pininput" placeholder="พิมพ์ให้ตรงกับที่ฝ่ายบุคคลบันทึกไว้">
-          <label class="lglabel">ตั้ง PIN (ตัวเลข 6 หลัก)</label>
-          <input type="password" inputmode="numeric" id="rgPin" class="pininput pin" placeholder="● ● ● ● ● ●">
-          <label class="lglabel">ยืนยัน PIN อีกครั้ง</label>
-          <input type="password" inputmode="numeric" id="rgPin2" class="pininput pin" placeholder="● ● ● ● ● ●"
+          <input type="text" id="rgName" class="pininput" placeholder="พิมพ์ให้ตรงกับที่ฝ่ายบุคคลบันทึกไว้"
                  onkeydown="if(event.key==='Enter')doReg()">
-          <button class="lbtn" onclick="doReg()">ตั้ง PIN แล้วเข้าใช้งาน →</button>
+          <button class="lbtn" onclick="doReg()">ขอ PIN ของฉัน →</button>
+        </div>
+        <!-- กล่องโชว์ PIN ครั้งเดียว -->
+        <div id="rgDone" style="display:none">
+          <div class="pinbox">
+            <div class="pbt">PIN ของคุณคือ</div>
+            <div class="pbn" id="rgPinShow">••••••</div>
+            <div class="pbw">⚠️ จำให้ดี — <b>ระบบจะไม่โชว์ให้ดูอีก</b> และไม่มีหน้าไหนเปิดดูย้อนหลังได้</div>
+          </div>
+          <button class="lbtn" onclick="regGoLogin()">จำแล้ว — เข้าสู่ระบบ →</button>
         </div>
         <div class="lerr" id="rgErr"></div>
         <div class="muted" style="font-size:12px;margin-top:10px">
           PIN นี้ใช้ได้ทั้ง <b>งานเคลม</b> และ <b>STT NOVA</b> (ทะเบียนเดียวกัน)<br>
-          ตั้งเองได้เฉพาะคนที่ยังไม่เคยมี PIN · ลืม PIN แล้วต้องให้ผู้ดูแลรีเซ็ตให้
+          ขอได้ครั้งเดียว เฉพาะคนที่ยังไม่เคยมี PIN · ลืม PIN แล้วต้องแจ้งผู้ดูแล
         </div>
       </div>
     </div>

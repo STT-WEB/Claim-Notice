@@ -901,32 +901,60 @@ T('งานซ่อม/ฝีมือ ไม่มีอะไหล่ — �
   return n+' → ส่งขออนุมัติได้โดยไม่มีรายการของ (ขั้น '+a.stage+')'; });
 
 console.log('\n⑭ ตั้ง PIN ครั้งแรกในระบบนี้เลย (ไม่ต้องไป NOVA)');
-T('คนที่ยังไม่มี PIN ตั้งเองได้ แล้วเข้าระบบได้ทันที', ()=>{
-  const emp='6811001';                               // นายศิวาวัฒน์ — Production, PIN ว่าง
-  const chk=call('checkPinSetup',[emp]);
-  if(!chk.ok) throw new Error('ควรตั้งได้ แต่ระบบบอกว่า: '+chk.msg);
-  if(!chk.hint) throw new Error('ไม่ได้บอกชื่อแบบปิดบางส่วนให้เจ้าตัวยืนยัน');
-  let r=call('setupPin',[emp,'ชื่อผิด','445566','445566']);
-  if(r.ok) throw new Error('ชื่อไม่ตรงทะเบียน แต่ตั้ง PIN ได้ — สวมสิทธิ์กันได้');
-  r=call('setupPin',[emp,'นายศิวาวัฒน์ มะลิดา','111111','111111']);
-  if(r.ok) throw new Error('PIN เดาง่ายอย่าง 111111 ไม่ควรผ่าน');
-  r=call('setupPin',[emp,'นายศิวาวัฒน์ มะลิดา','445566','445567']);
-  if(r.ok) throw new Error('PIN สองช่องไม่ตรงกัน แต่ผ่าน');
-  r=call('setupPin',[emp,'ศิวาวัฒน์ มะลิดา','445566','445566']);   // ไม่ใส่คำนำหน้าก็ต้องผ่าน
-  if(!r.ok) throw new Error('ตั้ง PIN ไม่สำเร็จ: '+r.msg);
-  const lg=call('loginEmpPin',[emp,'445566']);
-  if(!lg.ok) throw new Error('ตั้ง PIN แล้วเข้าระบบไม่ได้: '+lg.msg);
+T('ขอ PIN ครั้งแรก — ระบบสุ่มให้ โชว์ครั้งเดียว แล้วเข้าระบบด้วยเลขนั้นได้', ()=>{
+  const emp='6811001';
+  const c=call('checkPinSetup',[emp]);
+  if(!c.ok) throw new Error('เช็คไม่ผ่าน: '+c.msg);
+  if(!/••/.test(c.hint)) throw new Error('ชื่อไม่ถูกปิดบัง: '+c.hint);
+  let r=call('requestPin',[emp,'ชื่อผิดแน่นอน']);
+  if(r.ok) throw new Error('พิมพ์ชื่อผิดแต่ได้ PIN');
+  r=call('requestPin',[emp,'ศิวาวัฒน์ มะลิดา']);          // ไม่ใส่คำนำหน้าก็ต้องผ่าน
+  if(!r.ok) throw new Error('ขอ PIN ไม่สำเร็จ: '+r.msg);
+  if(!/^\d{6}$/.test(r.pin)) throw new Error('PIN ที่ได้ไม่ใช่ตัวเลข 6 หลัก: '+r.pin);
+  if(/^(\d)\1{5}$/.test(r.pin)||r.pin==='123456') throw new Error('สุ่มได้ PIN ที่เดาง่าย: '+r.pin);
+  const lg=call('loginEmpPin',[emp,r.pin]);
+  if(!lg.ok) throw new Error('ได้ PIN มาแล้วเข้าระบบไม่ได้: '+lg.msg);
   const again=call('checkPinSetup',[emp]);
-  if(again.ok) throw new Error('มี PIN แล้วยังตั้งซ้ำได้ — คนอื่นยึดบัญชีได้');
-  return lg.name+' ตั้ง PIN เองแล้วเข้าระบบได้ · ตั้งซ้ำไม่ได้แล้ว'; });
+  if(again.ok) throw new Error('ขอซ้ำได้อีก — คนอื่นยึดบัญชีได้');
+  return lg.name+' ได้ PIN จากระบบ · เข้าระบบได้ · ขอซ้ำไม่ได้'; });
 
-T('สิทธิ์ผู้บริหาร/ผู้อนุมัติ ตั้ง PIN เองไม่ได้ (กันคนยึดบัญชีที่เห็นเงินทั้งบริษัท)', ()=>{
-  const r=call('checkPinSetup',['999999']);          // คุณแบล็ค (VP) — EXEC → ADMIN
-  if(r.ok) throw new Error('บัญชีผู้บริหารตั้ง PIN เองได้ — อันตรายมาก');
-  if(!/ผู้บริหาร|ผู้ดูแล/.test(r.msg)) throw new Error('ข้อความไม่ได้บอกเหตุผล: '+r.msg);
-  const s2=call('setupPin',['999999','คุณแบล็ค (VP)','778899','778899']);
-  if(s2.ok) throw new Error('กันแค่หน้าเช็ค แต่ setupPin ยังตั้งได้จริง');
-  return 'กันไว้ถูกแล้ว: '+r.msg; });
+T('PIN ที่ระบบสุ่มให้ ต้องไม่ซ้ำกับใครในทะเบียน', ()=>{
+  /* เบียร์: "เบียร์จะไม่ให้ซ้ำ เพราะว่าแต่ละคนต้องจำของตัวเอง"
+     PIN ซ้ำ = ระบบแยกไม่ออกว่าใครกด ลายเซ็นบนเอกสารก็พิสูจน์ไม่ได้ */
+  const got=[];
+  [['4900044','นาย สุกิจ เพียพยัคฆ์']].forEach(([e,n])=>{
+    const r=call('requestPin',[e,n]);
+    if(!r.ok) throw new Error(e+' ขอไม่ได้: '+r.msg);
+    got.push(r.pin);
+  });
+  const all=call('getUsers_',[]).filter(u=>u.pin).map(u=>String(u.pin));
+  const dup=all.filter((v,i)=>all.indexOf(v)!==i);
+  if(dup.length) throw new Error('มี PIN ซ้ำกันในทะเบียน: '+dup.join(', '));
+  return 'ทะเบียนมี PIN '+all.length+' ตัว ไม่ซ้ำกันเลย'; });
+
+T('ระบบไม่บันทึกตัวเลข PIN ลง LOG (LOG บอกแค่ว่าใครขอ เมื่อไหร่)', ()=>{
+  const lg = call('ss_',[]).getSheetByName('LOG');
+  const lr = lg.getLastRow();
+  const v = lg.getRange(2,1,lr-1,lg.getLastColumn()).getDisplayValues();
+  const pins = call('getUsers_',[]).filter(u=>u.pin).map(u=>String(u.pin));
+  for (const row of v){
+    const line = row.join(' ');
+    for (const p of pins) if (line.indexOf(p) >= 0)
+      throw new Error('เจอเลข PIN ในบรรทัด LOG: '+line.slice(0,80));
+  }
+  return 'ตรวจ '+v.length+' บรรทัด ไม่มีเลข PIN หลุดลง LOG'; });
+
+/* เบียร์ 8 ก.ย. 2569: "ผู้ใช้ & PIN ของทุกคนนั้นแหละ Candy เป็นคนสร้าง PIN ให้"
+   → เลิกกันสิทธิ์ผู้บริหาร/ผู้อนุมัติแล้ว ขอ PIN ได้เหมือนกันหมด (กติกาเดียวกับ NOVA)
+     ด่านที่เหลือคือ ต้องพิมพ์ชื่อ-สกุลให้ตรงทะเบียน + ขอได้ครั้งเดียวตลอดชีพ */
+T('สิทธิ์ผู้บริหารก็ขอ PIN เองได้แล้ว แต่ต้องพิมพ์ชื่อให้ตรงทะเบียน', ()=>{
+  const r=call('checkPinSetup',['999999']);
+  if(!r.ok) throw new Error('ผู้บริหารขอ PIN ไม่ได้: '+r.msg);
+  const bad=call('requestPin',['999999','ใครก็ไม่รู้']);
+  if(bad.ok) throw new Error('พิมพ์ชื่อมั่วแล้วได้ PIN ของผู้บริหาร — อันตรายมาก');
+  const ok=call('requestPin',['999999','คุณแบล็ค (VP)']);
+  if(!ok.ok) throw new Error('ชื่อตรงแล้วยังขอไม่ได้: '+ok.msg);
+  return 'ขอได้ · ชื่อไม่ตรงกันไว้'; });
 
 T('คนที่ไม่มี role for Claim ตั้ง PIN ไม่ได้', ()=>{
   const r=call('checkPinSetup',['6406032']);         // ไม่ได้ใส่ role
@@ -941,13 +969,10 @@ T('ไม่มีคำสั่งดูรายชื่อ PIN หรือ
     if (sandbox[fn]) throw new Error(fn+' ยังอยู่ — ต้องเอาออกทั้งหมด'); });
   return 'listUsersPin / adminSetPin ถูกถอดออกแล้วทั้งคู่'; });
 
-T('พนักงานยังตั้ง PIN ของตัวเองครั้งแรกได้เหมือนเดิม (ไม่ได้ตัดทิ้งไปด้วย)', ()=>{
-  const r = call('checkPinSetup',['4900044']);
-  if(!r.ok) throw new Error('คนที่ยังไม่มี PIN ตั้งเองไม่ได้แล้ว: '+r.msg);
-  const s2 = call('setupPin',['4900044','นาย สุกิจ เพียพยัคฆ์','335577','335577']);
-  if(!s2.ok) throw new Error('ตั้ง PIN เองไม่สำเร็จ: '+s2.msg);
-  if(!call('loginEmpPin',['4900044','335577']).ok) throw new Error('ตั้งแล้วเข้าระบบไม่ได้');
-  return 'ตั้งเองได้ · เข้าระบบได้'; });
+T('ไม่มีคำสั่งให้พนักงานตั้งเลข PIN เองแล้ว — ระบบแจกอย่างเดียว', ()=>{
+  if (sandbox.setupPin) throw new Error('setupPin ยังอยู่ — เบียร์สั่งให้ระบบแจกอย่างเดียว');
+  if (!sandbox.requestPin) throw new Error('ไม่มี requestPin — พนักงานขอ PIN ไม่ได้เลย');
+  return 'setupPin ถูกถอดออก · เหลือ requestPin ที่ระบบสุ่มให้'; });
 
 T('รายงานส่ง HR — เห็นเฉพาะ HR · ผู้ดูแล · ผู้อนุมัติ (จัดซื้อไม่เห็นแล้ว)', ()=>{
   let buyBlocked = false;

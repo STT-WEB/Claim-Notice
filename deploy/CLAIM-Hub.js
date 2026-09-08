@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v1.4.1';
+var VERSION = 'v1.5.0';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -253,7 +253,7 @@ function getUsers_(){
  *   · ต้องพิมพ์ชื่อ-สกุลตัวเองให้ตรงกับในทะเบียน จะได้ไม่ใช่แค่รู้รหัสพนักงานแล้วสวมสิทธิ์
  *   · **สิทธิ์ระดับผู้บริหาร/ผู้อนุมัติ ตั้งเองไม่ได้** ต้องให้ผู้ดูแลตั้งให้เท่านั้น
  *     (ไม่งั้นใครก็ตามที่รู้รหัสพนักงานของ President จะยึดบัญชีที่เห็นเงินทั้งบริษัทได้)   */
-var PIN_SELF_BLOCK = ['ADMIN','APPROVER'];
+/* PIN_SELF_BLOCK ถูกถอดออก 8 ก.ย. 2569 — ขอ PIN ได้ทุกสิทธิ์เหมือนกันหมด */
 
 /** ชื่อในทะเบียนกับที่พิมพ์มา ตรงกันไหม — ตัดช่องว่างและคำนำหน้าออกก่อนเทียบ */
 function nameLike_(a, b){
@@ -276,11 +276,10 @@ function checkPinSetup(emp){
     if (us[i].role === 'GUEST')
       return { ok:false, msg:'รหัสนี้ไม่ได้อยู่ในระบบเคลม — ให้ผู้ดูแลกำหนดหน้าที่ (role for Claim) ให้ก่อน' };
     if (us[i].pin)
-      return { ok:false, msg:'รหัสนี้ตั้ง PIN ไว้แล้ว — ถ้าลืม PIN ให้ผู้ดูแลรีเซ็ตให้' };
-    for (var k = 0; k < (us[i].roles || []).length; k++){
-      if (PIN_SELF_BLOCK.indexOf(us[i].roles[k]) >= 0)
-        return { ok:false, msg:'สิทธิ์ระดับผู้บริหาร/ผู้อนุมัติ ตั้ง PIN เองไม่ได้ — ให้ผู้ดูแลตั้งให้เพื่อความปลอดภัย' };
-    }
+      return { ok:false, msg:'รหัสนี้มี PIN แล้ว — ขอใหม่ไม่ได้ · ลืม PIN ให้แจ้งผู้ดูแล' };
+    /* เบียร์ 8 ก.ย. 2569: "ผู้ใช้ & PIN ของทุกคนนั้นแหละ Candy เป็นคนสร้าง PIN ให้"
+       → ขอ PIN ได้ทุกสิทธิ์เหมือนกันหมด (กติกาเดียวกับ STT NOVA)
+       ด่านกันคนอื่นมาขอแทน = ต้องพิมพ์ชื่อ-สกุลเต็มให้ตรงทะเบียน + ขอได้ครั้งเดียวตลอดชีพ */
     /* บอกชื่อแบบปิดบางส่วน ให้คนที่เป็นเจ้าของรู้ว่าใช่ตัวเอง แต่คนอื่นเดาไม่ได้ */
     var nm = us[i].name || '';
     var hint = nm ? (nm.slice(0, 2) + '••••' + nm.slice(-2)) : '';
@@ -289,15 +288,31 @@ function checkPinSetup(emp){
   return { ok:false, msg:'ไม่พบรหัสพนักงาน ' + emp + ' ในทะเบียน — ตรวจเลขอีกครั้ง หรือแจ้งฝ่ายบุคคล' };
 }
 
-/** ตั้ง PIN ครั้งแรกด้วยตัวเอง */
-function setupPin(emp, fullName, pin, pin2){
-  emp = norm_(emp); pin = norm_(pin); pin2 = norm_(pin2);
+/** สุ่ม PIN 6 หลักที่ยังไม่ซ้ำใครในทะเบียน
+ *  เบียร์: "เบียร์จะไม่ให้ซ้ำ เพราะว่าแต่ละคนต้องจำของตัวเอง"
+ *  — ห้ามซ้ำ เพราะ PIN คือตัวบอกว่า "ใคร" เป็นคนกดบนเอกสาร ซ้ำเมื่อไหร่ลายเซ็นก็พิสูจน์ไม่ได้
+ *  — ตัดเลขที่เดาง่ายทิ้ง (111111 · 123456 · 000000 · เลขเรียง) */
+function newUniquePin_(){
+  var us = getUsers_(), used = {};
+  for (var i = 0; i < us.length; i++) if (us[i].pin) used[norm_(us[i].pin)] = true;
+  for (var t = 0; t < 400; t++){
+    var p = String(Math.floor(100000 + Math.random() * 900000));
+    if (used[p]) continue;
+    if (/^(\d)\1{5}$/.test(p)) continue;                 // 111111
+    if (p === '123456' || p === '654321') continue;
+    if (/^(\d)(\d)\1\2\1\2$/.test(p)) continue;         // 121212
+    return p;
+  }
+  return null;
+}
+
+/** ขอ PIN ครั้งแรก — ระบบสุ่มให้ แล้วโชว์บนหน้าจอครั้งเดียว (กติกาเดียวกับ STT NOVA)
+ *  เบียร์ 8 ก.ย. 2569: "พอกดขอ PIN ก็จะโชว์ให้พนักงานเห็นในหน้านั้นเลย แล้วเค้าก็จำกัน"
+ *  ⚠️ ระบบไม่มีหน้าไหนเปิดดู PIN ย้อนหลังได้อีก — เห็นได้ครั้งเดียวตอนนี้เท่านั้น */
+function requestPin(emp, fullName){
+  emp = norm_(emp);
   var pre = checkPinSetup(emp);
   if (!pre.ok) return pre;
-  if (!/^\d{6}$/.test(pin)) return { ok:false, msg:'PIN ต้องเป็นตัวเลข 6 หลัก' };
-  if (pin !== pin2)          return { ok:false, msg:'PIN สองช่องไม่ตรงกัน' };
-  if (/^(\d)\1{5}$/.test(pin) || pin === '123456' || pin === '000000')
-    return { ok:false, msg:'PIN นี้เดาง่ายเกินไป ใช้เลขอื่นครับ' };
 
   var us = getUsers_(), who = null;
   for (var i = 0; i < us.length; i++) if (us[i].emp === emp) who = us[i];
@@ -305,10 +320,15 @@ function setupPin(emp, fullName, pin, pin2){
   if (!nameLike_(who.name, fullName))
     return { ok:false, msg:'ชื่อ-สกุลไม่ตรงกับในทะเบียน — พิมพ์ให้ตรงกับที่ฝ่ายบุคคลบันทึกไว้' };
 
+  var pin = newUniquePin_();
+  if (!pin) return { ok:false, msg:'ระบบสุ่ม PIN ที่ไม่ซ้ำไม่ได้ — แจ้งผู้ดูแล' };
+
   var r = writeUserPin_(emp, pin);
   if (!r.ok) return r;
-  log_('setupPin', emp, who.name + ' ตั้ง PIN ครั้งแรกเอง');
-  return { ok:true, msg:'ตั้ง PIN เรียบร้อย — เข้าสู่ระบบได้เลย (PIN นี้ใช้กับ NOVA ได้ด้วย)' };
+  /* LOG บันทึกแค่ "ใครขอ เมื่อไหร่" — ไม่เก็บตัวเลข PIN ลง LOG เด็ดขาด */
+  log_('requestPin', emp, who.name + ' ขอ PIN ครั้งแรก (ระบบสุ่มให้)');
+  return { ok:true, pin:pin, name:who.name,
+           msg:'นี่คือ PIN ของคุณ จำไว้ให้ดี — ระบบจะไม่โชว์ให้ดูอีก' };
 }
 
 /** เขียน PIN ลงชีต USERS — ที่เดียวที่แตะช่องนี้ */

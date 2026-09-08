@@ -11,7 +11,7 @@
    วิธีแก้: ฝังเลขเวอร์ชันไว้ในไฟล์หน้าเว็บเองด้วย (CLIENT_VER ข้างล่างนี้)
    ถ้า 2 ค่าไม่ตรงกัน = จอที่เห็นเป็นของเก่าแน่นอน ระบบจะขึ้นแถบแดงบอกให้กด Ctrl+Shift+R
    ⚠️ แก้ไฟล์หน้าเว็บทุกครั้ง ต้องเลื่อน CLIENT_VER ให้ตรงกับ VERSION ใน CLAIM-Hub.js */
-var CLIENT_VER = 'v1.4.1';
+var CLIENT_VER = 'v1.5.0';
 
 var AUTH = null;        // {emp, pin} — อยู่ในหน่วยความจำหน้าเว็บเท่านั้น ไม่เก็บลงเครื่อง
 var ME   = null;
@@ -223,7 +223,7 @@ function checkReg(){
       $('rgErr').textContent = '';
       $('rgWho').innerHTML = '✅ พบรหัสนี้ในทะเบียน — <b style="color:#fff">' + esc(r.hint) + '</b>' +
         (r.dept ? ' · ' + esc(r.dept) : '') + (r.role ? ' · สิทธิ์ ' + esc(r.role) : '') +
-        '<br>ถ้าใช่ตัวคุณ พิมพ์ชื่อ-สกุลเต็มแล้วตั้ง PIN ได้เลย';
+        '<br>ถ้าใช่ตัวคุณ พิมพ์ชื่อ-สกุลเต็ม แล้วกดขอ PIN ได้เลย';
       $('rgStep2').style.display = '';
       $('rgName').focus();
     })
@@ -231,27 +231,39 @@ function checkReg(){
     .checkPinSetup(emp);
 }
 
+/* ═══ ขอ PIN ครั้งแรก — ระบบสุ่มให้ แล้วโชว์ครั้งเดียว ═══════════════════
+   เบียร์ 8 ก.ย. 2569: "พอกดขอ PIN ก็จะโชว์ให้พนักงานเห็นในหน้านั้นเลย แล้วเค้าก็จำกัน
+                        เพราะเบียร์จะไม่ให้ซ้ำ เพราะว่าแต่ละคนต้องจำของตัวเอง"
+   ⚠️ ห้ามพาเข้าระบบให้อัตโนมัติ — ต้องให้เขาเห็นเลขและจำก่อน
+      แล้วพิมพ์เองรอบแรก จะได้รู้ว่าจำได้จริง                                */
 function doReg(){
   var emp = $('rgEmp').value.trim(), nm = $('rgName').value.trim();
-  var p1 = $('rgPin').value.trim(), p2 = $('rgPin2').value.trim();
   $('rgErr').textContent = '';
   if (!nm){ $('rgErr').textContent = 'พิมพ์ชื่อ-สกุลของคุณ'; return; }
-  if (!p1 || !p2){ $('rgErr').textContent = 'กรอก PIN ให้ครบทั้งสองช่อง'; return; }
-  $('rgErr').innerHTML = '<span class="spin"></span> กำลังตั้ง PIN…';
+  $('rgErr').innerHTML = '<span class="spin"></span> กำลังขอ PIN…';
   google.script.run
     .withSuccessHandler(function(r){
-      if (!r || !r.ok){ $('rgErr').textContent = (r && r.msg) || 'ตั้ง PIN ไม่สำเร็จ'; return; }
-      /* ตั้งเสร็จ พาเข้าระบบให้เลย ไม่ต้องพิมพ์ซ้ำ */
-      google.script.run
-        .withSuccessHandler(function(lr){
-          if (lr && lr.ok){ AUTH = { emp:emp, pin:p1 }; enterApp(lr, 'ตั้ง PIN ครั้งแรก'); }
-          else { loginTab('login'); $('empInput').value = emp; $('loginErr').textContent = r.msg; }
-        })
-        .withFailureHandler(function(){ loginTab('login'); $('empInput').value = emp; })
-        .loginEmpPin(emp, p1);
+      if (!r || !r.ok){ $('rgErr').textContent = (r && r.msg) || 'ขอ PIN ไม่สำเร็จ'; return; }
+      $('rgErr').textContent = '';
+      $('rgStep2').style.display = 'none';
+      $('rgEmp').disabled = true;
+      $('rgPinShow').textContent = r.pin;
+      $('rgDone').style.display = '';
     })
     .withFailureHandler(function(e){ $('rgErr').textContent = (e && e.message) || 'เชื่อมต่อไม่ได้'; })
-    .setupPin(emp, nm, p1, p2);
+    .requestPin(emp, nm);
+}
+
+/* กดจำแล้ว → ไปแท็บเข้าสู่ระบบ เติมรหัสพนักงานให้ แต่ PIN ต้องพิมพ์เอง */
+function regGoLogin(){
+  var emp = $('rgEmp').value.trim();
+  $('rgPinShow').textContent = '••••••';       // ลบเลขออกจากหน้าจอทันที
+  $('rgDone').style.display = 'none';
+  $('rgEmp').disabled = false; $('rgEmp').value = ''; $('rgName').value = '';
+  loginTab('login');
+  $('empInput').value = emp;
+  $('pinInput').value = '';
+  $('pinInput').focus();
 }
 
 function logout(){
