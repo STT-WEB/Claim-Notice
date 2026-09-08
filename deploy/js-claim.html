@@ -630,6 +630,7 @@ function drawClaim(){
   fillVendorList();
   bindAll($('view'), docNo);
   applyLocks($('view'));
+  applyPaneLocks();          // ปิด "ทั้งแท็บ" ที่ยังไม่ถึงคิวของคนที่เปิดอยู่ (เบียร์สั่ง 8 ก.ย. 2569)
 
   /* ตารางรายการของใบที่บันทึกแล้ว — รูปผูกกับ "ลำดับรายการ" ตรง ๆ */
   var rows = [];
@@ -816,6 +817,29 @@ function paneSupplier(c, docNo){
                                  : '<span class="pill">ไม่มี — ข้ามไปปิดจบ</span>') + '</td></tr>';
   }
   t += '</tbody></table></div>';
+
+  /* เบียร์: "เพิ่มคำตอบ Supplier นำกลับไปซ่อม … ต้องมีของออกจากสโตร์ และรับเข้ามาใหม่ + ตรวจสอบจาก QC"
+     → กรณีนี้ของเดินทางออกไปแล้วกลับมา ต้องบันทึกวันไป-วันกลับไว้ ไม่งั้นตามของไม่ได้ว่าค้างที่ Supplier กี่วัน
+       ส่วนเส้นทาง "เข้าสโตร์ → QC ตรวจ" ระบบเดินให้เองแล้ว (back:true ใช้ขั้น 6-7-8 ชุดเดิม) */
+  var curR = null;
+  for (var rj = 0; rj < RS.length; rj++) if (RS[rj].key === cur) curR = RS[rj];
+  if (curR && curR.needSendBack){
+    t += '<div class="card tight" style="margin-top:14px"><div class="cardhd">' +
+         '<h3>🚚 ของที่ส่งกลับไปให้ Supplier ซ่อม</h3>' +
+         '<span class="sub">กรอกวันที่ของออกจากโรงงาน และวันที่ซ่อมเสร็จกลับมา</span></div>';
+    t += '<div class="fgrid">';
+    t += '<div class="frow"><label>วันที่ส่งของไปซ่อม <b class="req">*</b></label>' +
+      '<input data-save="saveClaimField" data-f="sendBackAt" placeholder="DD/MM/YYYY" value="' +
+      esc(h['วันที่ส่งของไปซ่อม']) + '"></div>';
+    t += '<div class="frow"><label>วันที่ของกลับจากซ่อม</label>' +
+      '<input data-save="saveClaimField" data-f="backFromRepairAt" placeholder="DD/MM/YYYY" value="' +
+      esc(h['วันที่ของกลับจากซ่อม']) + '"></div>';
+    t += '</div>';
+    t += '<div class="hint" style="margin-top:8px">ของกลับมาแล้ว ให้ <b>สโตร์รับเข้าคลัง</b> (ขั้น 6) แล้ว <b>QC ตรวจรับของกลับ</b> (ขั้น 7) ' +
+         'เหมือนกรณีส่งของใหม่มาให้ — วันที่ของกลับจากซ่อมตรงนี้กรอกทีหลังได้ ไม่บังคับตอนส่งต่อ</div>';
+    t += '</div>';
+  }
+
   t += '<div class="frow"><label>รายละเอียดผลการเคลม</label>' +
     '<textarea class="tall" data-save="saveClaimField" data-f="resultDetail" placeholder="สรุปว่าตกลงกันได้ยังไง">' + esc(h['รายละเอียดผลการเคลม']) + '</textarea></div>';
   t += '<div class="frow"><label>หมายเหตุ / ข้อความจาก Supplier</label>' +
@@ -1295,6 +1319,8 @@ function drawPhotoBox(box){
   if (typeof box === 'string') box = document.querySelector('[data-phbox="' + box + '"]');
   if (!box) return;
   box.innerHTML = photoStrip(box.getAttribute('data-phbox'), box.getAttribute('data-phreq') || 'hard');
+  /* กล่องรูปวาดใหม่ = ปุ่มชุดใหม่ ต้องล็อกซ้ำ ไม่งั้นแท็บที่ปิดไว้กลับมาแนบรูปได้ */
+  if (typeof relockPane === 'function') relockPane(box);
 }
 function photoStrip(seq, req){
   var list = PHOTOS[String(seq)] || [];

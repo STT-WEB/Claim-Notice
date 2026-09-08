@@ -43,23 +43,47 @@ function repHead(title, sub){
 
 /* ─── 3.5 รวมยอดเรียกเก็บ → ออกใบเดียว ───
    เบียร์: "ตอนเรียกเก็บเงิน สามารถรวมยอดจากใบเคลมสินค้าหลายใบ และออกใบรับเงินใบเดียวได้" */
+/* เบียร์ 8 ก.ย. 2569: "รวมหลายใบ CLM ในจ๊อบเดียว ออกใบเรียกเก็บรอบเดียว — ใช่ อยากรวมตามจ๊อบด้วย"
+   → มี 2 วิธีจัดกลุ่มให้เลือก ปุ่มสลับอยู่บนสุด ระบบจำไว้ให้ระหว่างใช้งาน */
+var BILLMODE = 'sup';       // 'sup' = รวมตาม Supplier · 'job' = รวมตามเลขที่ JOB
+function setBillMode(m){ BILLMODE = m; loadRepBill(); }
+
 function loadRepBill(){
-  srv('reportBilling', [AUTH], function(d){
+  srv('reportBilling', [AUTH, BILLMODE], function(d){
+    var byJob = (d.mode === 'job');
     var t = '<div class="card">' + repHead('3.5 รวมยอดเรียกเก็บ → ออกใบเดียว',
-      'รวมได้เฉพาะใบของ Supplier เจ้าเดียวกัน และเฉพาะใบที่ผลการเคลมบอกว่าต้องเรียกเงิน');
+      'รวมได้เฉพาะใบที่ผลการเคลมบอกว่าต้องเรียกเงิน · 1 ใบเรียกเก็บ = Supplier เจ้าเดียว');
+
+    /* ใช้ปุ่มแบบเดียวกับแถบเลือกฉบับในหน้าปริ้น — ปุ่มที่กำลังใช้อยู่จะเป็นสีแดง อีกปุ่มเป็นสีขาว
+       (ถ้าใช้ .btn ธรรมดา ปุ่มจะแดงทั้งคู่ แยกไม่ออกว่าตอนนี้อยู่โหมดไหน) */
+    t += '<div class="prbar" style="margin-bottom:14px"><div class="prgrp"><span>จัดกลุ่มแบบ</span>' +
+      '<button class="prb' + (byJob ? '' : ' on') + '" onclick="setBillMode(\'sup\')">' +
+        '🏭 ตาม Supplier</button>' +
+      '<button class="prb' + (byJob ? ' on' : '') + '" onclick="setBillMode(\'job\')">' +
+        '🚛 ตามเลขที่ JOB</button></div></div>';
+
     t += '<div class="hint" style="margin-bottom:12px">📌 <b>ใบรวมมีเลขที่ของตัวเอง CDN-YY/NNNN</b> ' +
-         '(คนละชุดกับเลขใบส่งมอบ DN- ที่ใช้อยู่แล้ว) แต่ยังอ้างอิงเลขใบเคลมทุกใบที่รวมเข้ามา ตรวจย้อนได้</div>';
+         '(คนละชุดกับเลขใบส่งมอบ DN- ที่ใช้อยู่แล้ว) แต่ยังอ้างอิงเลขใบเคลมทุกใบที่รวมเข้ามา ตรวจย้อนได้<br>' +
+         (byJob
+           ? '🚛 <b>รวมตามจ๊อบ</b> — งานคันเดียวกันเรียกเก็บรอบเดียว · ถ้าจ๊อบหนึ่งมี Supplier หลายเจ้า ' +
+             'จะเห็นแยกเป็นกลุ่มละเจ้า เพราะใบเรียกเก็บ 1 ใบส่งไปหาได้เจ้าเดียว'
+           : '🏭 <b>รวมตาม Supplier</b> — เจ้าเดียวกันข้ามจ๊อบก็รวมใบเดียวได้') + '</div>';
+
     if (!d.groups.length){
       t += '<div class="empty">ยังไม่มีใบเคลมที่ถึงขั้นเรียกเก็บเงิน</div></div>';
       $('view').innerHTML = t; return;
     }
     for (var i = 0; i < d.groups.length; i++){
       var g = d.groups[i];
-      t += '<div class="billgrp"><div class="cardhd"><h3>' + esc(g.supplier) + '</h3>' +
+      t += '<div class="billgrp"><div class="cardhd"><h3>' +
+        (byJob ? '🚛 JOB ' + esc(g.jobNo) + (g.jobName ? ' · ' + esc(g.jobName) : '') +
+                 '<br><span style="font-weight:600;font-size:13px">🏭 ' + esc(g.supplier) + '</span>'
+               : esc(g.supplier)) + '</h3>' +
         '<span class="sub">' + g.rows.length + ' ใบเคลม · รวม ' + fmt(g.sum) + ' บาท</span></div>';
       t += '<div class="tblwrap"><table class="grid"><thead><tr>' +
         '<th style="width:44px">รวม</th><th style="width:132px">เลขที่ใบเคลม</th>' +
-        '<th style="width:92px">วันที่</th><th style="width:128px">เลขที่ JOB</th>' +
+        '<th style="width:92px">วันที่</th>' +
+        (byJob ? '<th style="width:150px">Supplier</th>' : '<th style="width:128px">เลขที่ JOB</th>') +
         '<th>ผลการเคลม</th><th style="width:118px">ยอดเรียกเก็บ</th>' +
         '<th style="width:150px">สถานะ</th></tr></thead><tbody>';
       for (var k = 0; k < g.rows.length; k++){
@@ -67,16 +91,18 @@ function loadRepBill(){
         t += '<tr><td class="c"><input type="checkbox" class="bchk" data-grp="' + i + '" ' +
              'value="' + esc(r.docNo) + '"' + (done ? ' disabled' : ' checked') + '></td>' +
           '<td><a class="lk" onclick="go(\'claim\',\'' + esc(r.docNo) + '\')">' + esc(r.docNo) + '</a></td>' +
-          '<td class="c">' + esc(r.date) + '</td><td>' + esc(r.jobNo) + '</td>' +
+          '<td class="c">' + esc(r.date) + '</td>' +
+          '<td>' + esc(byJob ? r.supplier : r.jobNo) + '</td>' +
           '<td>' + esc(r.result) + '</td><td class="r">' + fmt(r.amount) + '</td>' +
-          '<td class="c">' + (done ? '<span class="pill ok">ออกใบรวมแล้ว ' + esc(r.billNo) + '</span>'
+          '<td class="c">' + (done ? '<span class="pill ok">ออกใบรวมแล้ว <a class="lk" onclick="openCdn(\'' +
+                                       esc(r.billNo) + '\')">' + esc(r.billNo) + '</a></span>'
                                    : '<span class="pill warn">ยังไม่เรียกเก็บ</span>') + '</td></tr>';
       }
-      t += '<tr class="sumrow"><td colspan="5" class="r">ยอดรวมของเจ้านี้ (ไม่มี VAT)</td>' +
+      t += '<tr class="sumrow"><td colspan="5" class="r">ยอดรวมของกลุ่มนี้ (ไม่มี VAT)</td>' +
            '<td class="r b">' + fmt(g.sum) + '</td><td></td></tr>';
       t += '</tbody></table></div>' +
         '<div style="margin-top:8px"><button class="btn primary" onclick="makeBill(' + i + ')">' +
-        '🧾 ออกใบเรียกเก็บรวมของ ' + esc(g.supplier) + '</button> ' +
+        '🧾 ออกใบเรียกเก็บรวม' + (byJob ? 'ของ JOB ' + esc(g.jobNo) : 'ของ ' + esc(g.supplier)) + '</button> ' +
         '<span class="hint">ระบบออกเลข CDN ใหม่ 1 เลข แล้วผูกกับใบเคลมทุกใบที่ติ๊กไว้</span></div></div>';
     }
     t += '</div>';
@@ -92,8 +118,8 @@ function makeBill(gi){
   srv('makeConsolidatedBill', [picked, AUTH], function(r){
     alert('🧾 ออกใบเรียกเก็บรวมแล้ว ' + r.billNo + '\n\n' +
           'Supplier: ' + r.supplier + '\nรวม ' + r.rows.length + ' ใบเคลม · ' + r.total + ' บาท\n\n' +
-          'ใบเคลมที่รวมไปแล้วจะไม่ถูกดึงมารวมซ้ำอีก');
-    loadRepBill();
+          'กำลังเปิดหน้าปริ้นใบเรียกเก็บรวมให้');
+    openCdn(r.billNo);
   }, function(m){ alert(m); });
 }
 

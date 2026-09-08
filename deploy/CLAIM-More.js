@@ -40,7 +40,9 @@ var CLAIM_FIELD_HDR = {
   workKind:'ลักษณะงานเคลม',           // PART / LABOUR / BOTH                       // เบียร์ 7 ก.ย. — ต่อจาก CHASSIS ผู้ผลิต บนหน้าจอ
   storeLoc:'ที่เก็บในคลัง', storeTrk:'ขนส่ง/เลขพัสดุ',
   issueTo:'ผู้รับของหน้างาน', issueDept:'แผนกที่เบิกไปใช้',
-  blame:'ความรับผิดชอบ', blameWho:'ชื่อผู้ทำเสียหาย', blameDept:'แผนกผู้ทำเสียหาย'
+  blame:'ความรับผิดชอบ', blameWho:'ชื่อผู้ทำเสียหาย', blameDept:'แผนกผู้ทำเสียหาย',
+  /* กรณี "Supplier รับของกลับไปซ่อม" (เบียร์ 8 ก.ย. 2569) */
+  sendBackAt:'วันที่ส่งของไปซ่อม', backFromRepairAt:'วันที่ของกลับจากซ่อม'
 };
 
 function saveClaimField(docNo, field, value, auth){
@@ -62,6 +64,7 @@ function saveClaimField(docNo, field, value, auth){
   if (!gate.ok) throw new Error(gate.why);
 
   var v = norm_(value);
+  if (field === 'sendBackAt' || field === 'backFromRepairAt') v = fmtDMY_(v);
 
   /* ── เรทแลกเปลี่ยน: ใส่ได้ครั้งเดียว ล็อกติดใบถาวร ── */
   if (field === 'rate'){
@@ -540,9 +543,18 @@ function mainSupplier_(d, docNo){
   return '(ยังไม่ระบุ Supplier)';
 }
 
-/** 3.5 · ใบที่ถึงคิวเรียกเก็บเงินแล้ว จัดกลุ่มตาม Supplier */
-function reportBilling(auth){
+/** 3.5 · ใบที่ถึงคิวเรียกเก็บเงินแล้ว จัดกลุ่มให้เลือกรวมได้
+ *
+ *  mode = 'sup' (เดิม) · รวมตาม Supplier — เจ้าเดียวกันทุกจ๊อบมารวมใบเดียว
+ *  mode = 'job' (เบียร์สั่ง 8 ก.ย. 2569: "ใช่ อยากรวมตามจ๊อบด้วย")
+ *              · รวมตามเลขที่ JOB — งานคันเดียวกันเรียกเก็บรอบเดียว
+ *
+ *  ⚠️ ถึงจะรวมตามจ๊อบ ก็ยัง "แยกตาม Supplier ภายในจ๊อบ" อยู่ดี
+ *     เพราะใบเรียกเก็บ 1 ใบ ส่งไปหา Supplier ได้เจ้าเดียว จะเอาเงินของ 2 เจ้ามาใส่ใบเดียวไม่ได้
+ *     ถ้าจ๊อบหนึ่งมี 2 เจ้า จะเห็นเป็น 2 กลุ่ม ออกใบละเจ้า — makeConsolidatedBill กันไว้อีกชั้น */
+function reportBilling(auth, mode){
   requireAny_(auth, ['APPROVER','PURCHASE']);
+  var byJob = (norm_(mode) === 'job');
   var OKST = ['STORE_IN','QC_RECV','STORE_OUT','CLOSE_WAIT','CLOSED'];
   var g = {}, order = [];
 
@@ -554,14 +566,21 @@ function reportBilling(auth){
     var B = billOfClaim_(d, dn, o);
     if (!B.bill) return;                                    // เคสที่ไม่ต้องเรียกเงิน ไม่ต้องขึ้น
     var sup = mainSupplier_(d, dn);
-    if (!g[sup]){ g[sup] = { supplier:sup, rows:[], sum:0 }; order.push(sup); }
-    g[sup].rows.push({ docNo:dn, date:o['วันที่'], jobNo:o['เลขที่ JOB'], jobName:o['ชื่อลูกค้า'],
-      result:B.resultText, amount:B.total,
+    var job = norm_(o['เลขที่ JOB']) || '(ยังไม่ระบุ JOB)';
+    var key = byJob ? (job + '  ' + sup) : sup;
+    if (!g[key]){
+      g[key] = { key:key, supplier:sup, jobNo:byJob ? job : '', jobName:byJob ? (o['ชื่อลูกค้า'] || '') : '',
+                 title: byJob ? (job + ' · ' + sup) : sup, rows:[], sum:0 };
+      order.push(key);
+    }
+    g[key].rows.push({ docNo:dn, date:o['วันที่'], jobNo:o['เลขที่ JOB'], jobName:o['ชื่อลูกค้า'],
+      supplier:sup, result:B.resultText, amount:B.total,
       billNo:o['เลขที่ใบเรียกเก็บรวม'] || '',
       billDate:o['วันที่ใบเรียกเก็บรวม'] || '' });
-    g[sup].sum = money_(g[sup].sum + B.total);
+    g[key].sum = money_(g[key].sum + B.total);
   });
-  return { groups: order.map(function(k){ return g[k]; }) };
+  if (byJob) order.sort();                     // เรียงตามเลขจ๊อบ หาคันที่ต้องการได้ง่าย
+  return { mode: byJob ? 'job' : 'sup', groups: order.map(function(k){ return g[k]; }) };
 }
 
 /** ออกใบเรียกเก็บรวม 1 ใบต่อ Supplier — เลขชุดของตัวเอง CDN (เบียร์เคาะ 7 ก.ย.: "แยกก็ได้")
@@ -600,6 +619,46 @@ function makeConsolidatedBill(docNos, auth){
   return { ok:true, billNo:no, date:today, supplier:sup, total:money_(total),
            rows:list.map(function(x){ return { docNo:x.docNo, jobNo:x.jobNo, date:x.date, amount:x.amount }; }),
            by:me.name };
+}
+
+/** ชื่อรายการในใบหนึ่ง — ใช้พิมพ์ลงใบเรียกเก็บรวม ให้เห็นว่าเงินก้อนนี้มาจากของอะไร */
+function itemNames_(d, docNo){
+  var out = [], lr = d.items.getLastRow();
+  if (lr <= 1) return out;
+  var vi = d.items.getRange(2,1,lr-1,HDR_ITEM.length).getDisplayValues();
+  for (var i = 0; i < vi.length; i++) if (norm_(vi[i][0]) === docNo){
+    var nm = norm_(vi[i][3]) || norm_(vi[i][2]);      // ชื่อสินค้า ถ้าไม่มีค่อยใช้รหัสสินค้า
+    if (nm) out.push(nm);
+  }
+  return out;
+}
+
+/** ใบเรียกเก็บรวม 1 ใบ — ดึงกลับมาเพื่อปริ้น
+ *  เบียร์: "รวมหลายใบ CLM ในจ๊อบเดียว ออกใบเรียกเก็บรอบเดียว" → ต้องมีกระดาษให้ส่งจริง
+ *  และในกระดาษต้องเห็นว่า "ยอดนี้มาจากใบเคลมใบไหนบ้าง" ไม่งั้น Supplier เถียงกลับไม่ได้ */
+function getConsolidatedBill(billNo, auth){
+  var me = requireAny_(auth, ['APPROVER','PURCHASE','ADMIN']);
+  var no = norm_(billNo);
+  if (!no) throw new Error('ไม่ได้ระบุเลขที่ใบเรียกเก็บรวม');
+  var rows = [], sup = '', date = '', jobs = [], total = 0;
+  eachClaim_(function(o, stage, d){
+    if (norm_(o['เลขที่ใบเรียกเก็บรวม']) !== no) return;
+    var dn = o['เลขที่เอกสาร'];
+    var B = billOfClaim_(d, dn, o);
+    if (!sup)  sup  = mainSupplier_(d, dn);
+    if (!date) date = o['วันที่ใบเรียกเก็บรวม'] || '';
+    var job = norm_(o['เลขที่ JOB']);
+    if (job && jobs.indexOf(job) < 0) jobs.push(job);
+    total = money_(total + B.total);
+    rows.push({ docNo:dn, date:o['วันที่'], jobNo:o['เลขที่ JOB'], model:o['MODEL'] || '',
+                serial:o['SERIAL NO.'] || '', result:B.resultText,
+                items:itemNames_(d, dn), goods:B.goods, labour:B.labour, expense:B.expense,
+                amount:B.total });
+  });
+  if (!rows.length) throw new Error('ไม่พบใบเรียกเก็บรวมเลขที่ ' + no);
+  rows.sort(function(x,y){ return x.docNo < y.docNo ? -1 : 1; });
+  return { billNo:no, date:date, supplier:sup, jobs:jobs, rows:rows,
+           total:money_(total), who:me.name };
 }
 
 /** 3.6 · รายงานส่ง HR — เฉพาะใบที่ระบุว่าพนักงานทำเสียหาย */

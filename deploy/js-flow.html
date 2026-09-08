@@ -201,6 +201,61 @@ function applyLocks(scope){
     els[i].title = '🔒 ' + why;
   }
 }
+/* ─── ล็อก "ทั้งแท็บ" ที่ยังไม่ถึงคิวของคนที่เปิดอยู่ ───
+   เบียร์ 8 ก.ย. 2569: "ทำไมคนเปิดใบเคลม ถึงมีหน้าต่าง คำตอบจาก Supplier และ ใบเรียกเก็บค่าเคลม
+    โดยที่เค้าสามารถกรอกได้ด้วยหล่ะ เค้าดูได้แต่เปิดไม่ได้สิ"
+
+   applyLocks ข้างบนล็อกได้เฉพาะช่องที่มี data-f (= ช่องที่มีชื่อในตารางสิทธิ์หลังบ้าน)
+   แต่ในแท็บพวกนี้ยังมีของที่ไม่มี data-f อีกเพียบ — ปุ่มวิทยุเลือกผลการเคลม ปุ่ม Accept
+   ปุ่มเพิ่มค่าแรง/ค่าใช้จ่าย ช่องวันที่รับกลับ ปุ่มแนบรูป — เลยยังกดได้อยู่
+   → ตัวนี้ปิดทั้งแท็บ: ทุก input/select/textarea/button ในแท็บที่ไม่ใช่ของเรา
+     พร้อมแถบบอกด้านบนว่าทำไม และแท็บยังกดเข้าไป "ดู" ได้ตามปกติ */
+function paneWhy(i){
+  return (FLOW && FLOW.panes && FLOW.panes['p' + i] && !FLOW.panes['p' + i].edit)
+    ? (FLOW.panes['p' + i].why || 'ยังไม่ถึงคิวของคุณ') : '';
+}
+/** ปิดของทุกอย่างในกล่องนี้ (ใช้ซ้ำได้ เพราะกล่องรูปวาดใหม่ทีหลัง) */
+function lockControls(scope, why){
+  if (!scope) return;
+  var els = scope.querySelectorAll('input,select,textarea,button');
+  for (var i = 0; i < els.length; i++){
+    if (els[i].getAttribute('data-nolock') === '1') continue;   // ปุ่มที่ยังต้องกดได้ เช่น ดูรูปใหญ่
+    els[i].disabled = true;
+    els[i].classList.add('locked');
+    if (!els[i].title) els[i].title = '🔒 ' + why;
+  }
+}
+function applyPaneLocks(){
+  if (!FLOW || !FLOW.panes) return;
+  for (var i = 1; i <= 4; i++){
+    var why = paneWhy(i), host = $('pane' + i);
+    if (!host || !why) continue;
+    if (!host.querySelector('.panelock')){
+      var bn = document.createElement('div');
+      bn.className = 'panelock';
+      bn.innerHTML = '👁 <b>แท็บนี้ดูได้อย่างเดียว</b> — ' + esc(why);
+      host.insertBefore(bn, host.firstChild);
+    }
+    lockControls(host, why);
+    /* ติดป้ายที่ปุ่มแท็บด้วย จะได้รู้ตั้งแต่ยังไม่กดเข้าไป ว่าแท็บนี้ดูได้อย่างเดียว */
+    var btn = $('tabbtn' + i);
+    if (btn && !btn.classList.contains('ro')){
+      btn.classList.add('ro');
+      btn.title = '👁 ดูได้อย่างเดียว — ' + why;
+      var sp = btn.querySelector('span');
+      if (sp) sp.textContent = '👁 ดูอย่างเดียว';
+    }
+  }
+}
+/** กล่องรูปวาดใหม่ทีหลัง (โหลดรูปเสร็จ / แนบรูปเพิ่ม) ต้องล็อกซ้ำ ไม่งั้นปุ่มกลับมากดได้ */
+function relockPane(el){
+  if (!el || !FLOW || !FLOW.panes) return;
+  for (var i = 1; i <= 4; i++){
+    var host = $('pane' + i);
+    if (host && host.contains(el)){ var w = paneWhy(i); if (w) lockControls(el, w); return; }
+  }
+}
+
 /** ล็อกช่องในตาราง Excel ด้วย (ตารางวาดใหม่บ่อย ต้องเรียกซ้ำทุกครั้งที่วาด) */
 function applyGridLocks(gridId){
   if (!FLOW || !FLOW.lock) return;

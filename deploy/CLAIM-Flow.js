@@ -124,6 +124,8 @@ var FIELD_STAGE = {
   blame:'SUPPLIER', blameWho:'SUPPLIER', blameDept:'SUPPLIER',
 
   currency:'SUPPLIER', rate:'SUPPLIER', rateDate:'SUPPLIER', billCase:'SUPPLIER',
+  /* วันที่ของกรณี "Supplier รับกลับไปซ่อม" — จัดซื้อกรอกตอนตอบผล · สโตร์เติมวันของกลับได้ */
+  sendBackAt:'SUPPLIER', backFromRepairAt:'ALWAYS:SUPPLIER',
   result:'SUPPLIER', resultDetail:'SUPPLIER', supplierNote:'SUPPLIER',
 
   status:'AUTO'          // ขึ้นเองตามขั้นตอน ไม่มีใครเลือกเอง
@@ -214,7 +216,10 @@ var HDR_FLOW = ['ขั้นตอน','รอใครทำ','เหตุผ
   'เลขที่ใบเรียกเก็บรวม','วันที่ใบเรียกเก็บรวม',
   /* ต่อท้ายเท่านั้น — เบียร์ 8 ก.ย. 2569: ใบเคลมที่เกิดจากใบตรวจรับ ต้องรู้ว่ามาจากใบไหน
      ประเภทการเคลม = insp (เคลมหลังตรวจรับ) ระบบตั้งให้เอง คนเลือกไม่ได้ */
-  'มาจากใบตรวจ'];
+  'มาจากใบตรวจ',
+  /* ต่อท้ายเท่านั้น — กรณี "Supplier รับของกลับไปซ่อม" (เบียร์ 8 ก.ย. 2569)
+     ของออกจากคลังไปให้ Supplier วันไหน · Supplier ส่งกลับมาวันไหน */
+  'วันที่ส่งของไปซ่อม','วันที่ของกลับจากซ่อม'];
 
 /* ลายเซ็น 9 ช่อง 2 รอบ (สเปคข้อ 7 + ที่เบียร์เพิ่ม 7 ก.ย.)
    รอบ 1 ครบ 4 ช่อง → ปุ่มพิมพ์ใบส่ง Supplier ถึงจะเปิดใช้ได้ */
@@ -266,12 +271,19 @@ var CLAIM_RESULTS = {
   BUYSELF:{ t:'Supplier ไม่มีของส่งให้ → STT ซื้อเอง ติดตั้งเอง', goods:'เรียกเก็บ', labor:'เรียกเก็บ', bill:true,  back:false },
   NEWPART:{ t:'Supplier ส่งของใหม่มาให้ → STT ติดตั้งเอง',        goods:'ไม่คิด',   labor:'เรียกเก็บ', bill:true,  back:true  },
   SWAP:   { t:'อุปกรณ์เปลี่ยนกลับมาแล้วจบ',                        goods:'—',       labor:'—',        bill:false, back:true  },
-  REJECT: { t:'Supplier ไม่รับเคลม (เลยประกัน / เหตุผลอื่น)',       goods:'—',       labor:'—',        bill:false, back:false }
+  REJECT: { t:'Supplier ไม่รับเคลม (เลยประกัน / เหตุผลอื่น)',       goods:'—',       labor:'—',        bill:false, back:false },
+  /* เบียร์ 8 ก.ย. 2569: "Supplier จะนำกลับไปซ่อม ต้องใส่วันที่ และจะนำกลับเข้ามาให้ ใส่วันที่
+     ... มันจะต้องมีของออกจากสโตร์ และรับเข้ามาใหม่ + ตรวจสอบจาก QC แน่นอน"
+     เส้นทาง: ของออกจากคลังไปให้ Supplier → Supplier ซ่อม → ของกลับเข้าคลัง → QC ตรวจ → เบิกออก
+     ใช้ขั้น 6-7-8 เดิมได้เลย (back:true) แค่เพิ่ม 2 วันที่ให้บันทึกว่าของออกไปเมื่อไหร่ กลับมาเมื่อไหร่ */
+  REPAIR: { t:'Supplier รับของกลับไปซ่อม แล้วส่งกลับมาให้',        goods:'—',       labor:'—',        bill:false, back:true,
+            needSendBack:true }
 };
 function resultList(){
   return Object.keys(CLAIM_RESULTS).map(function(k){
     var r = CLAIM_RESULTS[k];
-    return { key:k, text:r.t, goods:r.goods, labor:r.labor, bill:r.bill, back:r.back };
+    return { key:k, text:r.t, goods:r.goods, labor:r.labor, bill:r.bill, back:r.back,
+             needSendBack: !!r.needSendBack };
   });
 }
 /** ขั้นถัดไปจริง — ขั้น SUPPLIER แยกทางตามคำตอบ ไม่มีของกลับก็ข้ามสโตร์/QC/เบิกออกไปเลย */
@@ -461,10 +473,54 @@ function claimFlow(docNo, auth){
     stages: STAGES.filter(function(s){ return !s.hidden; })
                   .map(function(s){ return { key:s.key, no:s.no, name:s.name, who:s.who }; }),
     lock: lockMap_(key, me, received),
+    panes: paneEdit_(key, me, received),
     missing: claimMissing_(d, norm_(docNo), key, C)
   };
 }
 
+
+/** ขั้นนี้เป็นหน้าที่ของ role เราหรือเปล่า (ไม่สนว่ากดรับเรื่องหรือยัง) */
+function stageIsMine_(stageKey, me){
+  var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
+  if (mine.indexOf('ADMIN') >= 0) return true;
+  var st = stageDef_(stageKey);
+  for (var i = 0; i < mine.length; i++) if (st.roles.indexOf(mine[i]) >= 0) return true;
+  return false;
+}
+
+/** แท็บไหนคนนี้ "แก้ได้" ณ ขั้นนี้ — หน้าเว็บเอาไปทำเป็นแท็บดูอย่างเดียวทั้งแท็บ
+ *
+ *  เบียร์ 8 ก.ย. 2569: "ทำไมคนเปิดใบเคลม ถึงมีหน้าต่าง คำตอบจาก Supplier และ ใบเรียกเก็บค่าเคลม
+ *   โดยที่เค้าสามารถกรอกได้ด้วยหล่ะ เค้าดูได้แต่เปิดไม่ได้สิ"
+ *
+ *  ⚠️ ของเดิมล็อกเป็น "รายช่อง" (lockMap_) ซึ่งล็อกได้เฉพาะช่องที่มีชื่ออยู่ใน FIELD_STAGE/ITEM_STAGE
+ *     ของที่ไม่มีชื่อในตารางนั้น — ปุ่มวิทยุเลือกผลการเคลม · ปุ่ม Accept/ไม่ Accept ·
+ *     ปุ่มเพิ่มค่าแรง/ค่าใช้จ่าย · ช่องวันที่รับกลับ · ปุ่มแนบรูป — **ไม่เคยถูกล็อกเลย**
+ *     คนเปิดใบ (QC/Production) จึงกดของพวกนี้ได้หมด แล้วค่อยไปโดนหลังบ้านปฏิเสธทีหลัง
+ *     → เพิ่มการล็อก "ทั้งแท็บ" กฎอยู่ที่นี่ที่เดียว หน้าเว็บห้ามคิดเอง                    */
+function paneEdit_(stageKey, me, received){
+  function f(k){ return canEditField_(stageKey, k, FIELD_STAGE, me, received); }
+  function pick(){                       // แท็บหนึ่งกินหลายขั้น — ขั้นไหนก็ได้ที่แก้ได้ ถือว่าแก้ได้
+    var why = '';
+    for (var i = 0; i < arguments.length; i++){
+      var g = arguments[i];
+      if (g.ok) return { edit:true, why:'' };
+      /* เหตุผลของ canEditField_ เขียนไว้สำหรับ "ช่อง" — พอเอามาขึ้นหัวแท็บ ต้องเปลี่ยนคำให้ตรง */
+      if (!why) why = String(g.why || '').replace('ช่องนี้', 'แท็บนี้').replace('ช่องนี้เป็น', 'แท็บนี้เป็น');
+    }
+    return { edit:false, why:why };
+  }
+  /* แท็บ ① ใบแจ้งเคลม — ขั้น 1 ทีมงานกรอก · ขั้น 3 สโตร์เติมใบส่งมอบ/PO/Supplier */
+  var p1 = pick(f('jobNo'), f('deliveryNote'));
+  /* แท็บ ② คำตอบ Supplier — ขั้น 5 จัดซื้อเท่านั้น */
+  var p2 = pick(f('result'));
+  /* แท็บ ③ ใบเรียกเก็บค่าเคลม — ขั้น 5 จัดซื้อเท่านั้น (เรท ต้นทุน ค่าแรง ค่าใช้จ่าย) */
+  var p3 = pick(f('rate'));
+  /* แท็บ ④ รับของกลับ + QC — ขั้น 6 สโตร์รับเข้า · ขั้น 7 QC ตรวจ · ขั้น 8 สโตร์เบิกออก */
+  var p4 = pick(f('storeLoc'), f('issueTo'));
+  if (!p4.edit && norm_(stageKey) === 'QC_RECV' && stageIsMine_('QC_RECV', me)) p4 = { edit:true, why:'' };
+  return { p1:p1, p2:p2, p3:p3, p4:p4 };
+}
 
 /** ช่องไหนคนนี้แก้ไม่ได้บ้าง + เพราะอะไร — ส่งให้หน้าเว็บทำเป็นช่องสีเทาพร้อมเหตุผล
  *  ส่งเฉพาะ "ช่องที่ล็อก" ไม่ต้องส่งทั้งหมด ข้อมูลจะได้ไม่บวม */
@@ -774,7 +830,13 @@ function claimMissing_(d, docNo, stageKey, C){
   /* ขั้นจัดซื้อบันทึกผล — ต้องเลือกคำตอบ Supplier ก่อน ไม่งั้นระบบไม่รู้ว่าจะเดินทางไหนต่อ */
   if (stageKey === 'SUPPLIER'){
     var res = norm_(h['ผลการเคลม']);
-    if (!CLAIM_RESULTS[res]) miss.push('ยังไม่ได้เลือกผลการเคลมจาก Supplier (4 กรณี)');
+    if (!CLAIM_RESULTS[res]) miss.push('ยังไม่ได้เลือกผลการเคลมจาก Supplier');
+    /* กรณี Supplier รับของกลับไปซ่อม ต้องรู้ว่าของออกจากคลังไปวันไหน ไม่งั้นตามของไม่ได้ */
+    if (CLAIM_RESULTS[res] && CLAIM_RESULTS[res].needSendBack){
+      var sb = C ? C['วันที่ส่งของไปซ่อม']
+                 : norm_(d.claims.getRange(r, colOf_('วันที่ส่งของไปซ่อม')).getDisplayValue());
+      if (!norm_(sb)) miss.push('ยังไม่ได้ใส่วันที่ส่งของไปให้ Supplier ซ่อม');
+    }
     var noCost = [];
     for (var c = 0; c < items.length; c++) if (!norm_(items[c][11])) noCost.push(norm_(items[c][1]));
     if (CLAIM_RESULTS[res] && CLAIM_RESULTS[res].bill && noCost.length)

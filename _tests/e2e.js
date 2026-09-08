@@ -277,11 +277,14 @@ T('ขั้นจัดซื้อ ต้องเลือกผลการ�
             throw e; }
   throw new Error('ยังไม่เลือกผลการเคลมก็ส่งต่อได้'); });
 
-T('ผลการเคลม 4 กรณี ส่งมาให้หน้าเว็บครบ', ()=>{
+/* v1.7.0 · เบียร์เพิ่มกรณีที่ 5 "Supplier รับของกลับไปซ่อม" → 5 กรณี · ของกลับมา 3 กรณี */
+T('ผลการเคลม 5 กรณี ส่งมาให้หน้าเว็บครบ', ()=>{
   const f=call('claimFlow',[DOC,AUTH]);
-  if(!f.results || f.results.length!==4) throw new Error('ไม่ได้ 4 กรณี');
+  if(!f.results || f.results.length!==5) throw new Error('ไม่ได้ 5 กรณี ได้ '+(f.results||[]).length);
   const bill=f.results.filter(r=>r.bill).length, back=f.results.filter(r=>r.back).length;
-  if(bill!==2||back!==2) throw new Error('เงื่อนไขออกใบ ②/ของกลับ ไม่ตรงสเปค');
+  if(bill!==2||back!==3) throw new Error('เงื่อนไขออกใบ ②/ของกลับ ไม่ตรงสเปค (bill '+bill+' back '+back+')');
+  const rp=f.results.filter(r=>r.needSendBack);
+  if(rp.length!==1 || rp[0].key!=='REPAIR') throw new Error('ไม่มีกรณี "นำกลับไปซ่อม" ที่ต้องใส่วันที่ส่งของ');
   return f.results.map(r=>r.key).join(' · '); });
 
 T('ตอบ "ส่งของใหม่มาให้" → ของกลับมา ต้องเข้าสโตร์ก่อน', ()=>{
@@ -1305,6 +1308,150 @@ T('เอกสารที่ปริ้น ต้องไม่มีบร�
   if(src.indexOf('🎬')>=0) throw new Error('ยังมี 🎬 วิดีโอ ในหน้าปริ้น');
   if(/ดูใน Google Drive/.test(src)) throw new Error('ยังมีลิงก์ Google Drive ในหน้าปริ้น');
   return 'ไม่มีทั้ง 🎬 และลิงก์ Drive แล้ว'; });
+
+
+/* ══════════════ ⑱ v1.7.0 · Supplier นำกลับไปซ่อม + รวมใบเรียกเก็บตามจ๊อบ ══════════════ */
+console.log('\n⑱ Supplier นำกลับไปซ่อม · รวมใบเรียกเก็บตามจ๊อบ');
+
+/** เปิดใบเคลม 1 ใบ แล้วเดินให้ถึงขั้นจัดซื้อบันทึกผล (SUPPLIER) */
+function toSupplierStage(jobNo, supplier, cost){
+  const n = call('createClaim',[{claimType:'pre',area:'dom',jobNo:jobNo,jobName:'ทดสอบรวมบิล',dept:'QC',
+    items:[{code:'R1',name:'ปั๊มน้ำ',th:'ปั๊มรั่ว',qty:'1',unit:'PCS'}]},QC]).docNo;
+  call('savePhoto',[n,jobNo,'1',px,'a.jpg',QC]);
+  call('advanceClaim',[n,QC]);                       // → รออนุมัติ
+  call('advanceClaim',[n,BOSS]);                     // → สโตร์
+  call('receiveClaim',[n,STORE]);
+  call('saveItemField',[n,1,'po','PO-1',STORE]);
+  call('saveItemField',[n,1,'supplier',supplier,STORE]);
+  call('saveClaimField',[n,'deliveryNote','DN-'+jobNo.slice(-4),STORE]);
+  call('advanceClaim',[n,STORE]);                    // → จัดซื้อรับเอกสาร
+  call('receiveClaim',[n,BUY]);
+  call('advanceClaim',[n,BUY]);                      // → ส่ง Supplier รอคำตอบ
+  if (cost) call('saveItemField',[n,1,'cost',String(cost),BUY]);
+  return n;
+}
+
+T('ตอบ "Supplier รับของกลับไปซ่อม" แล้วยังไม่ใส่วันที่ส่งของ ต้องส่งต่อไม่ได้', ()=>{
+  const n = toSupplierStage('JT-69/9001','ร้านซ่อมเอ',0);
+  call('saveClaimField',[n,'result','REPAIR',BUY]);
+  const g = call('claimGate',[n,BUY]);
+  if (g.ok) throw new Error('ไม่ใส่วันที่ส่งของ ก็ส่งต่อได้ — ตามของไม่เจอแน่');
+  if (!g.missing.join(' ').match(/วันที่ส่งของ/)) throw new Error('ไม่ได้บอกว่าขาดวันที่ส่งของ: '+g.missing.join(' · '));
+  return g.missing.join(' · '); });
+
+T('ใส่วันที่ส่งของไปซ่อมแล้ว ส่งต่อได้ และของต้องกลับเข้าสโตร์ → QC ตรวจ', ()=>{
+  const n = toSupplierStage('JT-69/9002','ร้านซ่อมเอ',0);
+  call('saveClaimField',[n,'result','REPAIR',BUY]);
+  call('saveClaimField',[n,'sendBackAt','03/09/2569',BUY]);
+  call('saveClaimField',[n,'backFromRepairAt','15/09/2569',BUY]);
+  const g = call('claimGate',[n,BUY]);
+  if (!g.ok) throw new Error('ใส่ครบแล้วยังส่งไม่ได้: '+g.missing.join(' · '));
+  const r = call('advanceClaim',[n,BUY]);
+  if (r.stage!=='STORE_IN') throw new Error('ของกลับมาแล้วไม่เข้าสโตร์ ไปที่ '+r.stage);
+  call('receiveClaim',[n,STORE]);
+  call('saveClaimField',[n,'storeLoc','ชั้น A-1',STORE]);
+  const r2 = call('advanceClaim',[n,STORE]);
+  if (r2.stage!=='QC_RECV') throw new Error('เข้าสโตร์แล้วไม่ส่งให้ QC ตรวจ ไปที่ '+r2.stage);
+  const c = call('getClaim',[n,BUY]);
+  /* ระบบเก็บวันที่เป็น ค.ศ. เสมอ (fmtDMY_) พิมพ์ พ.ศ. เข้าไปก็แปลงให้ — เช็คแค่ว่าวัน/เดือนตรง */
+  if (!/^03\/09\//.test(c.head['วันที่ส่งของไปซ่อม']||'')) throw new Error('วันที่ส่งของไม่ลงชีต: '+c.head['วันที่ส่งของไปซ่อม']);
+  if (!/^15\/09\//.test(c.head['วันที่ของกลับจากซ่อม']||'')) throw new Error('วันที่ของกลับไม่ลงชีต: '+c.head['วันที่ของกลับจากซ่อม']);
+  return 'ส่งของ 03/09 · กลับ 15/09 · สโตร์ → QC ตามลำดับ'; });
+
+/* ── ข้อ 1 ที่เบียร์เจอ 8 ก.ย. 2569 ──
+   "ทำไมคนเปิดใบเคลม ถึงมีหน้าต่าง คำตอบจาก Supplier และ ใบเรียกเก็บค่าเคลม
+    โดยที่เค้าสามารถกรอกได้ด้วยหล่ะ เค้าดูได้แต่เปิดไม่ได้สิ" */
+T('คนเปิดใบเคลม (QC) ต้อง "ดูได้ แต่กรอกไม่ได้" ในแท็บ ② คำตอบ Supplier และ ③ ใบเรียกเก็บ', ()=>{
+  const n = call('createClaim',[{claimType:'pre',area:'dom',jobNo:'JT-69/9400',jobName:'ทดสอบสิทธิ์แท็บ',dept:'QC',
+    items:[{code:'L1',name:'ของ',th:'พัง',qty:'1',unit:'PCS'}]},QC]).docNo;
+  const f = call('claimFlow',[n,QC]);
+  if (!f.panes) throw new Error('หลังบ้านยังไม่ส่งสิทธิ์รายแท็บมาให้หน้าเว็บ');
+  if (!f.panes.p1.edit) throw new Error('แท็บ ① เป็นของคนเปิดใบ ต้องกรอกได้');
+  if (f.panes.p2.edit) throw new Error('แท็บ ② คำตอบ Supplier ยังกรอกได้ — ต้องเป็นของจัดซื้อเท่านั้น');
+  if (f.panes.p3.edit) throw new Error('แท็บ ③ ใบเรียกเก็บ ยังกรอกได้ — ต้องเป็นของจัดซื้อเท่านั้น');
+  if (f.panes.p4.edit) throw new Error('แท็บ ④ รับของกลับ ยังกรอกได้ — ต้องเป็นของสโตร์/QC ตอนของกลับมา');
+  if (!/จัดซื้อ/.test(f.panes.p2.why)) throw new Error('ไม่ได้บอกว่าแท็บนี้เป็นของใคร: '+f.panes.p2.why);
+  return '① กรอกได้ · ②③④ ดูอย่างเดียว — '+f.panes.p2.why.slice(0,40); });
+
+T('พอถึงคิวจัดซื้อ แท็บ ② และ ③ ต้องเปิดให้กรอกเอง ไม่ต้องไปแก้อะไร', ()=>{
+  const n = toSupplierStage('JT-69/9500','เจ้าเอฟ',0);
+  const f = call('claimFlow',[n,BUY]);
+  if (!f.panes.p2.edit) throw new Error('ถึงคิวจัดซื้อแล้ว แท็บ ② ยังปิดอยู่: '+f.panes.p2.why);
+  if (!f.panes.p3.edit) throw new Error('ถึงคิวจัดซื้อแล้ว แท็บ ③ ยังปิดอยู่: '+f.panes.p3.why);
+  if (f.panes.p1.edit) throw new Error('เลยขั้นแล้ว แท็บ ① ต้องปิด');
+  /* คนเปิดใบ (QC) มาดูตอนนี้ ต้องยังปิดอยู่เหมือนเดิม */
+  const q = call('claimFlow',[n,QC]);
+  if (q.panes.p2.edit || q.panes.p3.edit) throw new Error('QC ยังกรอกแท็บของจัดซื้อได้');
+  return 'จัดซื้อเปิด ②③ · QC ยังดูอย่างเดียว'; });
+
+T('ถึงคิวสโตร์รับของกลับ แท็บ ④ ต้องเปิดให้สโตร์ แต่ยังปิดสำหรับคนเปิดใบ', ()=>{
+  const n = toSupplierStage('JT-69/9600','เจ้าจี',0);
+  call('saveClaimField',[n,'result','NEWPART',BUY]);
+  call('saveItemField',[n,1,'cost','500',BUY]);
+  call('advanceClaim',[n,BUY]);                       // → STORE_IN
+  call('receiveClaim',[n,STORE]);
+  const st = call('claimFlow',[n,STORE]);
+  if (!st.panes.p4.edit) throw new Error('สโตร์รับเรื่องแล้ว แท็บ ④ ยังปิด: '+st.panes.p4.why);
+  const q = call('claimFlow',[n,QC]);
+  if (q.panes.p4.edit) throw new Error('คนเปิดใบยังกรอกแท็บ ④ ได้');
+  return 'สโตร์เปิด ④ · คนเปิดใบยังดูอย่างเดียว'; });
+
+T('หน้าเว็บต้องปิด "ทั้งแท็บ" จริง ไม่ใช่ปิดแค่ช่องที่มีชื่อในตารางสิทธิ์', ()=>{
+  const fs3=require('fs'), pth3=require('path');
+  const flow=fs3.readFileSync(pth3.join(__dirname,'..','deploy','js-flow.html'),'utf8');
+  const claim=fs3.readFileSync(pth3.join(__dirname,'..','deploy','js-claim.html'),'utf8');
+  if(!/function applyPaneLocks/.test(flow)) throw new Error('ไม่มี applyPaneLocks ในหน้าเว็บ');
+  if(!/querySelectorAll\('input,select,textarea,button'\)/.test(flow))
+    throw new Error('ยังไม่ได้ปิดปุ่ม/วิทยุ/ช่องที่ไม่มี data-f');
+  if(!/applyPaneLocks\(\)/.test(claim)) throw new Error('หน้าใบเคลมไม่ได้เรียก applyPaneLocks()');
+  if(!/relockPane/.test(claim)) throw new Error('กล่องรูปวาดใหม่แล้วไม่ได้ล็อกซ้ำ — ปุ่มแนบรูปจะกลับมากดได้');
+  return 'ปิดทั้งแท็บ + ล็อกกล่องรูปซ้ำหลังวาดใหม่แล้ว'; });
+
+T('รวมยอดเรียกเก็บ "ตามจ๊อบ" — จ๊อบเดียวกันแต่คนละเจ้า ต้องแยกกลุ่ม ไม่รวมมั่ว', ()=>{
+  const job='JT-69/9100';
+  const a=toSupplierStage(job,'เจ้าเอ',1000), b=toSupplierStage(job,'เจ้าเอ',2000),
+        c=toSupplierStage(job,'เจ้าบี',3000);
+  [a,b,c].forEach(n=>{ call('saveClaimField',[n,'result','BUYSELF',BUY]); call('advanceClaim',[n,BUY]); });
+
+  const byJob = call('reportBilling',[BUY,'job']);
+  if (byJob.mode!=='job') throw new Error('ไม่ได้โหมดรวมตามจ๊อบ');
+  const mine = byJob.groups.filter(g=>g.jobNo===job);
+  if (mine.length!==2) throw new Error('จ๊อบนี้มี 2 เจ้า ต้องได้ 2 กลุ่ม ได้ '+mine.length);
+  const gA = mine.filter(g=>g.supplier==='เจ้าเอ')[0];
+  if (!gA || gA.rows.length!==2) throw new Error('กลุ่มเจ้าเอในจ๊อบนี้ต้องมี 2 ใบ');
+
+  /* โหมดเดิม (ตาม Supplier) ต้องยังทำงานเหมือนเดิม ไม่พังของเก่า */
+  const bySup = call('reportBilling',[BUY]);
+  if (bySup.mode!=='sup') throw new Error('โหมดเริ่มต้นต้องเป็นรวมตาม Supplier');
+  return 'จ๊อบ '+job+' → เจ้าเอ 2 ใบ · เจ้าบี 1 ใบ'; });
+
+T('ออกใบเรียกเก็บรวมของจ๊อบ แล้วปริ้นได้ และเห็นว่ามาจากใบเคลมใบไหนบ้าง', ()=>{
+  const job='JT-69/9200';
+  const a=toSupplierStage(job,'เจ้าซี',1500), b=toSupplierStage(job,'เจ้าซี',2500);
+  [a,b].forEach(n=>{ call('saveClaimField',[n,'result','BUYSELF',BUY]); call('advanceClaim',[n,BUY]); });
+  const mk = call('makeConsolidatedBill',[[a,b],BUY]);
+  if (!/^CDN-\d\d\/\d+$/.test(mk.billNo)) throw new Error('เลขใบรวมผิดรูปแบบ '+mk.billNo);
+
+  const doc = call('getConsolidatedBill',[mk.billNo,BUY]);
+  if (doc.rows.length!==2) throw new Error('ใบรวมต้องมี 2 บรรทัด ได้ '+doc.rows.length);
+  const nos = doc.rows.map(r=>r.docNo);
+  if (nos.indexOf(a)<0 || nos.indexOf(b)<0) throw new Error('ในกระดาษไม่เห็นเลขใบเคลมต้นทาง');
+  if (doc.jobs.indexOf(job)<0) throw new Error('ในกระดาษไม่เห็นเลขจ๊อบ');
+  if (!doc.rows[0].items.length) throw new Error('ในกระดาษไม่เห็นชื่อรายการที่เคลม');
+  if (Math.round(doc.total)!==4000) throw new Error('ยอดรวมไม่ตรง ได้ '+doc.total);
+
+  /* รวมซ้ำไม่ได้ */
+  let blocked=false;
+  try { call('makeConsolidatedBill',[[a],BUY]); } catch(e){ blocked=/ไปแล้ว/.test(e.message); }
+  if (!blocked) throw new Error('ใบที่รวมไปแล้ว ยังถูกดึงมารวมซ้ำได้');
+  return mk.billNo+' · 2 ใบ · '+doc.total+' บาท · กันรวมซ้ำแล้ว'; });
+
+T('คนละ Supplier รวมใบเดียวไม่ได้ (ใบเรียกเก็บส่งได้เจ้าเดียว)', ()=>{
+  const a=toSupplierStage('JT-69/9301','เจ้าดี',1000), b=toSupplierStage('JT-69/9302','เจ้าอี',1000);
+  [a,b].forEach(n=>{ call('saveClaimField',[n,'result','BUYSELF',BUY]); call('advanceClaim',[n,BUY]); });
+  try { call('makeConsolidatedBill',[[a,b],BUY]); }
+  catch(e){ return 'กันไว้ถูกแล้ว: '+e.message.slice(0,50); }
+  throw new Error('รวม 2 เจ้าเข้าใบเดียวได้ — ส่งใบนี้ให้ใครก็ผิด'); });
 
 console.log('\n──────────────────────────────');
 console.log('ผ่าน '+pass+' · ไม่ผ่าน '+fail);

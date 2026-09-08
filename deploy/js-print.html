@@ -19,12 +19,15 @@ window.STT_LOGO = STT_LOGO;
 
    1 ใบเคลมมีได้หลาย Supplier → **แยกใบให้อัตโนมัติ** แต่ละเจ้าเห็นเฉพาะรายการของตัวเอง  */
 
-var PR = { kind:'int', sup:'', cols:{}, doc:'clm' };   // doc = 'clm' ใบเคลม · 'ins' ใบตรวจรับสินค้า
+var PR = { kind:'int', sup:'', cols:{}, doc:'clm' };   // doc = 'clm' ใบเคลม · 'ins' ใบตรวจรับสินค้า · 'cdn' ใบเรียกเก็บรวม
+var CDN = null;                                        // ข้อมูลใบเรียกเก็บรวมที่กำลังปริ้น
 
 /** หัวเอกสารของใบที่กำลังปริ้น — ใบเคลมกับใบตรวจใช้หน้ากระดาษชุดเดียวกัน
  *  ⚠️ ทุกที่ที่เคยเขียน CLAIM.head ตรง ๆ ต้องผ่านตัวนี้ ไม่งั้นปริ้นใบตรวจแล้วขึ้นข้อมูลใบเคลม */
 function prHead(){
   if (PR.doc === 'ins') return (INSP && INSP.head) || {};
+  if (PR.doc === 'cdn') return CDN
+    ? { 'เลขที่เอกสาร':CDN.billNo, 'วันที่':CDN.date, 'เลขที่ JOB':(CDN.jobs || []).join(' · ') } : {};
   return (CLAIM && CLAIM.head) || {};
 }
 function isIns(){ return PR.doc === 'ins'; }
@@ -133,6 +136,7 @@ function showMoney(){ return PR.kind !== 'notice' && PR.kind !== 'rcv'; }
 function showCost(){  return PR.kind === 'int'; }      // ต้นทุน/กำไร/เรท = ภายในเท่านั้น
 
 function docTitle(){
+  if (PR.doc === 'cdn') return ['ใบเรียกเก็บค่าเคลม (รวมหลายใบ)', 'CONSOLIDATED CLAIM DEBIT NOTE'];
   if (isIns()) return ['ใบตรวจรับสินค้า', 'INSPECTION REPORT'];
   if (PR.kind === 'int')    return ['ใบสรุปงานเคลม (ภายใน)', 'INTERNAL CLAIM SUMMARY'];
   if (PR.kind === 'notice') return ['ใบแจ้งเคลมสินค้า', 'CLAIM NOTICE'];
@@ -555,7 +559,7 @@ function pageHeadCont(sup, n){
 function pageFoot(n, total){
   /* FM-WH-03 Rev.00 = รหัสฟอร์มใบเคลม (เบียร์กำหนด)
      ใบตรวจรับสินค้ายังไม่ได้กำหนดรหัสฟอร์ม — รอเบียร์เคาะ แล้วมาเติมที่บรรทัดนี้จุดเดียว */
-  var code = isIns() ? '' : 'FM-WH-03 Rev.00';
+  var code = (isIns() || PR.doc === 'cdn') ? '' : 'FM-WH-03 Rev.00';
   return '<div class="pf"><span>' + code + '</span><span class="sp"></span>' +
          '<span>หน้า ' + n + '/' + total + '</span></div>';
 }
@@ -820,5 +824,101 @@ function blkInsSign(h){
          esc(String(f.history).split('\n').join(' · ')) + '</div></div>';
   }
   return t;
+}
+
+/* ═══════════════ ใบเรียกเก็บค่าเคลม "รวมหลายใบ" (CDN) — หน้าปริ้น (v1.7.0) ═══════════════
+ * เบียร์ 8 ก.ย. 2569: "รวมหลายใบ CLM ในจ๊อบเดียว ออกใบเรียกเก็บรอบเดียว — ใช่ อยากรวมตามจ๊อบด้วย"
+ *
+ * เดิมกดรวมแล้วได้แค่ "เลข CDN" ขึ้นบนจอ ไม่มีกระดาษให้ส่ง Supplier จริง
+ * ตัวนี้คือกระดาษฉบับนั้น — ใช้หัวจดหมาย ตัวแบ่งหน้า และท้ายกระดาษชุดเดียวกับใบเคลม
+ *
+ * สิ่งที่ต้องมีบนกระดาษ (เบียร์: ต้องรู้ว่ามาจากใบไหนบ้าง):
+ *   · 1 บรรทัด = 1 ใบเคลม  มีเลขที่ใบ วันที่ เลขจ๊อบ ชื่อของที่เคลม และยอดของใบนั้น
+ *   · ท้ายตารางเป็นยอดรวมทั้งใบ  ไม่มี VAT เหมือนใบเรียกเก็บใบเดี่ยว
+ * ═════════════════════════════════════════════════════════════════════════════ */
+function openCdn(billNo){
+  if (!billNo){ alert('ไม่ได้ระบุเลขที่ใบเรียกเก็บรวม'); return; }
+  srv('getConsolidatedBill', [billNo, AUTH], function(c){
+    CDN = c; PR.doc = 'cdn'; PR.kind = 'debit'; PR.sup = '';
+    drawCdn();
+  }, function(m){ alert(m); });
+}
+
+function drawCdn(){
+  var c = CDN;
+  var t = '<div class="card noprint"><div class="cardhd"><h3>ใบเรียกเก็บรวม ' + esc(c.billNo) + '</h3>' +
+    '<button class="btn" onclick="go(\'repbill\')">← กลับรายงานรวมยอด</button>' +
+    '<button class="btn dark" onclick="window.print()">🖨️ ปริ้น / บันทึกเป็น PDF</button></div>';
+  t += '<div class="prnote">🧾 ใบนี้รวม <b>' + c.rows.length + ' ใบเคลม</b> ของ <b>' + esc(c.supplier) + '</b>' +
+       (c.jobs && c.jobs.length ? ' · JOB ' + esc(c.jobs.join(', ')) : '') +
+       ' · รวม <b>' + fmt(c.total) + ' บาท</b> — บนกระดาษจะเห็นเลขใบเคลมทุกใบที่รวมเข้ามา</div>';
+  t += '</div><div id="prPages"></div>';
+  $('view').innerHTML = t;
+  $('prPages').innerHTML = buildCdnDoc();
+  paginate();
+}
+
+function buildCdnDoc(){
+  var c = CDN, blocks = [];
+
+  /* ก้อนที่ 1 — หัวใบ: ส่งถึงใคร อ้างจ๊อบอะไร */
+  var b = '<div class="blk"><div class="sec"><div class="sech">รายละเอียดใบเรียกเก็บ' +
+    '<span>DEBIT NOTE DETAIL</span></div><div class="box"><table class="f">';
+  /* ⚠️ row2 วางค่าลง HTML ตรง ๆ ต้อง esc() เองทุกช่อง (ของเดิมในไฟล์นี้ก็ทำแบบเดียวกัน) */
+  b += row2('เรียนถึง / To', '<b>' + esc(c.supplier) + '</b>', 'เลขที่ใบเรียกเก็บ / Note No.', '<b>' + esc(c.billNo) + '</b>');
+  b += row2('วันที่ / Date', esc(c.date), 'จำนวนใบเคลมที่รวม / Claims', esc(String(c.rows.length)) + ' ใบ');
+  b += row2('อ้างถึง JOB / Job Ref.', esc((c.jobs || []).join(' · ')), 'ผู้ออกเอกสาร / Issued by', esc(c.who || ''));
+  b += '</table></div></div></div>';
+  blocks.push(b);
+
+  /* ก้อนที่ 2 เป็นต้นไป — ตารางใบเคลม ตัดทีละ 12 บรรทัด กันตารางถูกผ่าครึ่งหน้า */
+  var PERBLK = 12;
+  for (var s = 0; s < c.rows.length; s += PERBLK){
+    var part = c.rows.slice(s, s + PERBLK);
+    var g = '<div class="blk">';
+    if (s === 0) g += '<div class="sec"><div class="sech">ใบเคลมที่รวมอยู่ในใบนี้<span>CLAIMS INCLUDED</span></div></div>';
+    g += '<table class="g"><thead><tr>' +
+      '<th style="width:30px">ที่</th><th style="width:110px">เลขที่ใบเคลม</th>' +
+      '<th style="width:74px">วันที่</th><th style="width:104px">เลขที่ JOB</th>' +
+      '<th>รายการที่เคลม</th><th style="width:96px">จำนวนเงิน</th></tr></thead><tbody>';
+    for (var i = 0; i < part.length; i++){
+      var r = part[i];
+      g += '<tr><td class="c">' + (s + i + 1) + '</td>' +
+        '<td><b>' + esc(r.docNo) + '</b></td>' +
+        '<td class="c">' + esc(r.date) + '</td>' +
+        '<td>' + esc(r.jobNo) + '</td>' +
+        '<td>' + esc((r.items || []).join(' · ')) +
+          (r.result ? '<span class="den">' + esc(r.result) + '</span>' : '') + '</td>' +
+        '<td class="r"><b>' + money(r.amount) + '</b></td></tr>';
+    }
+    g += '</tbody></table></div>';
+    blocks.push(g);
+  }
+
+  /* ก้อนสุดท้าย — ยอดรวม + ช่องเซ็น */
+  var gd = 0, lb = 0, ex = 0;
+  for (var k = 0; k < c.rows.length; k++){
+    gd += num2(c.rows[k].goods); lb += num2(c.rows[k].labour); ex += num2(c.rows[k].expense);
+  }
+  var sum = '<div class="blk"><div class="sum"><table>' +
+    (gd ? '<tr><td>ค่าของ / Parts</td><td class="r">' + money(gd) + '</td></tr>' : '') +
+    (lb ? '<tr><td>ค่าแรง / Labour</td><td class="r">' + money(lb) + '</td></tr>' : '') +
+    (ex ? '<tr><td>ค่าใช้จ่ายอื่น ๆ / Other expenses</td><td class="r">' + money(ex) + '</td></tr>' : '') +
+    '<tr class="tot"><td>รวมทั้งสิ้น (บาท) / Total THB</td><td class="r">' + money(c.total) + '</td></tr>' +
+    '</table></div>' +
+    '<div class="phcap" style="margin-top:4px">ไม่มีภาษีมูลค่าเพิ่ม / VAT not applicable · ' +
+    'ยอดข้างต้นเป็นผลรวมของใบเคลมทุกใบที่ระบุไว้ในตาราง</div></div>';
+  blocks.push(sum);
+
+  blocks.push('<div class="blk"><div class="sg manual">' +
+    '<div><div class="role">ผู้จัดทำ (จัดซื้อ)</div><div class="nm">' + esc(c.who || '') + '</div>' +
+      '<div class="ps">จัดซื้อ</div><div class="dt">' + esc(c.date) + '</div></div>' +
+    '<div><div class="role">ผู้อนุมัติ</div><div class="ln">ลงชื่อ</div>' +
+      '<div class="dt">วันที่ ______________</div></div>' +
+    '<div><div class="role">ผู้รับเอกสาร (Supplier)</div><div class="ln">ลงชื่อ</div>' +
+      '<div class="dt">วันที่ ______________</div></div>' +
+    '</div></div>');
+
+  return '<div class="docset" data-sup="' + esc(c.supplier) + '">' + blocks.join('') + '</div>';
 }
 </script>
