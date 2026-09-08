@@ -9,15 +9,18 @@ var INSFOREIGN = false;
 var INSTANKER = true;    // ใบนี้เป็นงานแท็งค์ไหม — แท็งค์ต้องมีช่องรูป STD เทียบ   // งานในประเทศไม่ต้องมีช่องภาษาอังกฤษให้รก
 
 /* ─────────── เปิดใบตรวจใหม่ ─────────── */
+/* ═══ เปิดใบตรวจรับสินค้า (ใบใหม่) ═══════════════════════════════════════
+   เบียร์ 8 ก.ย. 2569
+     · "ต้องมีลักษณะงาน >> อะไหล่ หรือ อุปกรณ์ / Tankers"
+     · "ต้องมี E. No หลัง CHASSIS ผู้ผลิต"
+     · "ชนิดงาน อันนี้มันรู้ได้เองจากลักษณะงานเลยใช่ไหม"  → ใช่ รวมเป็นช่องเดียว
+        ("ชนิดงาน" เดิมกับ "ลักษณะงาน" คือเรื่องเดียวกัน เลยเหลือช่องเดียว ไม่ต้องกรอกซ้ำ)
+     · แม่แบบเช็คลิสต์มาจากทะเบียนในระบบแล้ว (เมนู 🧾 แม่แบบเช็คลิสต์) ไม่ได้ฝังในโค้ด
+   ═════════════════════════════════════════════════════════════════════ */
 function newInspForm(){
   busy(true, 'กำลังเตรียมแม่แบบเช็คลิสต์…');
-  srv('listInspTemplates', [], function(tpl){
+  srv('listTemplates', [false, AUTH], function(tpl){
     INSTPL = tpl || [];
-    var opts = '';
-    for (var i = 0; i < INSTPL.length; i++){
-      opts += '<option value="' + esc(INSTPL[i].key) + '"' + (INSTPL[i].key === 'tanker' ? ' selected' : '') + '>' +
-              esc(INSTPL[i].name) + ' (' + INSTPL[i].n + ' หัวข้อ)</option>';
-    }
     var t = '<div class="card tight"><div class="cardhd"><h3>เปิดใบตรวจรับสินค้า (ใบใหม่)</h3>' +
       '<span class="sub">เลขที่ INS-YY/NNNN · คนละชุดกับใบเคลม</span>' +
       '<button class="btn primary" id="insSave" onclick="submitInsp()">💾 บันทึกเป็นร่าง</button></div>';
@@ -25,45 +28,96 @@ function newInspForm(){
     t += '<div id="imsg"></div>';
     t += '<div class="phnote">📷 ตรวจแล้วต้อง<b>ถ่ายรูปทุกข้อที่ไม่ผ่าน</b> ระบบถึงจะยอมให้ส่งไปเปิดใบเคลม</div>';
     t += '<div class="fgrid">';
-    t += fr('สถานที่ผลิต', '<select id="i_area" onchange="inspAreaChanged()"><option value="for">ต่างประเทศ</option><option value="dom">ในประเทศ</option></select>');
-    t += fr('เลขที่ JOB', '<input id="i_jobNo" placeholder="JT-69/0009" onblur="inspJobLookup()">');
-    t += fr('ชื่อลูกค้า', '<input id="i_jobName">');
+    t += fr('ลักษณะงาน', '<select id="i_kind" onchange="inspKindChanged()">' +
+            '<option value="tanker">Tankers</option>' +
+            '<option value="equip">อะไหล่ หรือ อุปกรณ์</option></select>',
+            'ขั้น 1|Tankers = แท็งค์ทั้งคัน มีช่องรูป STD เทียบ · อะไหล่/อุปกรณ์ = ไม่มีรูป STD', true);
+    t += fr('สถานที่ผลิต', '<select id="i_area" onchange="inspAreaChanged()">' +
+            '<option value="for">ต่างประเทศ</option><option value="dom">ในประเทศ</option></select>', 'ขั้น 1|', true);
+    t += fr('เลขที่ JOB', '<input id="i_jobNo" placeholder="JT-69/0009" onblur="inspJobLookup()">', 'ขั้น 1|', true);
+    t += fr('ชื่อลูกค้า', '<input id="i_jobName">', 'อัตโนมัติ|ขึ้นเองจากเลขที่ JOB');
 
-    t += fr('แม่แบบเช็คลิสต์', '<select id="i_template" onchange="inspTplNote()">' + opts + '</select>');
-    t += fr('MODEL', '<input id="i_model">');
+    t += fr('MODEL', '<input id="i_model" onblur="inspModelChanged()">',
+            'ขั้น 1|พิมพ์รุ่นแล้วระบบจะเลือกแม่แบบเช็คลิสต์ของรุ่นนั้นให้เอง');
+    t += fr('แม่แบบเช็คลิสต์', '<select id="i_template" onchange="inspTplNote()"></select>',
+            'ขั้น 1|หัวข้อที่ต้องตรวจของรุ่นนี้ + รูป STD · แก้ทะเบียนแม่แบบได้ที่เมนู 🧾 แม่แบบเช็คลิสต์');
     t += fr('SERIAL NO.', '<input id="i_serialNo">');
 
     t += fr('CHASSIS <i>STT</i>', '<input id="i_chassisStt">');
-    t += fr('CHASSIS <i>ผู้ผลิต</i>', '<input id="i_chassisMaker">');
-    t += fr('PO', '<input id="i_po">');
+    t += '<div id="i_cmkwrap">' + fr('CHASSIS <i>ผู้ผลิต</i>', '<input id="i_chassisMaker">') + '</div>';
+    /* เบียร์: "ต้องมี E. No หลัง CHASSIS ผู้ผลิต" · ในประเทศไม่มีทั้งคู่ (กติกาเดียวกับใบเคลม) */
+    t += '<div id="i_enowrap">' + fr('E. No.', '<input id="i_eNo" placeholder="หมายเลขเครื่อง">') + '</div>';
 
+    t += fr('PO', '<input id="i_po">');
     t += fr('Supplier', '<input id="i_supplier" list="vlist">');
     t += fr('วันรับสินค้า', '<input id="i_recv" placeholder="DD/MM/YYYY">');
-    t += fr('ชนิดงาน', '<select id="i_kind"><option value="tanker">Tankers (ไม่ผ่านสโตร์)</option><option value="equip">อุปกรณ์ (ผ่านสโตร์)</option></select>');
     t += '</div>';
-    t += '<div class="hint" id="i_tplnote" style="margin-top:8px"></div></div>';
+    /* ข้อความอธิบายแม่แบบวางเป็นบรรทัดเต็มใต้ฟอร์ม — ถ้ายัดไว้ในช่องจะดันคอลัมน์กว้างจนล้นการ์ด */
+    t += '<div class="hint" id="i_tplauto" style="margin-top:8px"></div>';
+    t += '<div class="hint" id="i_tplnote" style="margin-top:4px"></div></div>';
     $('view').innerHTML = t;
-    inspTplNote();
+    inspKindChanged();
     if (!VENDORS) srv('listVendors', [], function(v){ VENDORS = v || []; fillVendorList(); });
     else fillVendorList();
   });
 }
-function inspAreaChanged(){
-  // งานในประเทศส่วนใหญ่เป็นสินค้า/อุปกรณ์ ไม่ใช่แท็งค์ทั้งคัน — เดาให้ก่อน แก้เองได้
-  if ($('i_area').value === 'dom'){
-    $('i_kind').value = 'equip';
-    if ($('i_template').value === 'tanker') $('i_template').value = 'domestic';
-  } else {
-    $('i_kind').value = 'tanker';
-    if ($('i_template').value === 'domestic') $('i_template').value = 'tanker';
+
+/* รายชื่อแม่แบบที่ให้เลือก = เฉพาะของลักษณะงานที่เลือกไว้ ไม่ต้องเลื่อนหาในของที่ไม่เกี่ยว */
+function inspTplFill(pick){
+  var kind = $('i_kind') ? $('i_kind').value : 'tanker', opts = '', n = 0;
+  for (var i = 0; i < (INSTPL || []).length; i++){
+    var x = INSTPL[i];
+    if (x.kind !== kind) continue;
+    n++;
+    opts += '<option value="' + esc(x.key) + '"' + (x.key === pick ? ' selected' : '') + '>' +
+            esc(x.name) + (x.model ? ' · ' + esc(x.model) : '') +
+            ' (' + x.n + ' หัวข้อ' + (x.nStd ? ' · รูป STD ' + x.nStd : '') + ')</option>';
   }
+  if (!n) opts = '<option value="">— ยังไม่มีแม่แบบของลักษณะงานนี้ —</option>';
+  $('i_template').innerHTML = opts;
   inspTplNote();
 }
+
+function inspKindChanged(){
+  var isTanker = $('i_kind').value === 'tanker';
+  /* งานอะไหล่/อุปกรณ์ ส่วนใหญ่เป็นของเข้าสโตร์ในประเทศ — เดาให้ก่อน แก้เองได้ */
+  if (!isTanker && $('i_area').value === 'for' && !$('i_chassisMaker').value) { /* ไม่บังคับ */ }
+  inspTplFill('');
+  inspAreaChanged();
+}
+
+function inspAreaChanged(){
+  /* เบียร์ 8 ก.ย. 2569: ในประเทศ = ไม่มี CHASSIS ผู้ผลิต และไม่มี E. No. (กติกาเดียวกับใบเคลม) */
+  var isFor = $('i_area').value === 'for';
+  ['i_cmkwrap','i_enowrap'].forEach(function(id){
+    var w = $(id); if (w) w.style.display = isFor ? '' : 'none';
+  });
+  if (!isFor){
+    if ($('i_chassisMaker')) $('i_chassisMaker').value = '';
+    if ($('i_eNo')) $('i_eNo').value = '';
+  }
+}
+
+/* พิมพ์ MODEL แล้วให้ระบบเลือกแม่แบบของรุ่นนั้นให้เลย — ไม่ต้องจำว่ารุ่นไหนใช้แม่แบบอะไร */
+function inspModelChanged(){
+  var m = $('i_model').value;
+  if (!m) { $('i_tplauto').innerHTML = ''; return; }
+  srv('suggestTemplate', [m, $('i_kind').value, AUTH], function(r){
+    if (!r){ $('i_tplauto').innerHTML = ''; return; }
+    inspTplFill(r.key);
+    $('i_tplauto').innerHTML = r.exact
+      ? '✅ เจอแม่แบบของรุ่นนี้ — <b>' + esc(r.name) + '</b> ' + r.n + ' หัวข้อ'
+      : '💡 ยังไม่มีแม่แบบผูกกับรุ่นนี้ ใช้ <b>' + esc(r.name) + '</b> ไปก่อน (เปลี่ยนเองได้)';
+  });
+}
+
 function inspTplNote(){
   if (!INSTPL) return;
-  var k = $('i_template').value, n = '';
-  for (var i = 0; i < INSTPL.length; i++) if (INSTPL[i].key === k) n = INSTPL[i].note;
-  $('i_tplnote').innerHTML = '💡 ' + esc(n) + ' — เปิดใบแล้ว <b>เพิ่ม / ลบ / แก้หัวข้อได้ทุกข้อ</b> แม่แบบเป็นแค่ตัวตั้งต้น';
+  var k = $('i_template').value, n = '', nStd = 0;
+  for (var i = 0; i < INSTPL.length; i++) if (INSTPL[i].key === k){ n = INSTPL[i].note; nStd = INSTPL[i].nStd; }
+  $('i_tplnote').innerHTML = '💡 ' + esc(n || 'ยังไม่มีคำอธิบายแม่แบบนี้') +
+    (nStd ? ' — <b>มีรูป STD ' + nStd + ' ข้อ</b> ระบบใส่ให้ตอนเปิดใบเลย' : '') +
+    ' — เปิดใบแล้ว <b>เพิ่ม / ลบ / แก้หัวข้อได้ทุกข้อ</b> แม่แบบเป็นแค่ตัวตั้งต้น';
 }
 function inspJobLookup(){
   var j = $('i_jobNo').value.trim(); if (!j) return;
@@ -81,6 +135,7 @@ function submitInsp(){
     jobNo:jobNo, jobName:$('i_jobName').value, model:$('i_model').value,
     chassisStt:$('i_chassisStt').value, chassisMaker:$('i_chassisMaker').value,
     serialNo:$('i_serialNo').value, po:$('i_po').value, supplier:$('i_supplier').value,
+    eNo:$('i_eNo') ? $('i_eNo').value : '',
     recv:$('i_recv').value };
   $('insSave').disabled = true; $('insSave').textContent = 'กำลังเปิดใบ…';
   srv('createInspection', [h, AUTH], function(r){
@@ -169,8 +224,14 @@ function openInspection(docNo){
     t += fr('MODEL', ip('i2_model','saveInspHeadField','model',h['MODEL'])) +
          fr('SERIAL NO.', ip('i2_serialNo','saveInspHeadField','serialNo',h['SERIAL NO.'])) +
          fr('ผู้ตรวจ', ip('i2_inspector','saveInspHeadField','inspector',h['ผู้ตรวจ']));
-    t += fr('CHASSIS <i>STT</i>', ip('i2_chassisStt','saveInspHeadField','chassisStt',h['CHASSIS NO. (STT)'])) +
-         fr('CHASSIS <i>ผู้ผลิต</i>', ip('i2_chassisMaker','saveInspHeadField','chassisMaker',h['CHASSIS NO. (ผู้ผลิต)'])) +
+    t += fr('CHASSIS <i>STT</i>', ip('i2_chassisStt','saveInspHeadField','chassisStt',h['CHASSIS NO. (STT)']));
+    /* ในประเทศไม่มี CHASSIS ผู้ผลิต / E. No. (เบียร์ 8 ก.ย. 2569 — กติกาเดียวกับใบเคลม) */
+    if (INSFOREIGN){
+      t += fr('CHASSIS <i>ผู้ผลิต</i>', ip('i2_chassisMaker','saveInspHeadField','chassisMaker',h['CHASSIS NO. (ผู้ผลิต)'])) +
+           fr('E. No.', ip('i2_eNo','saveInspHeadField','eNo',h['E. No.'],'หมายเลขเครื่อง'));
+    }
+    t += fr('ลักษณะงาน', '<input value="' + esc(INSTANKER ? 'Tankers' : 'อะไหล่ หรือ อุปกรณ์') + '" disabled>',
+            'อัตโนมัติ|ตั้งตอนเปิดใบ · Tankers = มีช่องรูป STD เทียบ') +
          fr('วันรับสินค้า', ip('i2_recv','saveInspHeadField','recv',h['วันรับสินค้า'],'DD/MM/YYYY'));
     t += fr('PO', ip('i2_po','saveInspHeadField','po',h['PO'])) +
          fr('Supplier', ip('i2_supplier','saveInspHeadField','supplier',h['Supplier'],'','vlist')) +

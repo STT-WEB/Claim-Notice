@@ -423,7 +423,7 @@ function reportDocs(auth){
   for (var i = 0; i < claims.length; i++){
     out.push({ kind:'ใบเคลม', docNo:claims[i].docNo, date:claims[i].date,
       jobNo:claims[i].jobNo, jobName:claims[i].jobName,
-      detail:(claims[i].claimType === 'pre' ? 'ก่อนส่งมอบ' : 'หลังส่งมอบ') + ' · ' +
+      detail:claimTypeText_(claims[i].claimType) + ' · ' +
              (claims[i].area === 'for' ? 'ต่างประเทศ' : 'ในประเทศ'),
       n:claims[i].nItem, photos:claims[i].nPhoto, status:claims[i].status, by:claims[i].by });
   }
@@ -604,7 +604,9 @@ function makeConsolidatedBill(docNos, auth){
 
 /** 3.6 · รายงานส่ง HR — เฉพาะใบที่ระบุว่าพนักงานทำเสียหาย */
 function reportHR(auth){
-  requireAny_(auth, ['APPROVER','PURCHASE']);
+  /* เบียร์ 8 ก.ย. 2569: "อันนี้จะมีแค่ HR กับ Admin และคนที่ Approve เห็น"
+     → จัดซื้อไม่เห็นแล้ว เพราะเป็นเรื่องหักเงินเดือนพนักงาน ไม่ใช่ต้นทุนงาน */
+  requireAny_(auth, ['HR','ADMIN','APPROVER']);
   var out = [];
   /* ต้องกวาดทุกปี — HR หักเงินตอนไหนก็ได้ ใบอาจปิดข้ามปีมาแล้ว */
   eachClaim_(function(o, stage, d){
@@ -666,21 +668,11 @@ function reportSupplierDocs(auth){
   return { rows:out, nJob:Object.keys(jobs).length };
 }
 
-/** 3.8 · LOG — เก็บคนละแท็บกับตัวเอกสาร ลบ LOG ทิ้ง ใบเคลมยังอยู่ครบ */
-function reportLog(limit, auth){
-  requireAny_(auth, ['APPROVER']);
-  var sh = ensureTab_(ss_(), 'LOG', HDR_LOG);
-  var lr = sh.getLastRow();
-  if (lr < 2) return { rows:[], total:0 };
-  var n = Math.min(num_(limit) || 300, lr - 1);
-  var v = sh.getRange(lr - n + 1, 1, n, HDR_LOG.length).getDisplayValues();
-  var out = [];
-  for (var i = v.length - 1; i >= 0; i--){
-    out.push({ at:norm_(v[i][0]), user:norm_(v[i][1]), act:norm_(v[i][2]),
-               ref:norm_(v[i][3]), detail:norm_(v[i][4]) });
-  }
-  return { rows:out, total:lr - 1 };
-}
+/* ═══ ถอดออก 8 ก.ย. 2569 — เบียร์: "LOG ประวัติการใช้งาน เอาออกจากโปรแกรมเลย" ═══
+ *   reportLog() ถูกลบ — ไม่มีหน้าไหนในโปรแกรมเปิดดู LOG ได้อีกแล้ว
+ *   แต่ log_() ยัง "เขียน" ลงแท็บ LOG เหมือนเดิม เพราะเป็นหลักฐานว่าใครกดอะไรเมื่อไหร่
+ *   ระบบนี้ใช้ไป 10-20 ปี ถ้าไม่มีร่องรอยเลย ลายเซ็นบนเอกสารก็พิสูจน์อะไรไม่ได้
+ *   เบียร์ดู/ลบ LOG ได้ที่แท็บ LOG ในชีตโดยตรง (ลบทิ้งไม่กระทบตัวเอกสาร) */
 
 /** 3.1 รูปและวิดีโอทั้งระบบ — จัดกลุ่มตามจ๊อบ → เอกสาร */
 function reportMedia(auth){
@@ -1255,7 +1247,7 @@ function dashDocs(auth){
       state:docState_(c.stage, c.rejected, ['CLOSED']),
       jobNo:c.jobNo || '(ไม่ระบุจ๊อบ)', jobName:c.jobName || '(ไม่ระบุ)', model:c.model || '—',
       area:(c.area === 'for' ? 'ต่างประเทศ' : 'ในประเทศ'),
-      docType:(c.claimType === 'pre' ? 'ก่อนส่งมอบ' : 'หลังส่งมอบ'),
+      docType:claimTypeText_(c.claimType),
       supplier:sup[c.docNo] || '(ยังไม่ระบุ)',
       by:c.by || '—', dept:c.dept || '—',
       nItem:c.nItem || 0, nPhoto:c.nPhoto || 0,

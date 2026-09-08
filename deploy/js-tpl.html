@@ -1,0 +1,241 @@
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ทะเบียนแม่แบบเช็คลิสต์  (v1.4.0 · เบียร์ 8 ก.ย. 2569)
+ *   "แม่แบบมาตรฐานของแต่ละโมเดล ให้เลือกว่าจะใช้แม่แบบอะไร
+ *    ต้องมี Template ให้เบียร์กรอกข้อมูล เช่น การตรวจแท็งค์ model นี้ ต้องตรวจอะไรบ้าง + รูปภาพ เป็นหัวข้อ ๆ"
+ *
+ *   หน้านี้ทำ 2 อย่าง
+ *     ① รายการแม่แบบทั้งหมด — สร้าง / ก๊อป / ปิดใช้งาน
+ *     ② เปิดแม่แบบทีละตัว — แก้หัวข้อตรวจแบบตาราง Excel + แนบรูป STD ทีละข้อ
+ *   รูป STD ที่แนบไว้ตรงนี้ จะตามไปทุกใบตรวจที่เปิดจากแม่แบบนี้อัตโนมัติ
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+var TPLLIST = null;    /* รายการแม่แบบล่าสุดที่โหลดมา */
+var TPLCUR  = null;    /* แม่แบบที่กำลังเปิดแก้อยู่ { head, items } */
+var GTPL    = null;    /* ตารางหัวข้อตรวจ */
+
+function tplCanEdit(){ return hasRole('QC') || hasRole('APPROVER') || hasRole('ADMIN'); }
+
+/* ─── ① รายการแม่แบบทั้งหมด ─── */
+function loadTplList(){
+  busy(true, 'กำลังโหลดทะเบียนแม่แบบ…');
+  srv('listTemplates', [true, AUTH], function(rows){
+    TPLLIST = rows || [];
+    var nOn = TPLLIST.filter(function(x){ return x.active; }).length;
+    var t = '<div class="card">' + repHead('แม่แบบเช็คลิสต์ตรวจรับ',
+        'แม่แบบทั้งหมด ' + TPLLIST.length + ' ชุด · เปิดใช้อยู่ ' + nOn + ' ชุด');
+    t += '<div class="modtag">แม่แบบคือ<b>หัวข้อมาตรฐานที่ต้องตรวจของแต่ละรุ่น</b> ' +
+         'แนบรูป STD ไว้ทีละข้อได้ · เปิดใบตรวจจากแม่แบบไหน หัวข้อกับรูป STD ตามไปให้ทั้งชุด</div>';
+    if (tplCanEdit()){
+      t += '<div style="margin:12px 0;display:flex;gap:8px;flex-wrap:wrap">' +
+           '<button class="btn" onclick="tplNew()">+ สร้างแม่แบบใหม่</button></div>';
+    } else {
+      t += '<div class="hint" style="margin:10px 0">👁 ดูได้อย่างเดียว — แก้แม่แบบได้เฉพาะ QC และผู้บริหาร</div>';
+    }
+
+    if (!TPLLIST.length){
+      t += '<div class="empty">ยังไม่มีแม่แบบในระบบ<br><span>กด “สร้างแม่แบบใหม่” เพื่อเริ่ม</span></div></div>';
+      $('view').innerHTML = t; return;
+    }
+
+    t += '<div class="tblwrap"><table class="t"><thead><tr>' +
+      '<th style="width:96px">รหัส</th><th>ชื่อแม่แบบ</th>' +
+      '<th style="width:130px">ลักษณะงาน</th><th style="width:170px">MODEL ที่ผูก</th>' +
+      '<th style="width:78px">หัวข้อ</th><th style="width:88px">รูป STD</th>' +
+      '<th style="width:90px">ใช้งาน</th><th style="width:210px">จัดการ</th></tr></thead><tbody>';
+    for (var i = 0; i < TPLLIST.length; i++){
+      var x = TPLLIST[i];
+      t += '<tr' + (x.active ? '' : ' style="opacity:.5"') + '>' +
+        '<td><b>' + esc(x.key) + '</b></td>' +
+        '<td style="cursor:pointer" onclick="tplOpen(\'' + esc(x.key) + '\')"><b class="lk">' + esc(x.name) + '</b>' +
+          (x.note ? '<div class="hint">' + esc(x.note) + '</div>' : '') + '</td>' +
+        '<td><span class="pill' + (x.kind === 'tanker' ? '' : ' red') + '">' +
+          (x.kind === 'tanker' ? 'Tankers' : 'อะไหล่ / อุปกรณ์') + '</span></td>' +
+        '<td>' + esc(x.model || '— ทุกรุ่น —') + '</td>' +
+        '<td class="c">' + x.n + '</td>' +
+        '<td class="c">' + (x.nStd ? '<b>' + x.nStd + '</b> / ' + x.n : '—') + '</td>' +
+        '<td class="c">' + (x.active ? '<span class="pill green">เปิดใช้</span>' : '<span class="pill">ปิดอยู่</span>') + '</td>' +
+        '<td>' + (tplCanEdit()
+          ? '<button class="btn ghost" onclick="tplOpen(\'' + esc(x.key) + '\')">✏️ แก้</button> ' +
+            '<button class="btn ghost" onclick="tplCopy(\'' + esc(x.key) + '\')">⧉ ก๊อป</button> ' +
+            '<button class="btn ghost" onclick="tplToggle(\'' + esc(x.key) + '\',' + (x.active ? 'false' : 'true') + ')">' +
+              (x.active ? '🚫 ปิดใช้' : '✓ เปิดใช้') + '</button>'
+          : '<button class="btn ghost" onclick="tplOpen(\'' + esc(x.key) + '\')">👁 ดู</button>') + '</td></tr>';
+    }
+    t += '</tbody></table></div></div>';
+    $('view').innerHTML = t;
+  }, function(m){
+    $('view').innerHTML = '<div class="card">' + repHead('แม่แบบเช็คลิสต์ตรวจรับ', '') +
+      '<div class="empty">' + esc(m) + '</div></div>';
+  });
+}
+
+function tplNew(){
+  var name = prompt('ชื่อแม่แบบใหม่ (เช่น "แท็งค์ SEMI-TRAILER 32,000 L")');
+  if (!name) return;
+  srv('saveTemplate', [{ name:name, kind:'tanker', model:'', note:'' }, AUTH], function(r){
+    if (r && r.ok) tplOpen(r.key);
+  });
+}
+function tplCopy(key){
+  var name = prompt('ชื่อแม่แบบชุดใหม่ (ก๊อปหัวข้อและรูป STD มาให้ทั้งชุด)');
+  if (!name) return;
+  srv('copyTemplate', [key, name, AUTH], function(r){ if (r && r.ok) tplOpen(r.key); });
+}
+function tplToggle(key, on){
+  srv('setTemplateActive', [key, on, AUTH], function(){ loadTplList(); });
+}
+
+/* ─── ② เปิดแม่แบบทีละตัว ─── */
+function tplOpen(key){
+  busy(true, 'กำลังเปิดแม่แบบ…');
+  srv('getTemplate', [key, AUTH], function(c){
+    if (!c){ $('view').innerHTML = '<div class="msg bad">ไม่พบแม่แบบ ' + esc(key) + '</div>'; return; }
+    TPLCUR = c;
+    var h = c.head, ed = tplCanEdit();
+
+    var t = '<div class="card tight"><div class="cardhd">' +
+      '<h3>' + esc(h.key) + ' — ' + esc(h.name) + '</h3>' +
+      '<span class="sub">' + c.items.length + ' หัวข้อ</span>' +
+      '<button class="btn ghost" onclick="loadTplList()">← ทะเบียนแม่แบบ</button>' +
+      (ed ? '<button class="btn" onclick="tplSaveAll()">💾 บันทึกแม่แบบ</button>' : '') + '</div>';
+    t += '<div id="tmsg"></div>';
+    t += '<div class="fgrid">';
+    t += fr('ชื่อแม่แบบ', '<input id="t_name" value="' + esc(h.name) + '"' + (ed ? '' : ' disabled') + '>', 'ขั้น 1|', true);
+    t += fr('ลักษณะงาน', '<select id="t_kind"' + (ed ? '' : ' disabled') + '>' +
+        '<option value="tanker"' + (h.kind === 'tanker' ? ' selected' : '') + '>Tankers</option>' +
+        '<option value="equip"' + (h.kind === 'equip' ? ' selected' : '') + '>อะไหล่ หรือ อุปกรณ์</option></select>',
+        'ขั้น 1|เปิดใบตรวจแล้วจะเห็นเฉพาะแม่แบบของลักษณะงานที่เลือก', true);
+    t += fr('MODEL ที่ผูก', '<input id="t_model" value="' + esc(h.model) + '" placeholder="เว้นว่าง = ใช้ได้ทุกรุ่น"' +
+        (ed ? '' : ' disabled') + '>', 'ขั้น 1|พิมพ์รุ่นตอนเปิดใบตรวจ ระบบจะเลือกแม่แบบนี้ให้เอง');
+    t += fr('คำอธิบาย', '<input id="t_note" value="' + esc(h.note) + '" placeholder="ใช้กับกรณีไหน"' +
+        (ed ? '' : ' disabled') + '>');
+    t += '</div></div>';
+
+    t += '<div class="card tight"><div class="cardhd"><h3>หัวข้อที่ต้องตรวจ</h3>' +
+      '<span class="sub">ก๊อปจาก Google Sheets มาวางได้ทั้งตาราง · แนบรูป STD ทีละข้อ</span>' +
+      '</div>';
+    t += '<div class="note">📐 <b>รูป STD คือรูปมาตรฐานของรุ่นนี้</b> — ใส่ไว้ที่นี่ครั้งเดียว ' +
+         'ทุกใบตรวจที่เปิดจากแม่แบบนี้จะได้รูป STD ไปเทียบกับของที่รับมาจริงทันที ไม่ต้องแนบใหม่ทุกใบ</div>';
+    t += '<div id="tplGrid"></div></div>';
+    $('view').innerHTML = t;
+
+    /* ตารางวาดใหม่บ่อย (เพิ่มแถว / วางทับ) — ต้องเอารูป STD กลับมาทุกครั้งผ่าน onDraw */
+    GTPL = makeGrid('tplGrid', tplCols(), c.items.map(tplRowOf), {
+      /* ⚠️ ใช้ g ที่ onDraw ส่งมา ห้ามใช้ GTPL — ตอนวาดรอบแรก makeGrid ยังไม่ได้คืนค่าให้ GTPL
+         (เคยพลาดตรงนี้: รูป STD ไม่ขึ้นตอนเปิดหน้า แต่ขึ้นตอนกดเพิ่มแถว) */
+      onDraw: function(g){ tplDrawStd(g); if (!ed) tplLockAll(g); }
+    });
+  });
+}
+
+function tplCols(){
+  return [
+    { k:'cat',     label:'หมวด',              w:120 },
+    { k:'title',   label:'หัวข้อตรวจ (ไทย)',   w:270, type:'area' },
+    { k:'titleEn', label:'Check point (EN)',   w:240, type:'area' },
+    { k:'qty',     label:'จำนวน',             w:66, type:'num' },
+    { k:'unit',    label:'หน่วย',             w:66 },
+    { k:'std',     label:'📐 รูป STD ประจำรุ่น', sub:'ใส่ไว้ที่แม่แบบ ใช้ได้ทุกใบ', w:186 },
+    { k:'note',    label:'หมายเหตุ',          w:140 }
+  ];
+}
+/* ตำแหน่งคอลัมน์รูป STD ในตาราง — ใช้หา <td> ที่จะเอารูปไปวางแทนช่องพิมพ์ */
+function tplStdCol(){
+  var c = tplCols();
+  for (var i = 0; i < c.length; i++) if (c[i].k === 'std') return i;
+  return -1;
+}
+function tplRowOf(it){
+  return { cat:it.cat, title:it.title, titleEn:it.titleEn, qty:it.qty, unit:it.unit,
+           note:it.note, std:'', _seq:it.seq, _stdId:it.stdId, _stdThumb:it.stdThumb, _stdView:it.stdView };
+}
+
+/* วาดรูป STD ทับ "ช่องพิมพ์" ของคอลัมน์ std — ไม่ต้องแก้กลไกตารางกลาง */
+function tplDrawStd(g){
+  g = g || GTPL;
+  if (!g) return;
+  var cIdx = tplStdCol();
+  var host = document.getElementById(g.id);
+  if (!host) return;
+  for (var i = 0; i < g.rows.length; i++){
+    var r = g.rows[i];
+    var inp = host.querySelector('[data-r="' + i + '"][data-c="' + cIdx + '"]');
+    if (!inp) continue;
+    var cell = inp.parentNode;
+    var seq = r._seq || String(i + 1);
+    var t = '';
+    if (r._stdThumb){
+      t = '<div class="tplstd"><img src="' + esc(r._stdThumb) + '" onclick="window.open(\'' +
+          esc(r._stdView) + '\',\'_blank\')" title="กดเพื่อเปิดรูปเต็ม">' +
+          (tplCanEdit() ? '<b onclick="tplDelStd(\'' + esc(seq) + '\')" title="ลบรูป STD">✕</b>' : '') + '</div>';
+    } else if (tplCanEdit()){
+      t = '<label class="tplup">+ แนบรูป STD' +
+          '<input type="file" accept="image/*" style="display:none" onchange="tplUpStd(this,\'' + esc(seq) + '\')"></label>';
+    } else {
+      t = '<span class="hint">— ไม่มีรูป STD —</span>';
+    }
+    cell.innerHTML = t;
+  }
+}
+
+/* ผู้ที่ไม่มีสิทธิ์แก้ — ดูได้อย่างเดียว */
+function tplLockAll(g){
+  g = g || GTPL; if (!g) return;
+  var host = document.getElementById(g.id); if (!host) return;
+  var els = host.querySelectorAll('input,textarea,button');
+  for (var i = 0; i < els.length; i++) els[i].disabled = true;
+}
+
+function tplUpStd(input, seq){
+  var f = input.files && input.files[0];
+  if (!f) return;
+  if (!TPLCUR){ return; }
+  var box = input.parentNode;
+  box.textContent = 'กำลังอัปโหลด…';
+  var rd = new FileReader();
+  rd.onload = function(){
+    srv('saveTplPhoto', [TPLCUR.head.key, seq, rd.result, f.name, AUTH], function(r){
+      if (!r || !r.ok) return;
+      for (var i = 0; i < GTPL.rows.length; i++){
+        if (String(GTPL.rows[i]._seq) !== String(seq)) continue;
+        GTPL.rows[i]._stdId = r.id; GTPL.rows[i]._stdThumb = r.thumb; GTPL.rows[i]._stdView = r.view;
+      }
+      tplDrawStd();
+    }, function(m){ box.textContent = ''; $('tmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; });
+  };
+  rd.readAsDataURL(f);
+}
+function tplDelStd(seq){
+  if (!TPLCUR) return;
+  srv('delTplPhoto', [TPLCUR.head.key, seq, AUTH], function(){
+    for (var i = 0; i < GTPL.rows.length; i++){
+      if (String(GTPL.rows[i]._seq) !== String(seq)) continue;
+      GTPL.rows[i]._stdId = ''; GTPL.rows[i]._stdThumb = ''; GTPL.rows[i]._stdView = '';
+    }
+    tplDrawStd();
+  });
+}
+
+/* บันทึกทั้งหัวแม่แบบและหัวข้อพร้อมกัน — กดปุ่มเดียวจบ ไม่ต้องจำว่าบันทึกส่วนไหนแล้ว */
+function tplSaveAll(){
+  if (!TPLCUR) return;
+  var head = { key:TPLCUR.head.key, name:$('t_name').value, kind:$('t_kind').value,
+               model:$('t_model').value, note:$('t_note').value, active:TPLCUR.head.active };
+  if (!head.name.trim()){ $('tmsg').innerHTML = '<div class="msg bad">ต้องตั้งชื่อแม่แบบก่อน</div>'; return; }
+  var rows = gridData(GTPL.id), items = [];
+  for (var i = 0; i < rows.length; i++){
+    var r = rows[i];
+    if (!String(r.title || '').trim() && !String(r.cat || '').trim()) continue;
+    items.push({ cat:r.cat, title:r.title, titleEn:r.titleEn, qty:r.qty, unit:r.unit, note:r.note,
+                 stdId:r._stdId || '', stdThumb:r._stdThumb || '', stdView:r._stdView || '' });
+  }
+  $('tmsg').innerHTML = '<div class="msg">กำลังบันทึก…</div>';
+  srv('saveTemplate', [head, AUTH], function(){
+    srv('saveTemplateItems', [head.key, items, AUTH], function(r){
+      $('tmsg').innerHTML = '<div class="msg good">✓ บันทึกแล้ว ' + (r ? r.n : items.length) + ' หัวข้อ</div>';
+      tplOpen(head.key);
+    }, function(m){ $('tmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; });
+  }, function(m){ $('tmsg').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; });
+}
+</script>

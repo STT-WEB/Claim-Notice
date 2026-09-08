@@ -13,7 +13,11 @@
 var HDR_INSP = ['เลขที่เอกสาร','ชนิดเอกสาร','วันที่','สถานที่ผลิต','ชนิดงาน',
   'เลขที่ JOB','ชื่อลูกค้า','MODEL','CHASSIS NO. (STT)','CHASSIS NO. (ผู้ผลิต)','SERIAL NO.',
   'แม่แบบเช็คลิสต์','PO','Supplier','วันรับสินค้า','ผู้ตรวจ',
-  'สถานะ','ใบเคลมที่ออกจากใบนี้','หมายเหตุ','สร้างโดย','สร้างเมื่อ','แก้ไขล่าสุด'];
+  'สถานะ','ใบเคลมที่ออกจากใบนี้','หมายเหตุ','สร้างโดย','สร้างเมื่อ','แก้ไขล่าสุด',
+  /* ⚠️ เพิ่มทีหลัง "ต่อท้ายเท่านั้น" ห้ามแทรกกลาง — ensureCols_ เขียนทับหัวตาราง แต่ไม่ย้ายข้อมูลตาม
+     เบียร์ 8 ก.ย. 2569: "ต้องมี E. No หลัง CHASSIS ผู้ผลิต"
+     (ตำแหน่งบนหน้าจอวางไว้หลัง CHASSIS ผู้ผลิต ไม่ต้องตรงกับลำดับคอลัมน์ในชีต) */
+  'E. No.','รหัสแม่แบบ'];
 
 /* ═══ ขั้นตอนของใบตรวจรับ (v0.9.2) ═══════════════════════════
  * เบียร์: "ในเรื่องของ Inspection ก็เหมือนกัน" — คอนเซ็ปต์เดียวกับใบเคลม
@@ -233,27 +237,38 @@ function createInspection(h, auth){
   if (!norm_(h.jobNo)) throw new Error('ต้องระบุเลขที่ JOB');
 
   var docNo = nextInspNo_(), d = inspDb_();
-  var tplKey = norm_(h.template) || 'equipment';
-  var tpl = INSP_TEMPLATES[tplKey] || INSP_TEMPLATES.equipment;
+  /* แม่แบบมาจากทะเบียนในชีต (แก้เองได้) ไม่ใช่ฝังในโค้ดแล้ว */
+  var tpl = resolveTemplate_(h.template, h.model, h.kind, auth);
+  var tplName = tpl ? tpl.head.name : 'ใบเปล่า (พิมพ์หัวข้อเอง)';
+  var tplKey  = tpl ? tpl.head.key  : '';
+  var tItems  = tpl ? tpl.items : [];
 
   d.head.appendRow([
     docNo, 'INSPECTION', fmtDMY_(new Date()), norm_(h.area) || 'for', norm_(h.kind) || 'tanker',
     norm_(h.jobNo).toUpperCase(), norm_(h.jobName), norm_(h.model),
     norm_(h.chassisStt), norm_(h.chassisMaker), norm_(h.serialNo),
-    tpl.name, norm_(h.po), norm_(h.supplier), fmtDMY_(h.recv), me.name,
+    tplName, norm_(h.po), norm_(h.supplier), fmtDMY_(h.recv), me.name,
     'DRAFT', '', '', me.name, nowStamp_(), nowStamp_()
   ]);
+  ensureCols_(d.head, inspHdr_());
+  var nr = findInspRow_(d.head, docNo);
+  var cE = colOfI_('E. No.');      if (cE > 0) d.head.getRange(nr, cE).setValue(norm_(h.eNo));
+  var cT = colOfI_('รหัสแม่แบบ');   if (cT > 0) d.head.getRange(nr, cT).setValue(tplKey);
 
   var rows = [];
-  for (var i = 0; i < tpl.items.length; i++){
-    rows.push([docNo, i + 1, tpl.items[i][0], tpl.items[i][1], tpl.items[i][2],
-               '', '', '', '', '', '', '', '']);
+  for (var i = 0; i < tItems.length; i++){
+    rows.push([docNo, i + 1, tItems[i].cat, tItems[i].title, tItems[i].titleEn,
+               '', '', '', tItems[i].qty, tItems[i].unit, '', '', '']);
   }
   if (rows.length) d.items.getRange(d.items.getLastRow()+1, 1, rows.length, HDR_INSPIT.length).setValues(rows);
 
-  log_('createInspection', docNo, norm_(h.jobNo) + ' · ' + tpl.name);
-  setInsStage_(d.head, d.head.getLastRow(), 'IDRAFT', me, 'เปิดใบตรวจ');
-  return { ok:true, docNo:docNo, n:rows.length };
+  /* รูป STD ประจำรุ่นตามมาจากแม่แบบทันที — ช่องรูป STD ในตารางใช้ลำดับ "S" + เลขข้อ
+     เบียร์: "เผื่อวันนึงเรามีรูป STD ก็ใส่ไว้ได้เลย" → ใส่ไว้ที่แม่แบบครั้งเดียว ใช้ได้ทุกใบ */
+  var nStd = copyStdFromTemplate_(docNo, tItems, me.name);
+
+  log_('createInspection', docNo, norm_(h.jobNo) + ' · ' + tplName + ' · รูป STD ' + nStd);
+  setInsStage_(d.head, nr, 'IDRAFT', me, 'เปิดใบตรวจ');
+  return { ok:true, docNo:docNo, n:rows.length, nStd:nStd, template:tplName };
 }
 
 function inspItemsOf_(d, docNo){
@@ -373,14 +388,19 @@ function photoCountByDoc_(){
  * เบียร์: "เมื่อพิมแล้ว ต้องบันทึกเองเลย เหมือนทำใน GGS · ห้ามเด้งขึ้นลงเอง"
  * → ทุกฟังก์ชันนี้เขียนแค่ "ช่องเดียว" แล้วจบ ไม่ส่งข้อมูลทั้งใบกลับมา
  *   หน้าเว็บจึงไม่ต้องวาดใหม่ = จอไม่เด้ง focus ไม่หลุด                */
-var INSP_FIELD_COL = {
-  area:4, kind:5, jobNo:6, jobName:7, model:8, chassisStt:9, chassisMaker:10,
-  serialNo:11, po:13, supplier:14, recv:15, inspector:16, status:17, note:19
+/* ⚠️ อย่าใช้เลขคอลัมน์ตายตัวอีก — ใช้ "ชื่อหัวตาราง" แทน เพิ่มคอลัมน์ทีหลังก็ไม่พัง
+   (เลขเดิม: area:4 kind:5 … note:19 — เคยเป็นชนวนบั๊กเขียนผิดช่องแบบเงียบ ๆ) */
+var INSP_FIELD_NAME = {
+  area:'สถานที่ผลิต', kind:'ชนิดงาน', jobNo:'เลขที่ JOB', jobName:'ชื่อลูกค้า', model:'MODEL',
+  chassisStt:'CHASSIS NO. (STT)', chassisMaker:'CHASSIS NO. (ผู้ผลิต)', serialNo:'SERIAL NO.',
+  po:'PO', supplier:'Supplier', recv:'วันรับสินค้า', inspector:'ผู้ตรวจ', status:'สถานะ',
+  note:'หมายเหตุ', eNo:'E. No.'
 };
 function saveInspHeadField(docNo, field, value, auth){
   requireAny_(auth, ['QC','PRODUCTION','STORE','PURCHASE','DESIGN','APPROVER']);
-  var col = INSP_FIELD_COL[field];
-  if (!col) throw new Error('ไม่รู้จักช่อง ' + field);
+  var name = INSP_FIELD_NAME[field];
+  if (!name) throw new Error('ไม่รู้จักช่อง ' + field);
+  var col = colOfI_(name);
   var d = inspDbOf_(docNo);
   var r = insEditable_(d, docNo, null);       // อนุมัติแล้วแก้ไม่ได้
   if (r < 0) throw new Error('ไม่พบใบตรวจ ' + docNo);
@@ -595,8 +615,9 @@ function sendUnAccToClaim(docNo, auth){
 
   var d = inspDbOf_(docNo), r = findInspRow_(d.head, docNo);
   if (r < 0) throw new Error('ไม่พบใบตรวจ ' + docNo);
-  var hdr = d.head.getRange(1,1,1,HDR_INSP.length).getDisplayValues()[0];
-  var hrow = d.head.getRange(r,1,1,HDR_INSP.length).getDisplayValues()[0];
+  var fullI = inspHdr_();
+  var hdr = d.head.getRange(1,1,1,fullI.length).getDisplayValues()[0];
+  var hrow = d.head.getRange(r,1,1,fullI.length).getDisplayValues()[0];
   var H = {};
   for (var i = 0; i < hdr.length; i++) H[hdr[i]] = norm_(hrow[i]);
 
@@ -615,10 +636,14 @@ function sendUnAccToClaim(docNo, auth){
     fromSeq.push(items[k].seq);
   }
 
+  /* เบียร์ 8 ก.ย. 2569: "ประเภทการเคลม มันต้องมีว่า เคลมหลังจาก inspection แท็งค์ด้วย
+     ในกรณีที่มันเชื่อมมาจากใบ Inspection" — ระบบตั้งให้เอง คนเลือกเองไม่ได้ */
   var res = createClaim({
-    claimType:'pre', area:H['สถานที่ผลิต'], foreignKind:H['ชนิดงาน'],
+    claimType:'insp', fromInsp:docNo,
+    area:H['สถานที่ผลิต'], foreignKind:H['ชนิดงาน'],
     jobNo:H['เลขที่ JOB'], jobName:H['ชื่อลูกค้า'], model:H['MODEL'],
     chassisStt:H['CHASSIS NO. (STT)'], chassisMaker:H['CHASSIS NO. (ผู้ผลิต)'],
+    eNo:H['E. No.'], workKind:'PART',
     serialNo:H['SERIAL NO.'], dept:'QC / ตรวจรับ',
     items:claimItems
   }, auth);
@@ -631,8 +656,9 @@ function sendUnAccToClaim(docNo, auth){
     if (items[m].acc !== 'UNACC') continue;
     d.items.getRange(items[m].row, 11).setValue(res.docNo);
   }
-  d.head.getRange(r, 18).setValue(res.docNo);
-  d.head.getRange(r, 17).setValue('ส่งเคลมแล้ว');
+  /* ⚠️ ห้ามใช้เลขคอลัมน์ตายตัว — เพิ่มคอลัมน์ทีไรจะเขียนผิดช่องแบบเงียบ ๆ */
+  d.head.getRange(r, colOfI_('ใบเคลมที่ออกจากใบนี้')).setValue(res.docNo);
+  d.head.getRange(r, colOfI_('สถานะ')).setValue('ส่งเคลมแล้ว');
   d.head.getRange(r, colOfI_('แก้ไขล่าสุด')).setValue(nowStamp_());
 
   log_('sendUnAccToClaim', docNo, '→ ' + res.docNo + ' (' + claimItems.length + ' ข้อ)');
@@ -657,4 +683,314 @@ function copyPhotosToDoc_(fromDoc, toDoc, seqList, byName){
   }
   if (out.length) pt.getRange(pt.getLastRow()+1, 1, out.length, HDR_PHOTO.length).setValues(out);
   return out.length;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ทะเบียนแม่แบบเช็คลิสต์  (v1.4.0 · เบียร์ 8 ก.ย. 2569)
+ *   "แม่แบบเช็คลิสต์ >> มันเหมือนต้องเป็นไฟล์ที่ต้องสร้างขึ้นมาในระบบไหม
+ *    ว่าอันนี้คือแม่แบบมาตรฐานของแต่ละโมเดลไหม ให้เลือกว่าจะใช้แม่แบบอะไร
+ *    (ต้องมี Template ให้เบียร์กรอกข้อมูล เช่น การตรวจแท็งค์ model นี้ ต้องตรวจอะไรบ้าง + รูปภาพ เป็นหัวข้อ ๆ)"
+ *
+ * ออกแบบยังไง
+ *   • เก็บใน 2 แท็บ  TPL (หัวแม่แบบ) + TPLIT (หัวข้อตรวจ)  — เบียร์แก้เองได้จากในระบบ
+ *   • ไม่แบ่งตามปี — แม่แบบเป็น "ข้อมูลหลัก" ไม่ใช่ธุรกรรม ใช้ข้ามปีตลอดไป
+ *   • ผูกกับ MODEL ได้ → เปิดใบตรวจ พิมพ์ MODEL แล้วระบบเลือกแม่แบบให้เอง
+ *   • รูป STD แนบไว้ที่ "หัวข้อ" ในแม่แบบ (ข้อละ 1 รูป)
+ *     เปิดใบตรวจจากแม่แบบ = รูป STD ตามไปทุกข้อทันที ไม่ต้องแนบใหม่ทุกใบ
+ *     ← นี่คือคลังรูป STD ประจำรุ่นที่ค้างไว้ตั้งแต่รอบก่อน
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+var HDR_TPL   = ['รหัสแม่แบบ','ชื่อแม่แบบ','ลักษณะงาน','MODEL','คำอธิบาย','ใช้งาน',
+                 'สร้างโดย','สร้างเมื่อ','แก้ไขล่าสุด'];
+var HDR_TPLIT = ['รหัสแม่แบบ','ลำดับ','หมวด','หัวข้อตรวจ','หัวข้อ (EN)','จำนวน','หน่วย',
+                 'รูป STD file id','รูป STD ลิงก์','รูป STD ลิงก์เต็ม','หมายเหตุ'];
+
+var _TPLDB = null;
+function tplDb_(){
+  if (_TPLDB) return _TPLDB;
+  var ss = ss_();
+  _TPLDB = { ss:ss,
+    tpl  : ensureCols_(ensureTab_(ss, 'TPL',   HDR_TPL),   HDR_TPL),
+    items: ensureCols_(ensureTab_(ss, 'TPLIT', HDR_TPLIT), HDR_TPLIT) };
+  seedTemplates_(_TPLDB);
+  return _TPLDB;
+}
+
+/** ครั้งแรกสุด: ย้ายแม่แบบที่เคยฝังอยู่ในโค้ดลงชีตให้ เบียร์จะได้มีตัวตั้งต้นไว้แก้
+ *  ทำครั้งเดียว — มีแถวในชีตแล้วจะไม่ยัดซ้ำ */
+function seedTemplates_(d){
+  if (d.tpl.getLastRow() > 1) return;
+  var order = ['tanker','equipment','domestic','blank'];
+  var kindOf = { tanker:'tanker', equipment:'equip', domestic:'equip', blank:'equip' };
+  var n = 0;
+  for (var i = 0; i < order.length; i++){
+    var k = order[i], t = INSP_TEMPLATES[k];
+    if (!t) continue;
+    var key = 'TPL-' + ('000' + (++n)).slice(-4);
+    d.tpl.appendRow([key, t.name, kindOf[k], '', t.note, 'Y', 'ระบบ', nowStamp_(), nowStamp_()]);
+    var rows = [];
+    for (var j = 0; j < t.items.length; j++)
+      rows.push([key, j + 1, t.items[j][0], t.items[j][1], t.items[j][2], '', '', '', '', '', '']);
+    if (rows.length)
+      d.items.getRange(d.items.getLastRow() + 1, 1, rows.length, HDR_TPLIT.length).setValues(rows);
+  }
+}
+
+function nextTplNo_(){
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(20000); } catch(e){ throw new Error('ระบบกำลังออกเลขให้คนอื่นอยู่ ลองใหม่อีกครั้ง'); }
+  try {
+    var d = tplDb_(), lr = d.tpl.getLastRow(), max = 0;
+    if (lr > 1){
+      var v = d.tpl.getRange(2, 1, lr - 1, 1).getDisplayValues();
+      for (var i = 0; i < v.length; i++){
+        var m = norm_(v[i][0]).match(/^TPL-(\d+)$/);
+        if (m) max = Math.max(max, parseInt(m[1], 10));
+      }
+    }
+    return 'TPL-' + ('000' + (max + 1)).slice(-4);
+  } finally { try { lock.releaseLock(); } catch(e){} }
+}
+
+function tplRow_(d, key){
+  var lr = d.tpl.getLastRow(); if (lr < 2) return -1;
+  var v = d.tpl.getRange(2, 1, lr - 1, 1).getDisplayValues();
+  for (var i = 0; i < v.length; i++) if (norm_(v[i][0]) === key) return i + 2;
+  return -1;
+}
+
+/** หัวข้อทั้งหมดของแม่แบบหนึ่ง เรียงตามลำดับ */
+function tplItemsOf_(d, key){
+  var lr = d.items.getLastRow(); if (lr < 2) return [];
+  var v = d.items.getRange(2, 1, lr - 1, HDR_TPLIT.length).getDisplayValues();
+  var out = [];
+  for (var i = 0; i < v.length; i++){
+    if (norm_(v[i][0]) !== key) continue;
+    out.push({ row:i + 2, seq:norm_(v[i][1]), cat:norm_(v[i][2]),
+      title:norm_(v[i][3]), titleEn:norm_(v[i][4]), qty:norm_(v[i][5]), unit:norm_(v[i][6]),
+      stdId:norm_(v[i][7]), stdThumb:norm_(v[i][8]), stdView:norm_(v[i][9]), note:norm_(v[i][10]) });
+  }
+  out.sort(function(a, b){ return num_(a.seq) - num_(b.seq); });
+  return out;
+}
+
+/** รายชื่อแม่แบบ — ใช้ทั้งหน้าเปิดใบตรวจและหน้าจัดการแม่แบบ */
+function listTemplates(withOff, auth){
+  requireLogin_(auth);
+  var d = tplDb_(), lr = d.tpl.getLastRow();
+  if (lr < 2) return [];
+  var v = d.tpl.getRange(2, 1, lr - 1, HDR_TPL.length).getDisplayValues();
+  /* นับหัวข้อ + นับรูป STD ทีเดียวทั้งชีต ไม่วนอ่านทีละแม่แบบ */
+  var cnt = {}, std = {}, li = d.items.getLastRow();
+  if (li > 1){
+    var vi = d.items.getRange(2, 1, li - 1, 8).getDisplayValues();
+    for (var i = 0; i < vi.length; i++){
+      var k = norm_(vi[i][0]); if (!k) continue;
+      cnt[k] = (cnt[k] || 0) + 1;
+      if (norm_(vi[i][7])) std[k] = (std[k] || 0) + 1;
+    }
+  }
+  var out = [];
+  for (var r = 0; r < v.length; r++){
+    var key = norm_(v[r][0]); if (!key) continue;
+    var on = norm_(v[r][5]).toUpperCase() !== 'N';
+    if (!on && !withOff) continue;
+    out.push({ key:key, name:norm_(v[r][1]), kind:norm_(v[r][2]) || 'equip', model:norm_(v[r][3]),
+               note:norm_(v[r][4]), active:on, n:(cnt[key] || 0), nStd:(std[key] || 0),
+               by:norm_(v[r][6]), at:norm_(v[r][8]) });
+  }
+  return out;
+}
+
+function getTemplate(key, auth){
+  requireLogin_(auth);
+  key = norm_(key);
+  var d = tplDb_(), r = tplRow_(d, key);
+  if (r < 0) return null;
+  var v = d.tpl.getRange(r, 1, 1, HDR_TPL.length).getDisplayValues()[0];
+  return { head:{ key:norm_(v[0]), name:norm_(v[1]), kind:norm_(v[2]) || 'equip', model:norm_(v[3]),
+                  note:norm_(v[4]), active:norm_(v[5]).toUpperCase() !== 'N' },
+           items: tplItemsOf_(d, key) };
+}
+
+/** สร้าง/แก้หัวแม่แบบ — QC กับผู้ดูแลเท่านั้น (เป็นมาตรฐานของบริษัท ไม่ใช่ใครก็แก้ได้) */
+function saveTemplate(h, auth){
+  var me = requireAny_(auth, ['QC','APPROVER','ADMIN']);
+  h = h || {};
+  if (!norm_(h.name)) throw new Error('ต้องตั้งชื่อแม่แบบก่อน');
+  var d = tplDb_(), key = norm_(h.key), r = key ? tplRow_(d, key) : -1;
+  var kind = (norm_(h.kind) === 'tanker') ? 'tanker' : 'equip';
+  if (r < 0){
+    key = nextTplNo_();
+    d.tpl.appendRow([key, norm_(h.name), kind, norm_(h.model), norm_(h.note),
+                     h.active === false ? 'N' : 'Y', me.name, nowStamp_(), nowStamp_()]);
+    log_('saveTemplate', key, 'สร้าง · ' + norm_(h.name));
+  } else {
+    d.tpl.getRange(r, 2, 1, 5).setValues([[norm_(h.name), kind, norm_(h.model), norm_(h.note),
+                                           h.active === false ? 'N' : 'Y']]);
+    d.tpl.getRange(r, 9).setValue(nowStamp_());
+    log_('saveTemplate', key, 'แก้ไข · ' + norm_(h.name));
+  }
+  return { ok:true, key:key };
+}
+
+/** เขียนหัวข้อทั้งชุดใหม่ — เก็บรูป STD เดิมไว้ตามลำดับข้อที่ยังอยู่
+ *  (ลบแล้วเขียนใหม่ทั้งชุด แม่แบบหนึ่งมีไม่กี่สิบข้อ ปลอดภัยกว่าไล่ merge ทีละแถว) */
+function saveTemplateItems(key, items, auth){
+  requireAny_(auth, ['QC','APPROVER','ADMIN']);
+  key = norm_(key);
+  if (!key) throw new Error('ไม่รู้ว่าเป็นหัวข้อของแม่แบบไหน');
+  var d = tplDb_();
+  if (tplRow_(d, key) < 0) throw new Error('ไม่พบแม่แบบ ' + key);
+
+  var old = tplItemsOf_(d, key), keepStd = {};
+  for (var o = 0; o < old.length; o++) keepStd[old[o].seq] = old[o];
+
+  var lr = d.items.getLastRow();
+  if (lr > 1){
+    var v = d.items.getRange(2, 1, lr - 1, 1).getDisplayValues();
+    for (var i = v.length - 1; i >= 0; i--) if (norm_(v[i][0]) === key) d.items.deleteRow(i + 2);
+  }
+  items = items || [];
+  var rows = [];
+  for (var k = 0; k < items.length; k++){
+    var it = items[k] || {};
+    if (!norm_(it.title) && !norm_(it.cat)) continue;
+    /* รูป STD ผูกกับ "ลำดับข้อ" ที่ส่งมา — ถ้าหน้าเว็บส่ง stdId มาก็ใช้ตัวนั้น
+       ไม่ส่งมาก็หยิบของเดิมที่ลำดับเดียวกันไว้ให้ ไม่ให้รูปหายเพราะแก้ข้อความ */
+    var prev = keepStd[String(k + 1)] || {};
+    var sid = (it.stdId !== undefined) ? norm_(it.stdId) : norm_(prev.stdId);
+    var sth = (it.stdId !== undefined) ? norm_(it.stdThumb) : norm_(prev.stdThumb);
+    var svw = (it.stdId !== undefined) ? norm_(it.stdView)  : norm_(prev.stdView);
+    rows.push([key, k + 1, norm_(it.cat), norm_(it.title), norm_(it.titleEn),
+               norm_(it.qty), norm_(it.unit), sid, sth, svw, norm_(it.note)]);
+  }
+  if (rows.length)
+    d.items.getRange(d.items.getLastRow() + 1, 1, rows.length, HDR_TPLIT.length).setValues(rows);
+  d.tpl.getRange(tplRow_(d, key), 9).setValue(nowStamp_());
+  log_('saveTemplateItems', key, rows.length + ' หัวข้อ');
+  return { ok:true, n:rows.length };
+}
+
+/** ปิดใช้งานแม่แบบ — ไม่ลบทิ้ง เพราะใบตรวจเก่าอ้างชื่อแม่แบบนี้อยู่ */
+function setTemplateActive(key, on, auth){
+  requireAny_(auth, ['QC','APPROVER','ADMIN']);
+  var d = tplDb_(), r = tplRow_(d, norm_(key));
+  if (r < 0) throw new Error('ไม่พบแม่แบบ ' + key);
+  d.tpl.getRange(r, 6).setValue(on ? 'Y' : 'N');
+  d.tpl.getRange(r, 9).setValue(nowStamp_());
+  log_('setTemplateActive', norm_(key), on ? 'เปิดใช้' : 'ปิดใช้');
+  return { ok:true };
+}
+
+/** ก๊อปแม่แบบทั้งชุด (รวมรูป STD) — ใช้ตอนทำรุ่นใหม่ที่คล้ายของเดิม */
+function copyTemplate(key, newName, auth){
+  var me = requireAny_(auth, ['QC','APPROVER','ADMIN']);
+  var src = getTemplate(key, auth);
+  if (!src) throw new Error('ไม่พบแม่แบบ ' + key);
+  var d = tplDb_(), nk = nextTplNo_();
+  d.tpl.appendRow([nk, norm_(newName) || (src.head.name + ' (สำเนา)'), src.head.kind, src.head.model,
+                   src.head.note, 'Y', me.name, nowStamp_(), nowStamp_()]);
+  var rows = [];
+  for (var i = 0; i < src.items.length; i++){
+    var it = src.items[i];
+    rows.push([nk, i + 1, it.cat, it.title, it.titleEn, it.qty, it.unit,
+               it.stdId, it.stdThumb, it.stdView, it.note]);
+  }
+  if (rows.length)
+    d.items.getRange(d.items.getLastRow() + 1, 1, rows.length, HDR_TPLIT.length).setValues(rows);
+  log_('copyTemplate', nk, 'ก๊อปจาก ' + key);
+  return { ok:true, key:nk, n:rows.length };
+}
+
+/** แนบรูป STD ให้หัวข้อในแม่แบบ — เก็บใน Drive โฟลเดอร์ "แม่แบบเช็คลิสต์" */
+function saveTplPhoto(key, seq, dataUrl, fname, auth){
+  var me = requireAny_(auth, ['QC','APPROVER','ADMIN']);
+  key = norm_(key); seq = norm_(seq);
+  var d = tplDb_(), items = tplItemsOf_(d, key), hit = null;
+  for (var i = 0; i < items.length; i++) if (items[i].seq === seq) hit = items[i];
+  if (!hit) throw new Error('ไม่พบหัวข้อที่ ' + seq + ' ในแม่แบบ ' + key);
+
+  var m = String(dataUrl || '').match(/^data:([^;]+);base64,([\s\S]*)$/);
+  if (!m) throw new Error('ไฟล์รูปไม่ถูกต้อง');
+  var safe = key + '_ข้อ' + seq + '_' + new Date().getTime() + '.jpg';
+  var blob = Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], norm_(fname) || safe);
+  var f = mediaFolder_('แม่แบบเช็คลิสต์', key).createFile(blob);
+  try { f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch(e){}
+
+  var id = f.getId();
+  var thumb = 'https://drive.google.com/thumbnail?id=' + id + '&sz=w1000';
+  var view  = 'https://drive.google.com/file/d/' + id + '/view';
+  d.items.getRange(hit.row, 8, 1, 3).setValues([[id, thumb, view]]);
+  d.tpl.getRange(tplRow_(d, key), 9).setValue(nowStamp_());
+  log_('saveTplPhoto', key, 'ข้อ ' + seq);
+  return { ok:true, id:id, thumb:thumb, view:view };
+}
+
+function delTplPhoto(key, seq, auth){
+  requireAny_(auth, ['QC','APPROVER','ADMIN']);
+  var d = tplDb_(), items = tplItemsOf_(d, norm_(key));
+  for (var i = 0; i < items.length; i++){
+    if (items[i].seq !== norm_(seq)) continue;
+    d.items.getRange(items[i].row, 8, 1, 3).setValues([['', '', '']]);
+    log_('delTplPhoto', norm_(key), 'ข้อ ' + seq);
+    return { ok:true };
+  }
+  throw new Error('ไม่พบหัวข้อที่ ' + seq);
+}
+
+/** เดาแม่แบบให้จาก MODEL + ลักษณะงาน — ตรงรุ่นมาก่อน ไม่ตรงค่อยใช้ตัวกลาง ๆ ของลักษณะงานนั้น */
+function suggestTemplate(model, kind, auth){
+  var list = listTemplates(false, auth);
+  model = norm_(model).toUpperCase();
+  kind  = (norm_(kind) === 'tanker') ? 'tanker' : 'equip';
+  var exact = null, sameKind = null;
+  for (var i = 0; i < list.length; i++){
+    var t = list[i];
+    if (t.kind !== kind) continue;
+    if (!sameKind) sameKind = t;
+    var mm = norm_(t.model).toUpperCase();
+    if (mm && model && (model.indexOf(mm) >= 0 || mm.indexOf(model) >= 0)){ exact = t; break; }
+  }
+  var pick = exact || sameKind;
+  return pick ? { key:pick.key, name:pick.name, n:pick.n, exact:!!exact } : null;
+}
+
+
+/** ก๊อปรูป STD จากแม่แบบมาลงใบตรวจใบใหม่ — ชี้ไฟล์ Drive เดิม ไม่อัปซ้ำ ไม่กินที่
+ *  ช่องรูป STD ในตารางตรวจใช้ลำดับ "S" + เลขข้อ (ดู opt.photos2 ใน js-grid.html) */
+function copyStdFromTemplate_(docNo, tItems, byName){
+  var out = [];
+  for (var i = 0; i < tItems.length; i++){
+    var it = tItems[i];
+    if (!it.stdId) continue;
+    out.push([docNo, 'S' + (i + 1), 1, 'STD_' + (i + 1) + '.jpg',
+              it.stdId, it.stdThumb, it.stdView, 'Y', byName, nowStamp_(), 'Y']);
+  }
+  if (!out.length) return 0;
+  var pt = photoTabOf_(docNo);
+  pt.getRange(pt.getLastRow() + 1, 1, out.length, HDR_PHOTO.length).setValues(out);
+  return out.length;
+}
+
+
+/** หาแม่แบบให้ได้เสมอ แม้หน้าเว็บส่งชื่อเก่ามา
+ *  ลำดับ: รหัส TPL-xxxx ตรง ๆ → ชื่อแม่แบบตรง → รหัสเก่าที่เคยฝังในโค้ด (tanker/equipment/domestic)
+ *         → เดาจาก MODEL + ลักษณะงาน → ตัวแรกของลักษณะงานนั้น
+ *  เหตุผล: หน้าเว็บที่ยังไม่รีเฟรชจะส่งรหัสเก่ามา ห้ามให้เปิดใบแล้วได้ใบเปล่าโดยไม่มีใครรู้ */
+function resolveTemplate_(key, model, kind, auth){
+  key = norm_(key);
+  if (key){
+    var byKey = getTemplate(key, auth);
+    if (byKey) return byKey;
+  }
+  var list = listTemplates(false, auth);
+  var legacy = { tanker:'แท็งค์นำเข้า', equipment:'อุปกรณ์ประกอบแท็งค์', domestic:'สินค้าในประเทศ', blank:'ใบเปล่า' };
+  var want = legacy[key] || key;
+  for (var i = 0; i < list.length; i++){
+    if (want && list[i].name.indexOf(want) >= 0) return getTemplate(list[i].key, auth);
+  }
+  var sug = suggestTemplate(model, kind, auth);
+  return sug ? getTemplate(sug.key, auth) : null;
 }

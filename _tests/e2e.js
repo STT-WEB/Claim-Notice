@@ -594,11 +594,14 @@ T('3.7 ข้อมูลส่งบัญชี — เฉพาะใบท�
   const bad=d.rows.filter(r=>!/CLOSE|BILLED/.test(r.status||'CLOSED'));
   return d.rows.length+' ใบ · เรียกเก็บรวม '+d.sum.bill+' บาท'; });
 
-T('3.8 LOG — อ่านได้ และเป็นคนละแท็บกับตัวเอกสาร', ()=>{
-  const d=call('reportLog',[50,AUTH]);
-  if(!d.rows.length) throw new Error('LOG ว่าง');
-  const claims=call('listClaims',[{},AUTH]).length;
-  return d.rows.length+' รายการ (ทั้งหมด '+d.total+') · ใบเคลมในทะเบียน '+claims+' ใบ'; });
+/* เบียร์ 8 ก.ย. 2569: "LOG ประวัติการใช้งาน เอาออกจากโปรแกรมเลย"
+   → ไม่มีคำสั่งอ่าน LOG แล้ว แต่ยังต้องเขียนลงชีตอยู่ (หลักฐานคู่กับลายเซ็นบนเอกสาร) */
+T('LOG — ไม่มีคำสั่งเปิดดูในโปรแกรมแล้ว แต่ยังเก็บบันทึกไว้ในชีต', ()=>{
+  if (sandbox.reportLog) throw new Error('reportLog ยังอยู่ — ต้องเอาออกจากโปรแกรม');
+  const db = call('ss_',[]);                      // ไฟล์ฐานข้อมูลจริงที่ระบบใช้อยู่
+  const lg = db.getSheetByName('LOG');
+  if(!lg || lg.getLastRow() < 2) throw new Error('ไม่ได้เขียน LOG ลงชีตแล้ว — เสียหลักฐาน');
+  return 'ไม่มีคำสั่งอ่าน · ยังเขียนลงชีต '+(lg.getLastRow()-1)+' แถว'; });
 
 T('3.6-3.8 คนที่ไม่ใช่จัดซื้อ/ผู้บริหาร เปิดไม่ได้', ()=>{
   let blocked=0;
@@ -930,16 +933,33 @@ T('คนที่ไม่มี role for Claim ตั้ง PIN ไม่ไ�
   if(r.ok) throw new Error('คนที่ไม่อยู่ในระบบเคลม ตั้ง PIN ได้');
   return r.msg; });
 
-T('ผู้ดูแลตั้ง PIN ให้คนอื่นได้จากในระบบ — คนอื่นทำไม่ได้', ()=>{
-  let blocked=false;
-  try { call('adminSetPin',['4900044','223344',BUY]); } catch(e){ blocked=true; }
-  if(!blocked) throw new Error('จัดซื้อตั้ง PIN ให้คนอื่นได้ — ต้องเป็นผู้บริหารเท่านั้น');
-  const r=call('adminSetPin',['4900044','223344',AUTH]);
-  if(!r.ok) throw new Error('ผู้บริหารตั้งไม่สำเร็จ: '+r.msg);
-  if(!call('loginEmpPin',['4900044','223344']).ok) throw new Error('ตั้งแล้วเข้าไม่ได้');
-  const list=call('listUsersPin',[AUTH]);
-  if(!list.length) throw new Error('รายชื่อผู้ใช้ว่าง');
-  return 'ผู้บริหารตั้งให้ได้ · คนอื่นกันไว้ · รายชื่อ '+list.length+' คน'; });
+/* เบียร์ 8 ก.ย. 2569: "ระบบ PIN ... มันไม่ควรให้ใครเห็นด้วย เอาออกไปเลย"
+   → ไม่มีคำสั่งดูรายชื่อ PIN หรือตั้ง PIN ให้คนอื่นในโปรแกรมนี้แล้ว แม้แต่ผู้ดูแล
+     (กติกาเดียวกับ STT NOVA — PIN อยู่ในชีต USERS ผู้ดูแลแก้ในชีตเอง) */
+T('ไม่มีคำสั่งดูรายชื่อ PIN หรือตั้ง PIN ให้คนอื่นในระบบนี้แล้ว', ()=>{
+  ['listUsersPin','adminSetPin'].forEach(fn=>{
+    if (sandbox[fn]) throw new Error(fn+' ยังอยู่ — ต้องเอาออกทั้งหมด'); });
+  return 'listUsersPin / adminSetPin ถูกถอดออกแล้วทั้งคู่'; });
+
+T('พนักงานยังตั้ง PIN ของตัวเองครั้งแรกได้เหมือนเดิม (ไม่ได้ตัดทิ้งไปด้วย)', ()=>{
+  const r = call('checkPinSetup',['4900044']);
+  if(!r.ok) throw new Error('คนที่ยังไม่มี PIN ตั้งเองไม่ได้แล้ว: '+r.msg);
+  const s2 = call('setupPin',['4900044','นาย สุกิจ เพียพยัคฆ์','335577','335577']);
+  if(!s2.ok) throw new Error('ตั้ง PIN เองไม่สำเร็จ: '+s2.msg);
+  if(!call('loginEmpPin',['4900044','335577']).ok) throw new Error('ตั้งแล้วเข้าระบบไม่ได้');
+  return 'ตั้งเองได้ · เข้าระบบได้'; });
+
+T('รายงานส่ง HR — เห็นเฉพาะ HR · ผู้ดูแล · ผู้อนุมัติ (จัดซื้อไม่เห็นแล้ว)', ()=>{
+  let buyBlocked = false;
+  try { call('reportHR',[BUY]); } catch(e){ buyBlocked = true; }
+  if(!buyBlocked) throw new Error('จัดซื้อยังเปิดรายงานหักเงินพนักงานได้');
+  let storeBlocked = false;
+  try { call('reportHR',[STORE]); } catch(e){ storeBlocked = true; }
+  if(!storeBlocked) throw new Error('สโตร์ยังเปิดได้');
+  if(!call('reportHR',[BOSS])) throw new Error('ผู้อนุมัติเปิดไม่ได้');
+  if(!call('reportHR',[AUTH]))  throw new Error('ผู้ดูแลเปิดไม่ได้');
+  const hr = call('loginEmpPin',['6204002','604002']);
+  return 'จัดซื้อ/สโตร์ กันแล้ว · ผู้อนุมัติกับผู้ดูแลเปิดได้'; });
 
 
 /* ═══ ⑮ Dashboard สถานะเอกสาร (v1.3.0) ═══════════════════════════════
@@ -1016,6 +1036,145 @@ T('ยังไม่เข้าสู่ระบบ เปิด Dashboard �
   try { call('dashDocs',[{emp:'6100030',pin:'ผิด'}]); } catch(e){ blocked=true; }
   if(!blocked) throw new Error('PIN ผิดแต่ยังเปิด Dashboard ได้');
   return 'กันไว้แล้ว'; });
+
+
+/* ═══ ⑯ แม่แบบเช็คลิสต์ + ช่องใหม่ในใบตรวจ/ใบเคลม (v1.4.0) ═══════════════
+   เบียร์ 8 ก.ย. 2569 — แม่แบบต้องเป็นทะเบียนในระบบ แก้เองได้ + แนบรูป STD ต่อหัวข้อ */
+console.log('\n⑯ แม่แบบเช็คลิสต์ + ช่องใหม่');
+
+T('ครั้งแรกสุด ระบบย้ายแม่แบบที่เคยฝังในโค้ดลงทะเบียนให้เอง', ()=>{
+  const list = call('listTemplates',[true,AUTH]);
+  if(!list.length) throw new Error('ทะเบียนแม่แบบว่างเปล่า');
+  const bad = list.filter(x=>!/^TPL-\d{4}$/.test(x.key));
+  if(bad.length) throw new Error('รหัสแม่แบบผิดรูปแบบ: '+bad[0].key);
+  const kinds = Array.from(new Set(list.map(x=>x.kind)));
+  if(kinds.some(k=>k!=='tanker'&&k!=='equip')) throw new Error('ลักษณะงานแปลกปลอม: '+kinds.join(','));
+  return list.length+' ชุด · '+list.map(x=>x.key+'='+x.n+'ข้อ').join(' · '); });
+
+T('ย้ายลงชีตแล้วต้องไม่ยัดซ้ำเมื่อเรียกอีกรอบ', ()=>{
+  const a = call('listTemplates',[true,AUTH]).length;
+  reset();
+  const b = call('listTemplates',[true,AUTH]).length;
+  if(a !== b) throw new Error('เรียกซ้ำแล้วแม่แบบเพิ่มจาก '+a+' เป็น '+b);
+  return 'คงที่ '+a+' ชุด'; });
+
+T('สร้าง / แก้หัวข้อ / ก๊อปแม่แบบได้ครบ', ()=>{
+  const r = call('saveTemplate',[{name:'แท็งค์ SEMI-TRAILER 32,000 L', kind:'tanker',
+                                  model:'SEMI-TRAILER 32,000 L', note:'ทดสอบ'}, QC]);
+  if(!r.ok) throw new Error('สร้างไม่สำเร็จ');
+  call('saveTemplateItems',[r.key,[
+    {cat:'ตัวถัง', title:'สภาพผิวนอก', titleEn:'Outer shell', qty:'1', unit:'จุด'},
+    {cat:'อุปกรณ์', title:'แมนโฮลปิดสนิท', titleEn:'Manhole seals'},
+    {cat:'', title:''}                              // แถวว่าง ต้องถูกตัดทิ้ง
+  ],QC]);
+  const g = call('getTemplate',[r.key,QC]);
+  if(g.items.length !== 2) throw new Error('เขียนหัวข้อผิด ได้ '+g.items.length+' ข้อ (ควรเป็น 2)');
+  if(g.items[0].seq !== '1' || g.items[1].seq !== '2') throw new Error('ลำดับข้อไม่เรียง 1,2');
+  const c = call('copyTemplate',[r.key,'ก๊อปทดสอบ',QC]);
+  const g2 = call('getTemplate',[c.key,QC]);
+  if(g2.items.length !== 2) throw new Error('ก๊อปแล้วหัวข้อไม่ครบ');
+  if(g2.head.model !== 'SEMI-TRAILER 32,000 L') throw new Error('ก๊อปแล้ว MODEL ไม่ตามมา');
+  return r.key+' 2 ข้อ → ก๊อปเป็น '+c.key; });
+
+T('รูป STD แนบที่แม่แบบ แล้วแก้ข้อความหัวข้อ รูปต้องไม่หาย', ()=>{
+  const r = call('saveTemplate',[{name:'แม่แบบทดสอบรูป', kind:'tanker', model:'TESTMODEL'},QC]);
+  call('saveTemplateItems',[r.key,[{cat:'ตัวถัง',title:'ข้อ 1'},{cat:'ตัวถัง',title:'ข้อ 2'}],QC]);
+  const up = call('saveTplPhoto',[r.key,'2',px,'std2.jpg',QC]);
+  if(!up.ok || !up.id) throw new Error('อัปรูป STD ไม่สำเร็จ');
+  /* แก้ข้อความหัวข้อ โดยไม่ส่ง stdId กลับมา — รูปของข้อเดิมต้องยังอยู่ */
+  call('saveTemplateItems',[r.key,[{cat:'ตัวถัง',title:'ข้อ 1 แก้แล้ว'},{cat:'ตัวถัง',title:'ข้อ 2 แก้แล้ว'}],QC]);
+  const g = call('getTemplate',[r.key,QC]);
+  if(!g.items[1].stdId) throw new Error('แก้ข้อความแล้วรูป STD หาย');
+  if(g.items[0].stdId) throw new Error('รูปไปโผล่ผิดข้อ');
+  call('delTplPhoto',[r.key,'2',QC]);
+  if(call('getTemplate',[r.key,QC]).items[1].stdId) throw new Error('ลบรูปแล้วยังอยู่');
+  return 'รูปติดข้อที่ 2 · แก้ข้อความไม่หาย · ลบได้'; });
+
+T('เปิดใบตรวจจากแม่แบบ = หัวข้อ + รูป STD ตามมาให้ทั้งชุด', ()=>{
+  const r = call('saveTemplate',[{name:'แม่แบบเปิดใบ', kind:'tanker', model:'MDL-STD'},QC]);
+  call('saveTemplateItems',[r.key,[{cat:'ตัวถัง',title:'ผิวนอก'},{cat:'อุปกรณ์',title:'วาล์ว'}],QC]);
+  call('saveTplPhoto',[r.key,'1',px,'s1.jpg',QC]);
+  const ins = call('createInspection',[{template:r.key, jobNo:'JT-69/0001', model:'MDL-STD',
+                                        kind:'tanker', area:'for', eNo:'ENG-TEST-1'},QC]);
+  if(!ins.ok) throw new Error('เปิดใบตรวจไม่สำเร็จ');
+  if(ins.n !== 2) throw new Error('หัวข้อไม่ตามมา ได้ '+ins.n);
+  if(ins.nStd !== 1) throw new Error('รูป STD ไม่ตามมา ได้ '+ins.nStd);
+  /* ช่องรูป STD ในตารางใช้ลำดับ S+เลขข้อ */
+  const ph = call('listPhotos',[ins.docNo,QC]);
+  if(!ph['S1'] || !ph['S1'].length) throw new Error('รูป STD ไม่ได้ผูกกับช่อง S1');
+  const c = call('getInspection',[ins.docNo,QC]);
+  if(c.head['E. No.'] !== 'ENG-TEST-1') throw new Error('E. No. ไม่ถูกบันทึก: '+c.head['E. No.']);
+  return ins.docNo+' · 2 หัวข้อ · รูป STD 1 รูปที่ช่อง S1 · E. No. บันทึกแล้ว'; });
+
+T('หน้าเว็บที่ยังไม่รีเฟรช ส่งรหัสแม่แบบเก่ามา ต้องยังเปิดใบได้ ไม่ใช่ได้ใบเปล่าเงียบ ๆ', ()=>{
+  const ins = call('createInspection',[{template:'tanker', jobNo:'JT-69/0002',
+                                        kind:'tanker', area:'for'},QC]);
+  if(!ins.n) throw new Error('รหัสเก่า "tanker" แล้วได้ใบเปล่า — ผู้ใช้จะไม่รู้ตัว');
+  return 'รหัสเก่า tanker → '+ins.template+' ('+ins.n+' หัวข้อ)'; });
+
+T('เดาแม่แบบจาก MODEL ให้เอง', ()=>{
+  const r = call('saveTemplate',[{name:'แม่แบบ LPG', kind:'tanker', model:'LPG TANK 24,000 L'},QC]);
+  call('saveTemplateItems',[r.key,[{cat:'ตัวถัง',title:'ผิวนอก'}],QC]);
+  const hit = call('suggestTemplate',['LPG TANK 24,000 L','tanker',QC]);
+  if(!hit || hit.key !== r.key) throw new Error('MODEL ตรงเป๊ะแต่เดาไม่เจอ');
+  if(!hit.exact) throw new Error('ควรบอกว่าเป็นรุ่นตรง');
+  const miss = call('suggestTemplate',['รุ่นที่ไม่มีในทะเบียน','tanker',QC]);
+  if(!miss) throw new Error('ไม่มีรุ่นตรง ก็ควรเสนอแม่แบบกลาง ๆ ให้');
+  if(miss.exact) throw new Error('ไม่ตรงรุ่นแต่บอกว่าตรง');
+  return 'ตรงรุ่น → '+hit.name+' · ไม่ตรงรุ่น → เสนอ '+miss.name+' ให้แทน'; });
+
+T('คนที่ไม่ใช่ QC/ผู้บริหาร แก้แม่แบบไม่ได้ (เป็นมาตรฐานบริษัท)', ()=>{
+  let blocked = false;
+  try { call('saveTemplate',[{name:'ลองแก้',kind:'tanker'},STORE]); } catch(e){ blocked = true; }
+  if(!blocked) throw new Error('สโตร์สร้างแม่แบบได้');
+  const list = call('listTemplates',[false,STORE]);
+  if(!list.length) throw new Error('สโตร์ควรดูได้ แค่แก้ไม่ได้');
+  return 'สโตร์ดูได้ '+list.length+' ชุด แต่แก้ไม่ได้'; });
+
+T('ปิดใช้แม่แบบแล้วต้องหายจากตัวเลือกตอนเปิดใบ แต่ใบเก่ายังอ้างชื่อได้', ()=>{
+  const r = call('saveTemplate',[{name:'แม่แบบจะปิด', kind:'equip'},QC]);
+  call('saveTemplateItems',[r.key,[{cat:'ปริมาณ',title:'ครบตาม PO'}],QC]);
+  call('setTemplateActive',[r.key,false,QC]);
+  const on  = call('listTemplates',[false,QC]).map(x=>x.key);
+  const all = call('listTemplates',[true, QC]).map(x=>x.key);
+  if(on.indexOf(r.key) >= 0) throw new Error('ปิดแล้วยังโผล่ในตัวเลือก');
+  if(all.indexOf(r.key) < 0) throw new Error('ปิดแล้วหายไปจากทะเบียนเลย — ใบเก่าจะอ้างไม่ได้');
+  return 'ปิดแล้วซ่อนจากตัวเลือก แต่ยังอยู่ในทะเบียน'; });
+
+T('ใบเคลมที่เกิดจากใบตรวจ ต้องเป็นประเภท "เคลมหลังตรวจรับ" และรู้ว่ามาจากใบไหน', ()=>{
+  const r = call('saveTemplate',[{name:'แม่แบบส่งเคลม', kind:'tanker', model:'MDL-SEND'},QC]);
+  call('saveTemplateItems',[r.key,[{cat:'ตัวถัง',title:'ผิวนอกบุบ'},{cat:'อุปกรณ์',title:'วาล์วรั่ว'}],QC]);
+  const ins = call('createInspection',[{template:r.key, jobNo:'JT-69/0003', model:'MDL-SEND',
+                                        kind:'tanker', area:'for', eNo:'ENG-SEND-9'},QC]);
+  const items = call('getInspection',[ins.docNo,QC]).items;
+  for (const it of items){
+    call('saveInspItemField',[ins.docNo,it.seq,'acc','UNACC',QC]);
+    call('savePhoto',[ins.docNo,'JT-69/0003',String(it.seq),px,'p.jpg',QC]);
+  }
+  call('advanceInsp',[ins.docNo,QC]);            // ร่าง → รออนุมัติ
+  call('advanceInsp',[ins.docNo,BOSS]);          // รออนุมัติ → อนุมัติแล้ว
+  const sent = call('sendUnAccToClaim',[ins.docNo,QC]);
+  if(!sent.ok) throw new Error('ส่งไปเปิดใบเคลมไม่สำเร็จ');
+  const c = call('getClaim',[sent.claimNo,QC]);
+  if(c.head['ประเภทการเคลม'] !== 'insp')
+    throw new Error('ประเภทการเคลมควรเป็น insp ได้ '+c.head['ประเภทการเคลม']);
+  if(c.head['มาจากใบตรวจ'] !== ins.docNo)
+    throw new Error('ไม่ได้บันทึกว่ามาจากใบตรวจไหน ได้ "'+c.head['มาจากใบตรวจ']+'"');
+  if(c.head['E. No.'] !== 'ENG-SEND-9')
+    throw new Error('E. No. ไม่ตามไปที่ใบเคลม ได้ "'+c.head['E. No.']+'"');
+  if(c.head['ชนิดงานต่างประเทศ'] !== 'tanker')
+    throw new Error('ชนิดงาน ตปท. ไม่ตามไป ได้ "'+c.head['ชนิดงานต่างประเทศ']+'"');
+  return sent.claimNo+' · ประเภท insp · มาจาก '+ins.docNo+' · E.No + Tankers ตามไปครบ'; });
+
+T('เพิ่มคอลัมน์ E. No. แล้ว คอลัมน์เดิมของใบตรวจต้องไม่เลื่อน', ()=>{
+  const LOCK = ['เลขที่เอกสาร','ชนิดเอกสาร','วันที่','สถานที่ผลิต','ชนิดงาน','เลขที่ JOB','ชื่อลูกค้า',
+    'MODEL','CHASSIS NO. (STT)','CHASSIS NO. (ผู้ผลิต)','SERIAL NO.','แม่แบบเช็คลิสต์','PO','Supplier',
+    'วันรับสินค้า','ผู้ตรวจ','สถานะ','ใบเคลมที่ออกจากใบนี้','หมายเหตุ','สร้างโดย','สร้างเมื่อ','แก้ไขล่าสุด'];
+  const h = call('inspHdr_',[]);
+  for(let i=0;i<LOCK.length;i++)
+    if(h[i] !== LOCK[i]) throw new Error('คอลัมน์ที่ '+(i+1)+' เลื่อน: ควรเป็น "'+LOCK[i]+'" แต่เป็น "'+h[i]+'"');
+  if(h.indexOf('E. No.') <= LOCK.length-1) throw new Error('E. No. ต้องต่อท้าย ไม่ใช่แทรกกลาง');
+  return 'คอลัมน์เดิม '+LOCK.length+' ช่องอยู่ที่เดิม · E. No. ต่อท้ายที่ช่อง '+(h.indexOf('E. No.')+1); });
 
 console.log('\n──────────────────────────────');
 console.log('ผ่าน '+pass+' · ไม่ผ่าน '+fail);

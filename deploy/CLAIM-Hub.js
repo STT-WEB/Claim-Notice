@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v1.3.0';
+var VERSION = 'v1.4.1';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -85,6 +85,14 @@ function fmtDMY_(v){
 function nowStamp_(){
   var d = new Date(), p = function(n){ return (n<10?'0':'') + n; };
   return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+/** ประเภทการเคลม → ข้อความไทย · เขียนที่เดียว ใช้ทั้งรายงานและ Dashboard
+ *  insp = ใบที่เกิดจากใบตรวจรับ (เบียร์ 8 ก.ย. 2569) — ห้ามตกไปเป็น "หลังส่งมอบ" */
+function claimTypeText_(v){
+  v = norm_(v);
+  if (v === 'pre')  return 'ก่อนส่งมอบ';
+  if (v === 'insp') return 'เคลมหลังตรวจรับ';
+  return 'หลังส่งมอบ';
 }
 function yearBE_(){ return new Date().getFullYear() + 543; }
 function yy_(be){ return String(be).slice(-2); }
@@ -324,28 +332,12 @@ function writeUserPin_(emp, pin){
   return { ok:false, msg:'ไม่พบแถวของรหัสพนักงาน ' + emp };
 }
 
-/** ผู้ดูแล: ดูว่าใครยังไม่มี PIN + ตั้ง/รีเซ็ตให้ได้จากในระบบนี้เลย */
-function listUsersPin(auth){
-  requireAny_(auth, ['ADMIN']);
-  var us = getUsers_(), out = [];
-  for (var i = 0; i < us.length; i++){
-    if (!us[i].active) continue;
-    out.push({ emp:us[i].emp, name:us[i].name, dept:us[i].dept,
-               role:us[i].roleRaw, inClaim:us[i].role !== 'GUEST', hasPin:!!us[i].pin });
-  }
-  out.sort(function(a,b){ return (a.hasPin === b.hasPin) ? 0 : (a.hasPin ? 1 : -1); });
-  return out;
-}
-
-function adminSetPin(emp, pin, auth){
-  var me = requireAny_(auth, ['ADMIN']);
-  emp = norm_(emp); pin = norm_(pin);
-  if (!/^\d{6}$/.test(pin)) return { ok:false, msg:'PIN ต้องเป็นตัวเลข 6 หลัก' };
-  var r = writeUserPin_(emp, pin);
-  if (!r.ok) return r;
-  log_('adminSetPin', emp, 'ตั้งโดย ' + me.name);
-  return { ok:true, msg:'ตั้ง PIN ให้รหัส ' + emp + ' แล้ว' };
-}
+/* ═══ ถอดออก 8 ก.ย. 2569 — เบียร์: "ระบบ PIN ... มันไม่ควรให้ใครเห็นด้วย เอาออกไปเลย" ═══
+ *   listUsersPin() / adminSetPin() ถูกลบทิ้งทั้งคู่ — ไม่มีหน้าไหนในโปรแกรมนี้เปิดดูรายชื่อ PIN
+ *   หรือตั้ง PIN ให้คนอื่นได้อีกแล้ว (แม้แต่ผู้ดูแล)
+ *   กติกาเดียวกับ STT NOVA: PIN อยู่ในชีต USERS ช่องเดียว ผู้ดูแลแก้ในชีตโดยตรง
+ *   พนักงานตั้ง PIN ครั้งแรกเองได้ที่หน้าเข้าสู่ระบบ แท็บ "ยังไม่มี PIN"
+ *   (checkPinSetup / setupPin ยังอยู่ — เป็นของเจ้าตัวเอง ไม่ใช่การดู PIN คนอื่น) */
 
 function getEmail_(){
   try { return norm_(Session.getActiveUser().getEmail()).toLowerCase(); } catch(e){ return ''; }
@@ -825,6 +817,7 @@ function createClaim(h, auth){
   /* ช่องที่อยู่ท้ายตาราง (นอก HDR_CLAIM) ต้องเขียนด้วยชื่อหัวตาราง ไม่ใช่ put() */
   var cE = colOf_('E. No.');            if (cE > 0 && norm_(h.eNo))      d.claims.getRange(nr, cE).setValue(norm_(h.eNo));
   var cW = colOf_('ลักษณะงานเคลม');      if (cW > 0) d.claims.getRange(nr, cW).setValue(norm_(h.workKind) || 'PART');
+  var cF = colOf_('มาจากใบตรวจ');        if (cF > 0 && norm_(h.fromInsp)) d.claims.getRange(nr, cF).setValue(norm_(h.fromInsp));
   saveItems_(d, docNo, h.items || []);
   log_('createClaim', docNo, norm_(h.jobNo));
   return { ok:true, docNo:docNo };

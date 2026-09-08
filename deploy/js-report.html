@@ -15,15 +15,23 @@ function loadReportHome(){
   t += rep('repmedia','📷','3.1 รูปและวิดีโอ','รูปทั้งหมดในระบบ จัดตามจ๊อบ → เอกสาร กดดูใหญ่ได้ทันที');
   t += rep('repjob','🚛','3.2 สรุปงานเคลมตามจ๊อบงาน','จ๊อบไหนมีใบตรวจ/ใบเคลมกี่ใบ ค้างกี่ใบ — เลขจ๊อบคือแกนหลักของทั้งระบบ');
   t += rep('repdocs','🗂️','3.3 ทะเบียนเอกสาร','ใบตรวจรับ + ใบเคลม อยู่ในตารางเดียว เรียงตามเลขที่');
-  t += rep('repcost','💰','3.4 สรุปต้นทุนการเคลม','ยอดเงินรวมทุกใบ แยกบาท / สกุลต่างประเทศ — เห็นเฉพาะผู้บริหารและจัดซื้อ');
-  t += rep('repbill','🧾','3.5 รวมยอดเรียกเก็บ → ออกใบเดียว','รวมหลายใบเคลมของ Supplier เจ้าเดียวกัน ออกใบเรียกเก็บใบเดียว เลขชุด CDN ของตัวเอง');
-  t += rep('rephr','👥','3.6 รายงานส่ง HR','ใบที่ระบุว่าพนักงานทำเสียหาย — ส่งให้ HR ไปหักเงินตามระเบียบ');
-  t += rep('repacc','📒','3.7 ข้อมูลส่งบัญชี','ใบที่จบขั้นตอนแล้ว บัญชีรับข้อมูลอย่างเดียว ไม่ต้องกดติ๊กอะไร');
-  t += rep('replog','🕘','3.8 LOG ประวัติการใช้งาน','ใครทำอะไรกับใบไหน เมื่อไหร่ — เก็บคนละที่กับตัวเอกสาร');
+  /* ⚠️ ไทล์ที่มีตัวเงิน/เรื่องคน ต้องเช็คสิทธิ์เหมือนเมนูหน้าแรก
+     ของเดิมโชว์ให้ทุกคนเห็น (กดแล้วเซิร์ฟเวอร์ค่อยปฏิเสธ) — แค่เห็นหัวข้อก็ไม่เหมาะแล้ว */
+  t += rep('repcost','💰','3.4 สรุปต้นทุนการเคลม','ยอดเงินรวมทุกใบ แยกบาท / สกุลต่างประเทศ', ['PURCHASE','ADMIN','APPROVER']);
+  t += rep('repbill','🧾','3.5 รวมยอดเรียกเก็บ → ออกใบเดียว','รวมหลายใบเคลมของ Supplier เจ้าเดียวกัน ออกใบเรียกเก็บใบเดียว เลขชุด CDN ของตัวเอง', ['PURCHASE','ADMIN','APPROVER']);
+  /* เบียร์ 8 ก.ย. 2569: "จะมีแค่ HR กับ Admin และคนที่ Approve เห็น" */
+  t += rep('rephr','👥','3.6 รายงานส่ง HR','ใบที่ระบุว่าพนักงานทำเสียหาย — ส่งให้ HR ไปหักเงินตามระเบียบ', ['HR','ADMIN','APPROVER']);
+  t += rep('repacc','📒','3.7 ข้อมูลส่งบัญชี','ใบที่จบขั้นตอนแล้ว บัญชีรับข้อมูลอย่างเดียว ไม่ต้องกดติ๊กอะไร', ['PURCHASE','ADMIN','APPROVER']);
   t += '</div></div>';
   $('view').innerHTML = t;
 }
-function rep(v, ic, title, sub){
+function rep(v, ic, title, sub, only){
+  /* only = รายชื่อสิทธิ์ที่เห็นไทล์นี้ได้ · ไม่ใส่ = ทุกคนเห็น */
+  if (only){
+    var ok = false;
+    for (var i = 0; i < only.length; i++) if (hasRole(only[i])) ok = true;
+    if (!ok) return '';
+  }
   return '<div class="repcard" onclick="go(\'' + v + '\')"><div class="ic">' + ic + '</div>' +
          '<h4>' + esc(title) + '</h4><p>' + esc(sub) + '</p></div>';
 }
@@ -150,32 +158,6 @@ function loadRepAcc(){
   });
 }
 
-/* ─── 3.8 LOG — ตอบคำถามเบียร์: ลบ LOG แล้วเอกสารไม่หาย ─── */
-function loadRepLog(){
-  srv('reportLog', [300, AUTH], function(d){
-    var t = '<div class="card">' + repHead('3.8 LOG ประวัติการใช้งาน',
-      'ใครทำอะไรกับใบไหน เมื่อไหร่ · ผู้บริหารเท่านั้นที่เปิดดูได้');
-    t += '<div class="phbar ok" style="margin-bottom:12px">✅ <b>ลบ LOG แล้วเอกสารไม่หาย</b> — ' +
-         'LOG เก็บอยู่<b>คนละแท็บ</b>กับตัวเอกสาร ลบ LOG ทิ้งทั้งหมด ใบเคลมและใบตรวจรับยังอยู่ครบ ' +
-         'แค่ไม่รู้ว่าใครเคยทำอะไรไว้เท่านั้น</div>';
-    t += '<div class="hint" style="margin-bottom:8px">แสดง ' + d.rows.length + ' รายการล่าสุด จากทั้งหมด ' + d.total + ' รายการ</div>';
-    t += '<div class="tblwrap"><table class="grid"><thead><tr>' +
-      '<th style="width:36px">ที่</th><th style="width:150px">เวลา</th>' +
-      '<th style="width:170px">ใคร</th><th style="width:170px">ทำอะไร</th>' +
-      '<th style="width:140px">กับใบไหน</th><th>รายละเอียด</th></tr></thead><tbody>';
-    for (var i = 0; i < d.rows.length; i++){
-      var r = d.rows[i];
-      t += '<tr><td class="c">' + (i+1) + '</td><td>' + esc(r.at) + '</td>' +
-        '<td>' + esc(r.user) + '</td><td>' + esc(r.act) + '</td>' +
-        '<td>' + (r.ref ? '<a class="lk" onclick="go(\'claim\',\'' + esc(r.ref) + '\')">' + esc(r.ref) + '</a>' : '—') + '</td>' +
-        '<td>' + esc(r.detail) + '</td></tr>';
-    }
-    t += '</tbody></table></div></div>';
-    $('view').innerHTML = t;
-  });
-}
-
-/* ─── 3.1 รูปและวิดีโอ ─── */
 function loadRepMedia(){
   busy(true, 'กำลังรวบรวมรูปทั้งระบบ…');
   srv('reportMedia', [AUTH], function(jobs){
@@ -245,61 +227,6 @@ function loadRepJob(){
  * เบียร์: "จ๊อบนี้เคยออกเอกสารอะไรไปให้ใครบ้าง ออกเมื่อไหร่ ใครออก"
  * ⚠️ v1.2.3 — เมนูนี้อยู่ในกล่องงานที่ 3 มาตั้งแต่ v1.1.2 แต่ไม่เคยมีหน้าจริง
  *    กดแล้วขึ้น "ไม่รู้จักหน้า supdoc" ตัวแดง — ตอนนี้มีของจริงแล้ว */
-/* ═══ ผู้ใช้ & PIN — ผู้บริหารตั้ง PIN ให้พนักงานได้จากในระบบนี้เลย ═══
- * เบียร์ 7 ก.ย.: "คนที่ยังไม่มี PIN ทำไมต้องไป register ฝั่ง NOVA"
- * ช่อง PIN ในชีต USERS มีช่องเดียว ใช้ร่วมกันทั้ง 2 ระบบ ตั้งที่นี่ = ใช้เข้า NOVA ได้ด้วย */
-function loadUsersPin(){
-  busy(true, 'กำลังโหลดรายชื่อผู้ใช้…');
-  srv('listUsersPin', [AUTH], function(rows){
-    rows = rows || [];
-    var noPin = rows.filter(function(x){ return x.inClaim && !x.hasPin; });
-    var t = '<div class="card">' + repHead('ผู้ใช้ & PIN',
-      rows.length + ' คนที่เปิดใช้งาน · อยู่ในระบบเคลม ' +
-      rows.filter(function(x){ return x.inClaim; }).length + ' คน · ยังไม่มี PIN ' + noPin.length + ' คน');
-    t += '<div class="modtag">PIN ช่องเดียวกับ STT NOVA — ตั้งที่นี่แล้วใช้เข้าได้ทั้งสองระบบ · ' +
-         'พนักงานตั้งเองได้ที่หน้าเข้าสู่ระบบ แท็บ “ยังไม่มี PIN” ' +
-         '(ยกเว้นสิทธิ์ผู้บริหาร/ผู้อนุมัติ ต้องให้ผู้ดูแลตั้งให้)</div>';
-    t += '<div class="tblwrap"><table class="grid"><thead><tr>' +
-      '<th style="width:110px">รหัสพนักงาน</th><th>ชื่อ</th><th style="width:130px">แผนก</th>' +
-      '<th style="width:190px">หน้าที่ (role for Claim)</th>' +
-      '<th style="width:110px">PIN</th><th style="width:230px">ตั้ง / รีเซ็ต PIN</th></tr></thead><tbody>';
-    for (var i = 0; i < rows.length; i++){
-      var x = rows[i];
-      t += '<tr>' +
-        '<td><b>' + esc(x.emp) + '</b></td>' +
-        '<td>' + esc(x.name) + '</td>' +
-        '<td class="hint">' + esc(x.dept || '') + '</td>' +
-        '<td>' + (x.inClaim ? esc(x.role)
-                            : '<span class="dim">— ไม่อยู่ในระบบเคลม —</span>') + '</td>' +
-        '<td class="c">' + (x.hasPin ? '<span class="pill green">มีแล้ว</span>'
-                                     : '<span class="pill red">ยังไม่มี</span>') + '</td>' +
-        '<td>' + (x.inClaim
-          ? '<input id="pinset_' + esc(x.emp) + '" class="r" style="width:96px" ' +
-            'inputmode="numeric" maxlength="6" placeholder="6 หลัก"> ' +
-            '<button class="btn ghost" onclick="doSetPin(\'' + esc(x.emp) + '\')">ตั้ง</button> ' +
-            '<button class="btn ghost" onclick="randPin(\'' + esc(x.emp) + '\')" title="สุ่มเลขให้">🎲</button>' +
-            '<span class="hint" id="pinmsg_' + esc(x.emp) + '"></span>'
-          : '<span class="dim">ใส่ role for Claim ในชีต USERS ก่อน</span>') + '</td></tr>';
-    }
-    t += '</tbody></table></div></div>';
-    $('view').innerHTML = t; busy(false);
-  }, function(m){ $('view').innerHTML = '<div class="msg bad">' + esc(m) + '</div>'; busy(false); });
-}
-function randPin(emp){
-  var n = String(Math.floor(100000 + Math.random() * 900000));
-  $('pinset_' + emp).value = n;
-}
-function doSetPin(emp){
-  var v = ($('pinset_' + emp).value || '').trim();
-  var msg = $('pinmsg_' + emp);
-  if (!/^\d{6}$/.test(v)){ msg.textContent = ' PIN ต้องเป็นเลข 6 หลัก'; return; }
-  msg.textContent = ' กำลังตั้ง…';
-  srv('adminSetPin', [emp, v, AUTH], function(r){
-    msg.textContent = r && r.ok ? ' ✓ ตั้งแล้ว' : (' ' + ((r && r.msg) || 'ไม่สำเร็จ'));
-    if (r && r.ok) setTimeout(function(){ go('users'); }, 900);
-  }, function(m){ msg.textContent = ' ' + m; });
-}
-
 function loadSupDocs(){
   busy(true, 'กำลังโหลดทะเบียนเอกสารที่ส่ง Supplier…');
   srv('reportSupplierDocs', [AUTH], function(r){

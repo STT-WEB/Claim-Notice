@@ -39,6 +39,71 @@ function claimColsTail(){
 }
 
 /* ═══════════ เปิดใบแจ้งเคลมใหม่ — จบในหน้าเดียว ═══════════ */
+
+/* ═══ ตัวเลือกกลางของฟอร์มใบเคลม — เขียนที่เดียว ใช้ทั้งหน้าเปิดใบใหม่และหน้าใบที่บันทึกแล้ว
+   เบียร์ 8 ก.ย. 2569 สั่งคำพูดของแต่ละตัวเลือกไว้ตรงนี้ ═══════════════════ */
+var CLAIM_TYPES = [
+  ['after', 'หลังส่งมอบ (After-Sales)', 0],
+  ['pre',   'ก่อนส่งมอบ (Pre-Delivery)', 0],
+  /* ตัวที่ 3 — ระบบตั้งให้เองเมื่อใบนี้เกิดจากใบ Inspection · คนเลือกเองไม่ได้ */
+  ['insp',  'เคลมหลังตรวจรับ (จากใบ Inspection)', 1]
+];
+var WORK_KINDS = [
+  ['PART',   'อะไหล่ หรือ อุปกรณ์'],
+  ['LABOUR', 'งานซ่อม ไม่มีเปลี่ยนอะไหล่ (ค่าแรงและค่าใช้จ่ายอื่น ๆ)'],
+  ['BOTH',   'อะไหล่ หรือ อุปกรณ์ และ งานซ่อม']
+];
+/* เบียร์: "ไม่ต้อง (ผ่านสโตร์หรือไม่ผ่านสโตร์)" — เอาวงเล็บออก เหลือแค่ชนิดของงาน */
+var FOREIGN_KINDS = [
+  ['equip',  'อะไหล่ หรือ อุปกรณ์'],
+  ['tanker', 'Tankers']
+];
+function optsOf_(list, cur, autoOnly){
+  var t = '';
+  for (var i = 0; i < list.length; i++){
+    var v = list[i][0], lb = list[i][1], sysOnly = list[i][2];
+    /* ตัวเลือกที่ระบบตั้งให้เอง จะโผล่ก็ต่อเมื่อใบนี้เป็นตัวนั้นจริง ๆ และกดเลือกไม่ได้ */
+    if (sysOnly && cur !== v) continue;
+    t += '<option value="' + v + '"' + (cur === v ? ' selected' : '') +
+         (sysOnly ? ' data-sys="1"' : '') + '>' + esc(lb) + '</option>';
+  }
+  return t;
+}
+function claimTypeOpts(cur){ return optsOf_(CLAIM_TYPES, norm2(cur)); }
+function workKindOpts(cur){ return optsOf_(WORK_KINDS, norm2(cur) || 'PART'); }
+function foreignKindOpts(cur){ return optsOf_(FOREIGN_KINDS, norm2(cur) || 'equip'); }
+function norm2(v){ return String(v == null ? '' : v).trim(); }
+/* ประเภทการเคลม → ข้อความไทย · เขียนที่เดียว ใช้ทุกหน้า (รวมหน้าปริ้น)
+   ⚠️ ห้ามเขียน ternary pre/หลังส่งมอบ กระจายอีก ไม่งั้นใบ insp จะโผล่เป็น "หลังส่งมอบ" */
+function claimTypeText(v){
+  v = norm2(v);
+  for (var i = 0; i < CLAIM_TYPES.length; i++) if (CLAIM_TYPES[i][0] === v) return CLAIM_TYPES[i][1];
+  return CLAIM_TYPES[0][1];
+}
+/* แบบสั้น ใช้ในตารางและหัวใบ */
+function claimTypeShort(v){
+  v = norm2(v);
+  if (v === 'pre')  return 'ก่อนส่งมอบ';
+  if (v === 'insp') return 'เคลมหลังตรวจรับ';
+  return 'หลังส่งมอบ';
+}
+/* แปลงลิสต์กลางเป็นคู่ [ค่า, ข้อความ] ให้ sel() ใช้ — ตัวเลือกที่ระบบตั้งเองจะโผล่เฉพาะใบที่เป็นตัวนั้น */
+function pairsOf_(list, cur){
+  var out = [];
+  for (var i = 0; i < list.length; i++){
+    if (list[i][2] && norm2(cur) !== list[i][0]) continue;
+    out.push([list[i][0], list[i][1]]);
+  }
+  return out;
+}
+/* ใบที่ระบบตั้งประเภทให้เอง = ล็อกช่องไม่ให้เปลี่ยน (แต่ยังอ่านได้ว่าเป็นเคลมหลังตรวจรับ) */
+function lockSysClaimType(id){
+  var el = $(id || 'f_claimType'); if (!el) return;
+  var on = el.value === 'insp';
+  el.disabled = on;
+  el.title = on ? 'ใบนี้เกิดจากใบตรวจรับ ระบบตั้งประเภทให้เอง เปลี่ยนไม่ได้' : '';
+}
+
 function newClaimForm(){
   DRAFTID = 'DRAFT-' + Math.random().toString(36).slice(2, 10).toUpperCase();
   CURDOC = DRAFTID;          // รูปที่แนบตอนนี้ผูกกับคีย์ร่างไปก่อน
@@ -65,13 +130,13 @@ function newClaimForm(){
   var canStore = hasRole('STORE') || hasRole('PURCHASE') || hasRole('ADMIN');
 
   t += '<div class="fgrid">';
-  t += fr('ประเภทการเคลม', '<select id="f_claimType"><option value="after">หลังส่งมอบ (After-Sales)</option><option value="pre">ก่อนส่งมอบ (Pre-Delivery)</option></select>', W1, true);
+  /* เบียร์ 8 ก.ย. 2569: "ประเภทการเคลม มันต้องมีว่า เคลมหลังจาก inspection แท็งค์ด้วย
+     ในกรณีที่มันเชื่อมมาจากใบ Inspection"
+     → ตัวที่ 3 ระบบตั้งให้เองเฉพาะใบที่เกิดจากใบตรวจรับ เปิดใบใหม่เองเลือกไม่ได้ */
+  t += fr('ประเภทการเคลม', '<select id="f_claimType">' + claimTypeOpts('') + '</select>', W1, true);
   /* เบียร์ 7 ก.ย.: "งานเคลมที่เป็นงานฝีมือ ที่แบบไปซ่อม แต่มีแต่ค่าแรง แต่ไม่มีอุปกรณ์" */
-  t += fr('ลักษณะงาน', '<select id="f_workKind">' +
-      '<option value="PART">มีอะไหล่ที่ต้องเคลม</option>' +
-      '<option value="LABOUR">งานซ่อม/ฝีมือ — ไม่มีอะไหล่ (มีแต่ค่าแรง+ค่าใช้จ่าย)</option>' +
-      '<option value="BOTH">มีทั้งอะไหล่และงานซ่อม</option></select>',
-      'ขั้น 1|เลือกงานซ่อม/ฝีมือ = ไม่ต้องกรอกตารางของ แต่ต้องมีค่าแรงหรือค่าใช้จ่ายอื่น', true);
+  t += fr('ลักษณะงาน', '<select id="f_workKind">' + workKindOpts('') + '</select>',
+      'ขั้น 1|เลือกงานซ่อม = ไม่ต้องกรอกตารางของ แต่ต้องมีค่าแรงหรือค่าใช้จ่ายอื่น', true);
   t += fr('เลขที่ JOB', '<input id="f_jobNo" placeholder="JT-69/0009" onblur="jobLookup()">', W1, true);
   t += fr('ชื่อลูกค้า', '<input id="f_jobName" placeholder="ขึ้นเองจากเลขจ๊อบ">', 'อัตโนมัติ|ขึ้นเองจากเลขที่ JOB');
   /* เบียร์: "ประเภทงานคือ JT JM นั่นแหละ ตัวหนังสือที่มาก่อน - ใน Jobcode"
@@ -82,11 +147,15 @@ function newClaimForm(){
   t += fr('MODEL', '<input id="f_model">', W1, true);
   t += fr('SERIAL NO.', '<input id="f_serialNo">', W1);
 
-  t += '<div id="f_fkwrap" style="display:none">' + fr('ชนิดงาน ตปท.', '<select id="f_foreignKind"><option value="equip">อุปกรณ์ (ผ่านสโตร์)</option><option value="tanker">Tankers (ไม่ผ่านสโตร์)</option></select>', W1, true) + '</div>';
+  /* เบียร์ 8 ก.ย. 2569: "ถ้ามาจากการ inspection แท็งค์ ตรงนี้ก็ให้ขึ้นเลยว่า Tankers
+     ถ้าเป็นอุปกรณ์ก็ขึ้นมาเลยว่าเป็น อะไหล่ หรือ อุปกรณ์ ไม่ต้อง (ผ่านสโตร์หรือไม่ผ่านสโตร์)" */
+  t += '<div id="f_fkwrap" style="display:none">' +
+       fr('ชนิดงาน ตปท.', '<select id="f_foreignKind">' + foreignKindOpts('') + '</select>', W1, true) + '</div>';
   t += '<div id="f_csttwrap">' + fr('CHASSIS <i>STT</i>', '<input id="f_chassisStt">', W1) + '</div>';
+  /* เบียร์ 8 ก.ย. 2569: "สถานที่ผลิต >> จะไม่มี CHASSIS ผู้ผลิต / E. No."
+     → งานในประเทศไม่มีเลขตัวถังผู้ผลิตต่างประเทศและไม่มี E. No. ซ่อนทั้งคู่ไปเลย ไม่ให้รก */
   t += '<div id="f_cmkwrap">' + fr('CHASSIS <i>ผู้ผลิต</i>', '<input id="f_chassisMaker">', W1) + '</div>';
-  /* เบียร์ 7 ก.ย.: "ต้องมีกรอก E.No ต่อจาก Chassis No. ผู้ผลิตด้วย" */
-  t += fr('E. No.', '<input id="f_eNo" placeholder="หมายเลขเครื่อง">', W1);
+  t += '<div id="f_enowrap">' + fr('E. No.', '<input id="f_eNo" placeholder="หมายเลขเครื่อง">', W1) + '</div>';
 
   t += fr('JMC ที่ผูก', '<input id="f_jmc" placeholder="เว้นว่างได้ เติมทีหลัง">', 'ขั้น 1|ขั้น 1 · คนเปิดใบเป็นคนกรอก เติมทีหลังได้');
   t += fr('เลขใบส่งมอบ', '<input id="f_deliveryNote" placeholder="' +
@@ -239,6 +308,11 @@ function missingFields(){
 /** ใบที่บันทึกแล้ว: เปลี่ยนในประเทศ↔ต่างประเทศ ต้องให้คอลัมน์แปลอังกฤษเข้า/ออกตามด้วย
  *  เบียร์: "เปลี่ยนเป็นต่างประเทศ มันไม่มีช่องแปลภาษามาให้ ข้อมูลมันไม่ล้อกัน" */
 function areaChangedSaved(){
+  /* กติกาเดียวกับหน้าเปิดใบใหม่ — ในประเทศ = ไม่มี CHASSIS ผู้ผลิต · ไม่มี E. No. · ไม่มีชนิดงาน ตปท. */
+  var el = $('c_area'), isFor = el ? (el.value === 'for') : false;
+  ['c_cmkwrap','c_enowrap','c_fkwrap'].forEach(function(id){
+    var w = $(id); if (w) w.style.display = isFor ? '' : 'none';
+  });
   if (!GEDIT) return;
   var keep = gridData(GEDIT.id);
   GEDIT = makeGrid('gridEdit', claimCols(), keep, GEDIT.opt);
@@ -250,7 +324,16 @@ function areaChangedSaved(){
 
 function areaChanged(){
   var isFor = ($('f_area').value === 'for');
-  $('f_fkwrap').style.display = isFor ? '' : 'none';
+  $('f_fkwrap').style.display  = isFor ? '' : 'none';
+  /* เบียร์ 8 ก.ย. 2569: ในประเทศ = ไม่มี CHASSIS ผู้ผลิต และไม่มี E. No.
+     ซ่อนแล้วล้างค่าด้วย ไม่ให้ค่าที่พิมพ์ค้างไว้ตอนเลือกต่างประเทศหลุดไปกับใบในประเทศ */
+  var cm = $('f_cmkwrap'), en = $('f_enowrap');
+  if (cm) cm.style.display = isFor ? '' : 'none';
+  if (en) en.style.display = isFor ? '' : 'none';
+  if (!isFor){
+    if ($('f_chassisMaker')) $('f_chassisMaker').value = '';
+    if ($('f_eNo')) $('f_eNo').value = '';
+  }
   /* เบียร์: "ถ้าต่างประเทศ ต้องมี CHASSIS ผู้ผลิต บังคับใส่ CHASSIS STT ด้วย
      ประเภทการเคลม เลขที่ JOB ด้วย" → ดาวแดงขึ้น/ลงตามสถานที่ผลิต */
   markReq('f_csttwrap', isFor);
@@ -454,7 +537,7 @@ function loadList(){
       var r = rows[i];
       t += '<tr style="cursor:pointer" onclick="go(\'claim\',\'' + r.docNo + '\')">' +
         '<td><b>' + esc(r.docNo) + '</b></td><td class="c">' + esc(r.date) + '</td>' +
-        '<td>' + (r.claimType === 'pre' ? 'ก่อนส่งมอบ' : 'หลังส่งมอบ') + ' · ' + (r.area === 'for' ? 'ต่างประเทศ' : 'ในประเทศ') + '</td>' +
+        '<td>' + claimTypeShort(r.claimType) + ' · ' + (r.area === 'for' ? 'ต่างประเทศ' : 'ในประเทศ') + '</td>' +
         '<td>' + esc(r.jobNo) + '</td><td>' + esc(r.jobName) + '</td>' +
         '<td class="c">' + photoPill(r) + '</td>' +
         '<td class="c">' + esc(r.status) + '</td><td>' + esc(r.by) + '</td></tr>';
@@ -493,7 +576,7 @@ function drawClaim(){
   var t = '<div class="card noprint tight"><div class="cardhd">' +
     '<h3>' + esc(docNo) + '</h3>' +
     '<span class="sub">' + esc(h['เลขที่ JOB']) + ' · ' + esc(h['ชื่อลูกค้า']) + ' · ' +
-      (h['ประเภทการเคลม'] === 'pre' ? 'ก่อนส่งมอบ' : 'หลังส่งมอบ') + ' · ' +
+      claimTypeShort(h['ประเภทการเคลม']) + ' · ' +
       (h['สถานที่ผลิต'] === 'for' ? 'ต่างประเทศ' : 'ในประเทศ') + '</span>' +
     '<span class="savebar ok" id="savebar">✓ บันทึกอัตโนมัติ</span>' +
     '<button class="btn" onclick="go(\'list\')">← ทะเบียน</button></div>';
@@ -557,6 +640,8 @@ function drawClaim(){
   drawExpense();
   drawTrBtns('GEDIT');
   applyGridLocks(GEDIT.id);
+  lockSysClaimType('c_claimType');      // ใบที่เกิดจากใบตรวจรับ ห้ามเปลี่ยนประเภทเอง
+  areaChangedSaved();                   // ซ่อน CHASSIS ผู้ผลิต / E. No. / ชนิดงาน ตปท. ตามสถานที่ผลิต
   showTab(CURTAB);
   updatePhBar();
 }
@@ -595,7 +680,10 @@ function paneClaim(c, docNo){
        '<span><i class="ca"></i><b class="ka">สีเทา</b> ระบบเติมให้เอง</span></div>';
 
   t += fr('ประเภทการเคลม', sel('c_claimType','saveClaimField','claimType',h['ประเภทการเคลม'],
-            [['after','หลังส่งมอบ (After-Sales)'],['pre','ก่อนส่งมอบ (Pre-Delivery)']]), W1, true) +
+            pairsOf_(CLAIM_TYPES, h['ประเภทการเคลม'])) +
+            (h['มาจากใบตรวจ'] ? '<div class="hint" style="margin-top:3px">มาจากใบตรวจ ' +
+               '<b class="lk" onclick="go(\'ins\',\'' + esc(h['มาจากใบตรวจ']) + '\')">' +
+               esc(h['มาจากใบตรวจ']) + '</b></div>' : ''), W1, true) +
        fr('สถานที่ผลิต', sel('c_area','saveClaimField','area',h['สถานที่ผลิต'],
             [['dom','ในประเทศ'],['for','ต่างประเทศ']]).replace('<select ', '<select onchange="areaChangedSaved()" '),
             W1, true) +
@@ -606,14 +694,17 @@ function paneClaim(c, docNo){
        fr('MODEL', ip('c_model','saveClaimField','model',h['MODEL']), W1, true);
   t += fr('SERIAL NO.', ip('c_serialNo','saveClaimField','serialNo',h['SERIAL NO.']), W1) +
        fr('CHASSIS <i>STT</i>', ip('c_chassisStt','saveClaimField','chassisStt',h['CHASSIS NO. (STT)']), W1, isFor) +
-       fr('CHASSIS <i>ผู้ผลิต</i>', ip('c_chassisMaker','saveClaimField','chassisMaker',h['CHASSIS NO. (ผู้ผลิต)']), W1, isFor);
-  /* E. No. อยู่ต่อจาก CHASSIS ผู้ผลิต ตามที่เบียร์สั่ง 7 ก.ย. */
-  t += fr('E. No.', ip('c_eNo','saveClaimField','eNo',h['E. No.'],'หมายเลขเครื่อง'), W1);
+       '<div id="c_cmkwrap">' + fr('CHASSIS <i>ผู้ผลิต</i>', ip('c_chassisMaker','saveClaimField','chassisMaker',h['CHASSIS NO. (ผู้ผลิต)']), W1, isFor) + '</div>';
+  /* ชนิดงาน ตปท. — ใบที่มาจากใบตรวจรับ ระบบเติมมาให้แล้ว (Tankers / อะไหล่ หรือ อุปกรณ์) */
+  t += '<div id="c_fkwrap"' + (isFor ? '' : ' style="display:none"') + '>' +
+       fr('ชนิดงาน ตปท.', sel('c_foreignKind','saveClaimField','foreignKind',
+          h['ชนิดงานต่างประเทศ'] || 'equip', pairsOf_(FOREIGN_KINDS, h['ชนิดงานต่างประเทศ'] || 'equip')),
+          W1, isFor) + '</div>';
+  /* E. No. อยู่ต่อจาก CHASSIS ผู้ผลิต · งานในประเทศไม่มีทั้งคู่ (เบียร์ 8 ก.ย. 2569) */
+  t += '<div id="c_enowrap">' + fr('E. No.', ip('c_eNo','saveClaimField','eNo',h['E. No.'],'หมายเลขเครื่อง'), W1) + '</div>';
   t += fr('ลักษณะงาน', sel('c_workKind','saveClaimField','workKind', h['ลักษณะงานเคลม'] || 'PART',
-      [['PART','มีอะไหล่ที่ต้องเคลม'],
-       ['LABOUR','งานซ่อม/ฝีมือ — ไม่มีอะไหล่'],
-       ['BOTH','มีทั้งอะไหล่และงานซ่อม']]),
-      'ขั้น 1|งานซ่อม/ฝีมือ = ไม่ต้องกรอกตารางของ แต่ต้องมีค่าแรงหรือค่าใช้จ่ายอื่น', true);
+      pairsOf_(WORK_KINDS, h['ลักษณะงานเคลม'] || 'PART')),
+      'ขั้น 1|งานซ่อม = ไม่ต้องกรอกตารางของ แต่ต้องมีค่าแรงหรือค่าใช้จ่ายอื่น', true);
   t += fr('JMC ที่ผูก', ip('c_jmc','saveClaimField','jmc',h['JMC ที่ผูก'],'เว้นว่างได้ เติมทีหลัง'), 'ขั้น 1|ขั้น 1 · คนเปิดใบเป็นคนกรอก เติมทีหลังได้') +
        fr('เลขใบส่งมอบ', ip('c_deliveryNote','saveClaimField','deliveryNote',h['เลขใบส่งมอบ']), W2, true) +
        fr('ผู้ขอเคลม', '<input value="' + esc(h['ผู้ขอเคลม'] || '') + '" disabled>', 'อัตโนมัติ|ชื่อคนที่เปิดใบนี้');
