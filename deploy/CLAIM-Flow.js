@@ -232,15 +232,22 @@ var SIGN_R2 = ['ลายเซ็น จัดซื้อ ผลเคลม',
 var PRINT_OK_STAGES = ['PURCHASE','SUPPLIER','STORE_IN','QC_RECV','STORE_OUT','CLOSE_WAIT','CLOSED'];
 
 /** ใครกดปริ้นฉบับส่ง Supplier ได้บ้าง — จัดซื้อ (และผู้บริหาร) หลังใบถึงขั้นจัดซื้อแล้ว */
-function canPrintOut_(stageKey, me){
+function canPrintOut_(stageKey, me, received){
   var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
   var isBuyer = mine.indexOf('PURCHASE') >= 0 || mine.indexOf('ADMIN') >= 0;
-  return isBuyer && PRINT_OK_STAGES.indexOf(norm_(stageKey)) >= 0;
+  if (!isBuyer) return false;
+  if (PRINT_OK_STAGES.indexOf(norm_(stageKey)) < 0) return false;
+  /* เบียร์ 8 ก.ย. 2569: "การเข้ามาหน้าจัดซื้อ มันต้องกดรับข้อมูลก่อน ถึงจะ print เอกสารได้นะ"
+     → เอกสารที่ออกไปข้างนอกต้องมีคนรับผิดชอบชัดเจน ยังไม่กดรับเรื่อง = ยังไม่มีใครรับ */
+  if (norm_(stageKey) === 'PURCHASE' && received === false) return false;
+  return true;
 }
-function printBlockWhy_(stageKey, me){
+function printBlockWhy_(stageKey, me, received){
   var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
   if (mine.indexOf('PURCHASE') < 0 && mine.indexOf('ADMIN') < 0)
     return 'เอกสารที่ส่งออกนอกบริษัท ให้จัดซื้อเป็นคนพิมพ์ — คุณดูตัวอย่างได้ทุกหน้า';
+  if (norm_(stageKey) === 'PURCHASE' && received === false)
+    return 'กด "📥 รับเรื่อง" ก่อน แล้วปุ่มปริ้นจะเปิดให้ — เอกสารที่ส่งออกไปข้างนอกต้องมีคนรับผิดชอบชัดเจน';
   var st = stageDef_(stageKey);
   return 'ใบนี้ยังอยู่ขั้นที่ ' + st.no + ' (' + st.name + ') ยังไม่ถึงจัดซื้อ — ' +
          'พิมพ์ส่ง Supplier ได้เมื่อใบเดินมาถึงขั้นจัดซื้อแล้ว';
@@ -316,6 +323,17 @@ function signStage_(sh, row, stageKey, me){
 }
 
 /** ลายเซ็นทั้งใบ สำหรับหน้าเว็บและหน้าปริ้น */
+/* ลายเซ็นทั้ง 9 ช่อง จากแถวที่อ่านมาแล้ว — ไม่ต้องแตะชีตอีก 9 ครั้ง */
+function signsFromRow_(C){
+  var out = [], keys = SIGN_R1.concat(SIGN_R2);
+  var lab = ['ผู้เปิดใบ','ผู้อนุมัติ','สโตร์','จัดซื้อ',
+             'จัดซื้อ (ผลเคลม)','สโตร์รับของเข้า','QC ตรวจรับ','สโตร์เบิกออก','ผู้บริหาร'];
+  for (var i = 0; i < keys.length; i++){
+    out.push({ role:lab[i], text:norm_(C[keys[i]]), round: i < SIGN_R1.length ? 1 : 2 });
+  }
+  return out;
+}
+
 function signsOf_(sh, row){
   var out = [], keys = SIGN_R1.concat(SIGN_R2);
   var lab = ['ผู้เปิดใบ','ผู้อนุมัติ','สโตร์','จัดซื้อ',
@@ -378,62 +396,75 @@ function setStage_(sh, row, key, me, note){
 }
 
 /** ข้อมูลขั้นตอนสำหรับหน้าเว็บ — บอกได้เลยว่าใครทำอะไรต่อ และคนที่เปิดดูทำอะไรได้ */
+/* ═══ อ่านข้อมูลใบเดียว "แตะชีตครั้งเดียว" ═══════════════════════════════
+   เบียร์ 8 ก.ย. 2569: "ยังช้ามาก ... ยิ่งเวลาที่ย้อนกลับหน้าเอกสารไปอีกหน้า คือช้าเลย"
+   วัดแล้วเจอต้นตอ: ของเดิม claimFlow ไปหยิบข้อมูลทีละช่อง
+   d.claims.getRange(r, colOf_('...')).getDisplayValue()  ≈ 20 กว่ารอบต่อการเปิด 1 ใบ
+   ใน Apps Script การแตะชีต 1 ครั้ง = วิ่งข้ามเน็ตไปหา Google Sheets 1 รอบ (20-80 ms)
+   → เปิดใบเดียวเสีย 1-4 วินาที ทั้งที่ข้อมูลอยู่แถวเดียวกันหมด
+   แก้: อ่าน "ทั้งแถว" ทีเดียว แล้วหยิบจากอาร์เรย์ในหน่วยความจำ                */
+function rowCache_(d, r){
+  var full = claimHdr_();
+  var hdr = d.claims.getRange(1, 1, 1, full.length).getDisplayValues()[0];
+  var row = d.claims.getRange(r, 1, 1, full.length).getDisplayValues()[0];
+  var m = {};
+  for (var i = 0; i < hdr.length; i++) if (hdr[i]) m[hdr[i]] = norm_(row[i]);
+  return m;
+}
+
 function claimFlow(docNo, auth){
   var me = requireLogin_(auth);
   var d = dbOf_(docNo), r = findClaimRow_(d.claims, norm_(docNo));
   if (r < 0) return null;
   ensureCols_(d.claims, claimHdr_());
 
-  var key = claimStage_(d.claims, r), st = stageDef_(key);
+  var C = rowCache_(d, r);                      // ← แตะชีตครั้งเดียว ได้ทั้งแถว
+  var key = norm_(C['ขั้นตอน']) || 'REQUEST', st = stageDef_(key);
   var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
   var isAdmin = mine.indexOf('ADMIN') >= 0;
   var isOwner = isAdmin;
   for (var i = 0; i < mine.length; i++) if (st.roles.indexOf(mine[i]) >= 0) isOwner = true;
 
-  var rcvAt = norm_(d.claims.getRange(r, colOf_('รับเรื่องเมื่อ')).getDisplayValue());
+  var rcvAt = C['รับเรื่องเมื่อ'];
   var received = st.needReceive ? !!rcvAt : true;
 
   return {
     needReceive: !!st.needReceive, receiveLabel: st.receiveLabel || '📥 กดรับเรื่อง',
     received: received,
     receivedAt: rcvAt,
-    receivedBy: norm_(d.claims.getRange(r, colOf_('รับเรื่องโดย')).getDisplayValue()),
+    receivedBy: C['รับเรื่องโดย'],
     isDraft: !!st.draft,
     canCancel: isAdmin && key !== 'CANCELLED' && key !== 'CLOSED',
-    cancelReason: norm_(d.claims.getRange(r, colOf_('เหตุผลยกเลิก')).getDisplayValue()),
+    cancelReason: C['เหตุผลยกเลิก'],
     stage:key, no:st.no, name:st.name, who:st.who, todo:st.todo,
     next:st.next, nextLabel:st.nextLabel,
     isOwner:isOwner,
     canReject: (['APPROVAL','STORE','PURCHASE','SUPPLIER'].indexOf(key) >= 0) && isOwner,
     canRejectReturn: (key === 'QC_RECV') && isOwner,
-    round1Done: round1Done_(d.claims, r),
-    /* เบียร์ 7 ก.ย.: "PDF จะปริ้นได้ตอนที่จัดซื้อจะส่งให้ Sup เท่านั้น แต่แผนกอื่น ๆ Preview เฉย ๆ ได้"
-       canPrint = สิทธิ์กดปริ้นจริง · ทุกคนดูตัวอย่างได้เสมอ ไม่ต้องเช็คอะไร */
-    canPrint: canPrintOut_(key, me),
-    printWhy: canPrintOut_(key, me) ? '' : printBlockWhy_(key, me),
+    round1Done: !!C['ลายเซ็น จัดซื้อ ผลเคลม'],
+    canPrint: canPrintOut_(key, me, received),
+    printWhy: canPrintOut_(key, me, received) ? '' : printBlockWhy_(key, me, received),
     results: resultList(),
-    docNos: { gr:norm_(d.claims.getRange(r, colOf_('เลขที่รับของเข้าคลัง')).getDisplayValue()),
-              grDate:norm_(d.claims.getRange(r, colOf_('วันที่รับของเข้าคลัง')).getDisplayValue()),
-              rcv:norm_(d.claims.getRange(r, colOf_('เลขที่ใบตรวจรับของกลับ')).getDisplayValue()),
-              rcvDate:norm_(d.claims.getRange(r, colOf_('วันที่ตรวจรับของกลับ')).getDisplayValue()),
-              rcvBy:norm_(d.claims.getRange(r, colOf_('ผู้ตรวจรับของกลับ')).getDisplayValue()),
-              is:norm_(d.claims.getRange(r, colOf_('เลขที่ใบเบิกออก')).getDisplayValue()),
-              isDate:norm_(d.claims.getRange(r, colOf_('วันที่เบิกออก')).getDisplayValue()),
-              cdn:norm_(d.claims.getRange(r, colOf_('เลขที่ใบเรียกเก็บรวม')).getDisplayValue()) },
-    round: num_(d.claims.getRange(r, colOf_('รอบเคลม')).getDisplayValue()) || 1,
-    rejectNote: norm_(d.claims.getRange(r, colOf_('เหตุผลที่ตีกลับ')).getDisplayValue()),
-    rejectBy:   norm_(d.claims.getRange(r, colOf_('ตีกลับโดย')).getDisplayValue()),
-    rejectAt:   norm_(d.claims.getRange(r, colOf_('ตีกลับเมื่อ')).getDisplayValue()),
-    history:    norm_(d.claims.getRange(r, colOf_('ประวัติขั้นตอน')).getDisplayValue()),
-    signs: signsOf_(d.claims, r),
-    printedAt:  norm_(d.claims.getRange(r, colOf_('ปริ้นส่งออกแล้วเมื่อ')).getDisplayValue()),
-    printedBy:  norm_(d.claims.getRange(r, colOf_('ปริ้นโดย')).getDisplayValue()),
+    docNos: { gr:C['เลขที่รับของเข้าคลัง'], grDate:C['วันที่รับของเข้าคลัง'],
+              rcv:C['เลขที่ใบตรวจรับของกลับ'], rcvDate:C['วันที่ตรวจรับของกลับ'],
+              rcvBy:C['ผู้ตรวจรับของกลับ'],
+              is:C['เลขที่ใบเบิกออก'], isDate:C['วันที่เบิกออก'],
+              cdn:C['เลขที่ใบเรียกเก็บรวม'] },
+    round: num_(C['รอบเคลม']) || 1,
+    rejectNote: C['เหตุผลที่ตีกลับ'],
+    rejectBy:   C['ตีกลับโดย'],
+    rejectAt:   C['ตีกลับเมื่อ'],
+    history:    C['ประวัติขั้นตอน'],
+    signs: signsFromRow_(C),
+    printedAt:  C['ปริ้นส่งออกแล้วเมื่อ'],
+    printedBy:  C['ปริ้นโดย'],
     stages: STAGES.filter(function(s){ return !s.hidden; })
                   .map(function(s){ return { key:s.key, no:s.no, name:s.name, who:s.who }; }),
     lock: lockMap_(key, me, received),
-    missing: claimMissing_(d, norm_(docNo), key)
+    missing: claimMissing_(d, norm_(docNo), key, C)
   };
 }
+
 
 /** ช่องไหนคนนี้แก้ไม่ได้บ้าง + เพราะอะไร — ส่งให้หน้าเว็บทำเป็นช่องสีเทาพร้อมเหตุผล
  *  ส่งเฉพาะ "ช่องที่ล็อก" ไม่ต้องส่งทั้งหมด ข้อมูลจะได้ไม่บวม */
@@ -558,6 +589,11 @@ function advanceClaim(docNo, auth){
   var key = claimStage_(d.claims, r), st = stageDef_(key);
   if (!st.next) throw new Error('เอกสารนี้ปิดงานแล้ว');
 
+  /* เก็บกวาดแถวเปล่าก่อนส่งต่อทุกครั้ง (เบียร์ 8 ก.ย. 2569)
+     แถวที่กด "+ เพิ่มแถว" ไว้แล้วไม่ได้กรอก ต้องไม่ตามไปกวนขั้นถัดไป
+     และรูปที่ค้างอยู่กับแถวนั้นต้องหายตามไปด้วย ไม่ให้โผล่ผิดข้อ */
+  if (key === 'REQUEST' || key === 'STORE') cleanBlankItems_(d, docNo);
+
   var mine = (me.roles && me.roles.length) ? me.roles : [me.role];
   var allow = st.nextRoles || st.roles;          // บางขั้น คนกดส่งต่อไม่ใช่คนเดียวกับคนกรอก
   var ok = (!st.nextRoles) && mine.indexOf('ADMIN') >= 0;
@@ -661,10 +697,15 @@ function rejectClaim(docNo, toStage, reason, auth){
 }
 
 /** ขั้นนี้ยังขาดอะไรบ้าง — เช็คก่อนยอมให้ส่งต่อ */
-function claimMissing_(d, docNo, stageKey){
-  var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
+/* C = ข้อมูลทั้งแถวที่อ่านมาแล้ว (ถ้ามี) — ส่งมาด้วยจะไม่แตะชีตซ้ำ
+   เปิดใบ 1 ครั้ง เดิมแตะชีต 41 ครั้ง ส่วนใหญ่มาจากการอ่านทีละช่องแบบนี้ */
+function claimMissing_(d, docNo, stageKey, C){
   var r = findClaimRow_(d.claims, docNo);
-  var h = claimRowObj_(hdr, d.claims.getRange(r,1,1,HDR_CLAIM.length).getDisplayValues()[0]);
+  var h = C;
+  if (!h){
+    var hdr = d.claims.getRange(1,1,1,HDR_CLAIM.length).getDisplayValues()[0];
+    h = claimRowObj_(hdr, d.claims.getRange(r,1,1,HDR_CLAIM.length).getDisplayValues()[0]);
+  }
   var items = [], lr = d.items.getLastRow();
   if (lr > 1){
     var v = d.items.getRange(2,1,lr-1,HDR_ITEM.length).getDisplayValues();
@@ -674,8 +715,10 @@ function claimMissing_(d, docNo, stageKey){
 
   /* งานซ่อม/ฝีมือ ไม่มีอะไหล่ → ไม่บังคับตารางของ แต่ต้องมีค่าแรงหรือค่าใช้จ่ายอย่างน้อย 1 บรรทัด
      ไม่งั้นจะเปิดใบเปล่า ๆ ที่ไม่มีอะไรให้เรียกเก็บเลย */
-  var cw = colOf_('ลักษณะงานเคลม');
-  var kind = (cw > 0 && r > 0) ? norm_(d.claims.getRange(r, cw).getDisplayValue()) : '';
+  var kind;
+  if (C && C['ลักษณะงานเคลม'] !== undefined) kind = norm_(C['ลักษณะงานเคลม']);
+  else { var cw = colOf_('ลักษณะงานเคลม');
+         kind = (cw > 0 && r > 0) ? norm_(d.claims.getRange(r, cw).getDisplayValue()) : ''; }
   var labourOnly = (kind === 'LABOUR');
 
   if (stageKey === 'REQUEST'){
@@ -694,6 +737,17 @@ function claimMissing_(d, docNo, stageKey){
       if (!nLab && !nExp) miss.push('งานซ่อม/ฝีมือ ต้องมีค่าแรงหรือค่าใช้จ่ายอื่นอย่างน้อย 1 บรรทัด');
     } else {
       if (!items.length)          miss.push('ยังไม่มีรายการที่เคลม');
+      /* เบียร์ 8 ก.ย. 2569: "ใส่รูปไป แต่ไม่ใส่ข้อมูล ชื่อสินค้า หรือรายละเอียด
+         กลายเป็นว่ามันให้ส่งอนุมัติได้ด้วย ทั้ง ๆ ที่ข้อมูลไม่ครบ ... มันต้องไม่ให้เซฟ หรือส่งไปเลย"
+         → แถวที่มี "แค่รูป" ต้องถูกจับตั้งแต่ตรงนี้ ไม่ให้หลุดไปหลอกสโตร์ */
+      var noName = [], noDetail = [];
+      for (var n = 0; n < items.length; n++){
+        var sqn = norm_(items[n][1]);
+        if (!norm_(items[n][3]) && !norm_(items[n][2])) noName.push(sqn);   // ชื่อสินค้า / รหัสสินค้า
+        if (!norm_(items[n][4])) noDetail.push(sqn);                        // รายละเอียด (ไทย)
+      }
+      if (noName.length)   miss.push('รายการที่ ' + noName.join(', ') + ' ยังไม่มีชื่อสินค้า');
+      if (noDetail.length) miss.push('รายการที่ ' + noDetail.join(', ') + ' ยังไม่ได้เขียนรายละเอียดการเคลม');
       var noPhoto = [];
       var ph = photosOf_(docNo);   // ห้ามเรียก listPhotos ที่นี่ มันบังคับล็อกอิน
       for (var k = 0; k < items.length; k++){
@@ -728,7 +782,7 @@ function claimMissing_(d, docNo, stageKey){
   }
 
   if (stageKey === 'STORE_IN'){
-    if (!norm_(d.claims.getRange(r, colOf_('ที่เก็บในคลัง')).getDisplayValue()))
+    if (!norm_(C ? C['ที่เก็บในคลัง'] : d.claims.getRange(r, colOf_('ที่เก็บในคลัง')).getDisplayValue()))
       miss.push('ยังไม่ได้ระบุที่เก็บในคลัง (Location)');
   }
 
@@ -744,9 +798,9 @@ function claimMissing_(d, docNo, stageKey){
   }
 
   if (stageKey === 'STORE_OUT'){
-    if (!norm_(d.claims.getRange(r, colOf_('ผู้รับของหน้างาน')).getDisplayValue()))
+    if (!norm_(C ? C['ผู้รับของหน้างาน'] : d.claims.getRange(r, colOf_('ผู้รับของหน้างาน')).getDisplayValue()))
       miss.push('ยังไม่ได้ระบุผู้รับของหน้างาน');
-    if (!norm_(d.claims.getRange(r, colOf_('แผนกที่เบิกไปใช้')).getDisplayValue()))
+    if (!norm_(C ? C['แผนกที่เบิกไปใช้'] : d.claims.getRange(r, colOf_('แผนกที่เบิกไปใช้')).getDisplayValue()))
       miss.push('ยังไม่ได้ระบุแผนกที่เบิกไปใช้');
   }
 

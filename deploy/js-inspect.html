@@ -63,6 +63,39 @@ function newInspForm(){
 }
 
 /* รายชื่อแม่แบบที่ให้เลือก = เฉพาะของลักษณะงานที่เลือกไว้ ไม่ต้องเลื่อนหาในของที่ไม่เกี่ยว */
+/* กด "บันทึกไว้ก่อน" ในใบตรวจ — รีดทุกช่องลงชีต แล้วเช็คว่าส่งขออนุมัติได้หรือยัง */
+function saveInspNow(){
+  var b = $('insSaveBtn');
+  if (b){ b.disabled = true; b.textContent = '💾 กำลังบันทึก…'; }
+  var el = document.activeElement; if (el && el.blur) el.blur();
+  if (INSGRID) syncGrid(INSGRID.id);
+  setTimeout(function(){
+    if (b){ b.disabled = false; b.textContent = '💾 บันทึกไว้ก่อน'; }
+    var bar = $('savebar'); if (bar){ bar.className = 'savebar ok'; bar.textContent = '✓ บันทึกแล้ว'; }
+    refreshInsGate(true);
+  }, 900);
+}
+
+/* เช็คสด ๆ ว่าใบตรวจส่งขออนุมัติได้หรือยัง — เรียกหลังบันทึกทุกครั้ง
+   เบียร์: "ยังส่งต่อไม่ได้ — ข้อ 1..12 ยังไม่ได้ติ๊กผลตรวจ ทั้ง ๆ ที่เบียร์ติ๊กหมดแล้ว" */
+var INSGATET = null;
+function refreshInsGate(now){
+  if (!CURDOC) return;
+  if (INSGATET) clearTimeout(INSGATET);
+  INSGATET = setTimeout(function(){
+    srv('inspGate', [CURDOC, AUTH], function(g){
+      if (!g) return;
+      var box = $('insmiss');
+      if (box){
+        if (g.ok){ box.style.display = 'none'; }
+        else { box.textContent = g.msg; box.style.display = ''; }
+      }
+      var b2 = $('insAdvBtn');
+      if (b2){ if (g.ok) b2.classList.remove('notready'); else b2.classList.add('notready'); }
+    });
+  }, now ? 0 : 900);
+}
+
 function inspTplFill(pick){
   var kind = $('i_kind') ? $('i_kind').value : 'tanker', opts = '', n = 0;
   for (var i = 0; i < (INSTPL || []).length; i++){
@@ -211,7 +244,11 @@ function openInspection(docNo){
     var t = '<div class="card noprint"><div class="cardhd">' +
       '<h3>' + esc(h['เลขที่เอกสาร']) + ' — ใบตรวจรับสินค้า</h3>' +
       '<span class="sub">' + esc(h['แม่แบบเช็คลิสต์']) + '</span>' +
-      '<button class="btn" onclick="openPrintIns()">🖨️ ปริ้น / PDF</button>' +
+      /* เบียร์ 8 ก.ย. 2569: "พอกดร่างแล้ว พอใส่ข้อมูลเพิ่มมันไม่มีให้บันทึก
+         มันมีแต่ปริ้น PDF กับ ส่งขออนุมัติ มันไม่ถูกต้องนะ"
+         → ใส่ปุ่มบันทึกให้กดยืนยันได้ตลอด เหมือนฝั่งใบเคลม */
+      '<button class="btn" id="insSaveBtn" onclick="saveInspNow()">💾 บันทึกไว้ก่อน</button>' +
+      '<button class="btn ghost" onclick="openPrintIns()">🖨️ ปริ้น / PDF</button>' +
       '<span class="savebar ok" id="savebar">✓ บันทึกอัตโนมัติ</span></div>';
 
     INSFLOW = c.flow || null;
@@ -332,7 +369,9 @@ function drawInspGrid(c, docNo){
       var el = gridCell(g.id, r, colIdxIns(g, k));
       fieldMark(el, 'wait');
       google.script.run
-        .withSuccessHandler(function(){ fieldMark(el, 'ok'); if (k === 'acc'){ g.rows[r].acc = v; paintAccCells(g); updateInsPhBar(); } })
+        .withSuccessHandler(function(){ fieldMark(el, 'ok');
+          if (k === 'acc'){ g.rows[r].acc = v; paintAccCells(g); updateInsPhBar(); }
+          refreshInsGate(); })
         .withFailureHandler(function(e){ fieldMark(el, 'bad', (e && e.message) || 'บันทึกไม่สำเร็จ'); })
         .saveInspItemField(CURDOC, seq, k, v, AUTH);
     },
@@ -454,9 +493,24 @@ function inspTranslate(){
 function insFlowBar(f){
   if (!f) return '';
   var t = flowBar(f);
-  /* flowBar วาดปุ่มของใบเคลม (doAdvance / openReject) — ใบตรวจต้องเรียกคนละฟังก์ชัน */
-  t = t.replace(/onclick="doAdvance\(\)"/g, 'onclick="doAdvanceInsp()"')
-       .replace(/onclick="openReject\(\)"/g, 'onclick="openRejectInsp()"');
+  /* flowBar วาดปุ่มของใบเคลม — ใบตรวจต้องเรียกคนละฟังก์ชัน และใช้ id คนละชุด
+     (ไม่งั้น refreshGate ของใบเคลมจะมาแตะปุ่มของใบตรวจ) */
+  t = t.replace(/onclick="advClick\(\)"/g, 'onclick="advClickIns()"')
+       .replace(/onclick="doAdvance\(\)"/g, 'onclick="doAdvanceInsp()"')
+       .replace(/onclick="openReject\(\)"/g, 'onclick="openRejectInsp()"')
+       .replace(/id="advBtn"/g, 'id="insAdvBtn"')
+       .replace(/id="flowmiss"/g, 'id="insmiss"');
   return t;
+}
+
+function advClickIns(){
+  var b = $('insAdvBtn');
+  if (b && b.classList.contains('notready')){
+    var box = $('insmiss');
+    if (box && box.textContent) alert(box.textContent);
+    else alert('ยังกรอกไม่ครบ — ดูบรรทัดสีแดงเหนือปุ่ม');
+    return;
+  }
+  doAdvanceInsp();
 }
 </script>

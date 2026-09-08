@@ -821,11 +821,18 @@ T('ปริ้นส่ง Supplier — เฉพาะจัดซื้อ �
   call('saveItemField',[n,1,'po','PO-P',STORE]);
   call('saveItemField',[n,1,'supplier','เจ้าทดสอบ',STORE]);
   call('advanceClaim',[n,STORE]);                                   // → PURCHASE
-  const fb=call('claimFlow',[n,BUY]), fq=call('claimFlow',[n,QC]);
-  if(!fb.canPrint) throw new Error('ถึงขั้นจัดซื้อแล้ว แต่จัดซื้อยังปริ้นไม่ได้: '+fb.printWhy);
+  /* เบียร์ 8 ก.ย. 2569: "การเข้ามาหน้าจัดซื้อ มันต้องกดรับข้อมูลก่อน ถึงจะ print เอกสารได้นะ" */
+  let fb=call('claimFlow',[n,BUY]);
+  if(fb.canPrint) throw new Error('ยังไม่กดรับเรื่อง แต่จัดซื้อปริ้นได้แล้ว');
+  if(!/รับเรื่อง/.test(fb.printWhy||'')) throw new Error('ไม่ได้บอกว่าต้องกดรับเรื่องก่อน: '+fb.printWhy);
+  call('receiveClaim',[n,BUY]);                                     // จัดซื้อกดรับเรื่อง
+  fb=call('claimFlow',[n,BUY]);
+  const fq=call('claimFlow',[n,QC]);
+  if(!fb.canPrint) throw new Error('กดรับเรื่องแล้ว แต่จัดซื้อยังปริ้นไม่ได้: '+fb.printWhy);
   if(fq.canPrint)  throw new Error('QC ปริ้นส่ง Supplier ได้ ทั้งที่ไม่ใช่หน้าที่');
+  if(call('claimFlow',[n,STORE]).canPrint) throw new Error('สโตร์ปริ้นได้ — ต้องเป็นจัดซื้อเท่านั้น');
   if(!fq.printWhy) throw new Error('ไม่ได้บอกเหตุผลให้คนที่ปริ้นไม่ได้');
-  return 'จัดซื้อปริ้นได้ · QC ได้แต่ดูตัวอย่าง ("'+fq.printWhy.slice(0,40)+'…")'; });
+  return 'ต้องกดรับเรื่องก่อนถึงปริ้นได้ · สโตร์/QC ได้แต่ดูตัวอย่าง'; });
 
 T('พิมพ์เลขจ๊อบไม่ตรงรูปแบบ ก็ต้องหาเจอ (บั๊กที่พนักงานเจอ)', ()=>{
   const want='JT-69/0001';
@@ -1200,6 +1207,104 @@ T('เพิ่มคอลัมน์ E. No. แล้ว คอลัมน�
     if(h[i] !== LOCK[i]) throw new Error('คอลัมน์ที่ '+(i+1)+' เลื่อน: ควรเป็น "'+LOCK[i]+'" แต่เป็น "'+h[i]+'"');
   if(h.indexOf('E. No.') <= LOCK.length-1) throw new Error('E. No. ต้องต่อท้าย ไม่ใช่แทรกกลาง');
   return 'คอลัมน์เดิม '+LOCK.length+' ช่องอยู่ที่เดิม · E. No. ต่อท้ายที่ช่อง '+(h.indexOf('E. No.')+1); });
+
+
+/* ═══ ⑰ แถวเปล่า · รูปกำพร้า · เช็คสดว่าส่งต่อได้ยัง (v1.6.0) ═════════════
+   เบียร์ 8 ก.ย. 2569 — 4 อาการที่เจอตอนใช้จริง                              */
+console.log('\n⑰ แถวเปล่า · รูปกำพร้า · ปุ่มส่งต่อ');
+
+function mkDraft(){
+  const dft='DRAFT-B'+Math.floor(Math.random()*99999);
+  call('savePhoto',[dft,'JT-69/0001','r1',px,'a.jpg',QC]);
+  return call('createClaimWithPhotos',[{claimType:'pre',area:'dom',jobNo:'JT-69/0001',
+    jobName:'ทดสอบแถวเปล่า',dept:'QC',
+    items:[{code:'X1',name:'ของจริง',th:'พังจริง',qty:'1',unit:'PCS',_rid:'r1'}]}, dft,{r1:1},QC]).docNo;
+}
+
+T('แถวที่มีแต่รูป ไม่มีชื่อสินค้า ต้องส่งอนุมัติไม่ได้', ()=>{
+  const n=mkDraft();
+  call('addClaimItem',[n,QC]);                       // กด "+ เพิ่มแถว" ได้แถวเปล่า
+  call('savePhoto',[n,'JT-69/0001','2',px,'b.jpg',QC]);   // แนบรูปให้แถวเปล่า
+  const g=call('claimGate',[n,QC]);
+  if(g.ok) throw new Error('ระบบยอมให้ส่ง ทั้งที่รายการที่ 2 มีแต่รูป');
+  if(!/ชื่อสินค้า|รายละเอียด/.test(g.missing.join(' ')))
+    throw new Error('บอกเหตุผลไม่ตรง: '+g.missing.join(' · '));
+  return g.missing.join(' · '); });
+
+T('แถวเปล่าถูกเก็บกวาดตอนส่งต่อ + รูปกำพร้าหายตามไป ไม่ไปโผล่ที่สโตร์', ()=>{
+  const n=mkDraft();
+  call('addClaimItem',[n,QC]);
+  call('savePhoto',[n,'JT-69/0001','2',px,'b.jpg',QC]);   // รูปของแถวเปล่า
+  call('advanceClaim',[n,QC]);                            // → ต้องเก็บกวาดก่อนส่ง
+  const c=call('getClaim',[n,QC]);
+  if(c.items.length !== 1) throw new Error('แถวเปล่ายังอยู่ '+c.items.length+' รายการ');
+  const ph=call('listPhotos',[n,QC]);
+  if(ph['2'] && ph['2'].length) throw new Error('รูปกำพร้าของแถวเปล่ายังอยู่ที่ข้อ 2');
+  if(!ph['1'] || !ph['1'].length) throw new Error('รูปของรายการจริงหายไปด้วย');
+  return 'เหลือ 1 รายการ · รูปข้อ 1 อยู่ครบ · รูปกำพร้าข้อ 2 ถูกลบ'; });
+
+T('ลบแถวเปล่าแล้ว เลขข้อเรียงใหม่ และรูปย้ายตามเลขใหม่ ไม่โผล่ผิดข้อ', ()=>{
+  const dft='DRAFT-C'+Math.floor(Math.random()*99999);
+  call('savePhoto',[dft,'JT-69/0001','r2',px,'c.jpg',QC]);
+  const n=call('createClaimWithPhotos',[{claimType:'pre',area:'dom',jobNo:'JT-69/0001',
+    jobName:'ทดสอบเรียงเลข',dept:'QC',
+    items:[{code:'Y1',name:'ของ A',th:'พัง A',qty:'1',unit:'PCS',_rid:'r1'},
+           {code:'Y2',name:'ของ B',th:'พัง B',qty:'1',unit:'PCS',_rid:'r2'}]}, dft,{r1:0,r2:2},QC]).docNo;
+  call('savePhoto',[n,'JT-69/0001','1',px,'d.jpg',QC]);
+  /* ทำให้ข้อ 1 กลายเป็นแถวเปล่า (เหมือนคนลบข้อความทิ้ง) */
+  ['code','name','th','en','unit'].forEach(f=>call('saveItemField',[n,1,f,'',QC]));
+  call('saveItemField',[n,1,'qty','',QC]);
+  call('cleanClaimItems',[n,QC]);
+  const c=call('getClaim',[n,QC]);
+  if(c.items.length !== 1) throw new Error('ควรเหลือ 1 รายการ ได้ '+c.items.length);
+  if(norm2(c.items[0].name) !== 'ของ B') throw new Error('รายการที่เหลือผิดตัว: '+c.items[0].name);
+  if(String(c.items[0].seq) !== '1') throw new Error('ไม่ได้เรียงเลขใหม่ ได้ข้อ '+c.items[0].seq);
+  const ph=call('listPhotos',[n,QC]);
+  if(!ph['1'] || !ph['1'].length) throw new Error('รูปของ "ของ B" ไม่ได้ย้ายมาข้อ 1');
+  return 'เหลือ "ของ B" เป็นข้อ 1 · รูปย้ายตามมาถูกข้อ'; });
+function norm2(v){ return String(v==null?'':v).trim(); }
+
+T('claimGate — กรอกครบแล้วต้องตอบว่าส่งได้ทันที ไม่ต้องเปิดหน้าใหม่', ()=>{
+  const n=mkDraft();
+  let g=call('claimGate',[n,QC]);
+  if(!g.ok) throw new Error('ใบที่กรอกครบแล้วยังบอกว่าส่งไม่ได้: '+g.missing.join(' · '));
+  call('advanceClaim',[n,QC]); call('advanceClaim',[n,BOSS]);        // → STORE
+  g=call('claimGate',[n,STORE]);
+  if(g.ok) throw new Error('ขั้นสโตร์ยังไม่กรอกอะไร แต่บอกว่าส่งได้');
+  call('receiveClaim',[n,STORE]);
+  call('saveClaimField',[n,'deliveryNote','DN-G',STORE]);
+  call('saveItemField',[n,1,'po','PO-G',STORE]);
+  call('saveItemField',[n,1,'supplier','เจ้า G',STORE]);
+  g=call('claimGate',[n,STORE]);
+  if(!g.ok) throw new Error('กรอกครบแล้วยังบอกว่าส่งไม่ได้: '+g.missing.join(' · '));
+  return 'กรอกครบ → ok:true ทันที ไม่ต้องรีเฟรช'; });
+
+
+T('เลือกรูปที่จะขึ้น PDF ได้ตั้งแต่ตอนแนบรูปครั้งแรก แล้วต้องไม่หายตอนบันทึกใบ', ()=>{
+  /* เบียร์ 8 ก.ย. 2569: "ในขั้นตอนแรก ที่ฝ่ายที่ใส่รูป เค้าใส่รูปมา ให้เค้าเลือกเลย
+     เอารูปไหนขึ้น PDF บ้าง สมมติใส่มา 5 รูป ให้เลือก 3 ใน 5 รูป มาเลยตั้งแต่ต้น" */
+  const dft='DRAFT-P'+Math.floor(Math.random()*99999);
+  for(let i=1;i<=5;i++) call('savePhoto',[dft,'JT-69/0001','r1',px,'p'+i+'.jpg',QC]);
+  let ph=call('listPhotos',[dft,QC])['r1'];
+  if(ph.length!==5) throw new Error('แนบ 5 รูปแล้วเห็น '+ph.length);
+  /* ปิด 2 รูป ไม่ให้ขึ้นเอกสาร (เหลือ 3 ใน 5 ตามที่เบียร์ยกตัวอย่าง) */
+  call('setPhotoInDoc',[dft,ph[0].id,0,QC]);
+  call('setPhotoInDoc',[dft,ph[1].id,0,QC]);
+  const n=call('createClaimWithPhotos',[{claimType:'pre',area:'dom',jobNo:'JT-69/0001',
+    jobName:'ทดสอบเลือกรูป',dept:'QC',
+    items:[{code:'Z1',name:'ของ',th:'พัง',qty:'1',unit:'PCS',_rid:'r1'}]}, dft,{r1:1},QC]).docNo;
+  const after=call('listPhotos',[n,QC])['1'];
+  if(!after || after.length!==5) throw new Error('รูปย้ายมาไม่ครบ ได้ '+(after?after.length:0));
+  const onDoc=after.filter(x=>x.doc!==false).length;
+  if(onDoc!==3) throw new Error('เลือกไว้ 3 รูป แต่หลังบันทึกขึ้นเอกสาร '+onDoc+' รูป');
+  return 'แนบ 5 · เลือกขึ้นเอกสาร 3 · บันทึกใบแล้วยังเป็น 3 เหมือนเดิม'; });
+
+T('เอกสารที่ปริ้น ต้องไม่มีบรรทัดวิดีโอ/ลิงก์ Google Drive แล้ว', ()=>{
+  const fs2=require('fs'), pth=require('path');
+  const src=fs2.readFileSync(pth.join(__dirname,'..','deploy','js-print.html'),'utf8');
+  if(src.indexOf('🎬')>=0) throw new Error('ยังมี 🎬 วิดีโอ ในหน้าปริ้น');
+  if(/ดูใน Google Drive/.test(src)) throw new Error('ยังมีลิงก์ Google Drive ในหน้าปริ้น');
+  return 'ไม่มีทั้ง 🎬 และลิงก์ Drive แล้ว'; });
 
 console.log('\n──────────────────────────────');
 console.log('ผ่าน '+pass+' · ไม่ผ่าน '+fail);

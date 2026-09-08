@@ -39,6 +39,9 @@ class Sheet {
   insertColumnsAfter(a,n){ this._maxCols+=n; return this; }
   setFrozenRows(){ return this; } setColumnWidth(){ return this; } autoResizeColumn(){ return this; }
   getRange(r,c,nr,nc){
+    /* นับไว้วัดความเร็ว — ใน Apps Script ของจริง แต่ละครั้งคือวิ่งข้ามเน็ตไปหา Google Sheets
+       จำนวนครั้งนี่แหละคือตัวชี้ว่าช้าเพราะอะไร (ดู _tests/perf.js) */
+    STATS.getRange++; STATS.cells += (nr||1)*(nc||1);
     if (typeof r==='string'){ throw new Error('A1 notation ไม่ได้จำลองไว้: '+r); }
     return new Range(this, r, c, nr===undefined?1:nr, nc===undefined?1:nc);
   }
@@ -151,7 +154,7 @@ const ContentService = {
   createTextOutput:t=>({ setMimeType(){ return this; }, getContent:()=>t }),
   MimeType:{JSON:'json'}
 };
-const STATS = { openById:0, cachePut:0, driveFiles:0 };
+const STATS = { openById:0, cachePut:0, driveFiles:0, getRange:0, cells:0 };
 
 module.exports = { SpreadsheetApp, CacheService, PropertiesService, DriveApp, Utilities, Session,
                    LockService, LanguageApp, UrlFetchApp, MailApp, HtmlService, ContentService,

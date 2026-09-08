@@ -310,10 +310,7 @@ function blkItemDetails(items, h){
       }
       t += '</div>';
 
-      if (c === chunks - 1){
-        t += '<div class="vd">🎬 วิดีโอและไฟล์เพิ่มเติมของข้อนี้ · 📁 ดูใน Google Drive → ' +
-             '<b>รูป-วิดีโอ / ' + esc(jobNo || 'ไม่ระบุจ๊อบ') + ' / ' + esc(docNo) + '</b></div>';
-      }
+      /* บรรทัดลิงก์ Drive ถูกเอาออก 8 ก.ย. 2569 ตามที่เบียร์สั่ง — เอกสารที่ส่งออกไม่ต้องมี */
       t += '</div>';
       out.push(t);
     }
@@ -471,10 +468,7 @@ function blkPhotos(items){
       t += '</div>';
       /* บรรทัดวิดีโอ/โฟลเดอร์ ตาม Mockup — ไฟล์ใหญ่อัปไว้ใน Drive ไม่ได้อยู่บนกระดาษ
          พิมพ์ "ทางไป" ไว้ให้ ใครถือกระดาษอยู่ก็ตามไปดูของจริงได้ */
-      if (c + perChunk >= ph.length){
-        t += '<div class="vd">🎬 วิดีโอและไฟล์เพิ่มเติมของข้อนี้ · ' +
-             '📁 ดูใน Google Drive → <b>รูป-วิดีโอ / ' + esc(jobNo || 'ไม่ระบุจ๊อบ') + ' / ' + esc(docNo) + '</b></div>';
-      }
+      /* บรรทัดลิงก์ Drive ถูกเอาออก 8 ก.ย. 2569 ตามที่เบียร์สั่ง */
       t += '</div>';
       out.push(t);
     }
@@ -732,8 +726,7 @@ function blkInsPhotos(items, h){
        : '<b>— ยังไม่ตรวจ —</b>') +
         ' &nbsp;·&nbsp; ' + (it.found ? esc(it.found) : '<span style="color:#999">(ยังไม่ได้เขียนคำอธิบาย)</span>') +
         (it.foundEn ? '<span class="den">' + esc(it.foundEn) + '</span>' : '') + '</div>';
-    var vdline = '<div class="vd">🎬 วิดีโอและไฟล์เพิ่มเติมของข้อนี้ · 📁 ดูใน Google Drive → ' +
-        '<b>รูป-วิดีโอ / ' + esc(jobNo || 'ไม่ระบุจ๊อบ') + ' / ' + esc(docNo) + '</b></div>';
+    var vdline = '';   /* เอาบรรทัดลิงก์ Drive ออกแล้ว 8 ก.ย. 2569 (เบียร์สั่ง) */
 
     var extra = [];                     // รูปที่เหลือ หลังใช้รูปแรกไปเทียบกับ STD แล้ว
 

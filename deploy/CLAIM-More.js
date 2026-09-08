@@ -1292,3 +1292,110 @@ function dashDocs(auth){
 
   return { rows:rows, stages:stages, at:nowStamp_() };
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * เก็บกวาดแถวเปล่า + เช็คสด ๆ ว่าส่งต่อได้หรือยัง  (v1.6.0 · เบียร์ 8 ก.ย. 2569)
+ *
+ * ที่มาของบั๊ก (เจอจากที่เบียร์เล่า แล้วไล่โค้ดจนถึงต้นตอ)
+ *   กด "+ เพิ่มแถว" → addClaimItem() เขียน "แถวว่างเปล่า" ลงชีตทันที
+ *   ถ้าคนกรอกไม่ได้ใส่ข้อมูลต่อ (แต่เผลอแนบรูปไว้) แถวเปล่านั้นจะอยู่ในชีตตลอดไป
+ *   → สโตร์เปิดใบมาเจอ "รายการที่ 2 ยังไม่มี PO · ยังไม่มี Supplier" ทั้งที่ไม่มีข้อมูลอะไรเลย
+ *   → รูปของแถวเปล่าก็โผล่ตามไปด้วย  → และสโตร์ลบแถวเองไม่ได้ = ตัน
+ *
+ * วิธีแก้ ทำ 2 ชั้น
+ *   ① กันไม่ให้หลุด — claimMissing_ ขั้นร่าง บังคับว่าทุกแถวต้องมีชื่อสินค้า + รายละเอียด
+ *   ② เก็บกวาดให้เอง — ก่อนส่งต่อทุกครั้ง ลบแถวที่ "ไม่มีข้อมูลอะไรเลย" ทิ้ง พร้อมรูปกำพร้า
+ *      แล้วเรียงเลขรายการใหม่ให้ต่อเนื่อง (รูปย้ายตามเลขใหม่ด้วย ไม่ให้รูปไปโผล่ผิดข้อ)
+ * ═════════════════════════════════════════════════════════════════════════ */
+
+/** แถวนี้ "เปล่าจริง ๆ" ไหม — ไม่มีรหัส ไม่มีชื่อ ไม่มีรายละเอียด ไม่มีจำนวน */
+function itemBlank_(v){
+  return !norm_(v[2]) && !norm_(v[3]) && !norm_(v[4]) && !norm_(v[5]) && !norm_(v[6]);
+}
+
+/** ลบแถวเปล่าของใบนี้ + รูปที่ค้างอยู่กับแถวเปล่า แล้วเรียงเลขรายการใหม่
+ *  คืน { removed:[เลขข้อที่ลบ], renum:{เลขเดิม:เลขใหม่} } */
+function cleanBlankItems_(d, docNo){
+  docNo = norm_(docNo);
+  var lr = d.items.getLastRow();
+  if (lr < 2) return { removed:[], renum:{} };
+  var v = d.items.getRange(2, 1, lr - 1, HDR_ITEM.length).getDisplayValues();
+
+  var keep = [], removed = [];
+  for (var i = 0; i < v.length; i++){
+    if (norm_(v[i][0]) !== docNo) continue;
+    if (itemBlank_(v[i])) removed.push(norm_(v[i][1]));
+    else keep.push(v[i]);
+  }
+  if (!removed.length) return { removed:[], renum:{} };
+
+  /* เลขข้อเดิม → เลขข้อใหม่ (หลังลบแถวเปล่าออก) */
+  var renum = {}, changed = false;
+  for (var k = 0; k < keep.length; k++){
+    var oldSeq = norm_(keep[k][1]), newSeq = String(k + 1);
+    renum[oldSeq] = newSeq;
+    if (oldSeq !== newSeq) changed = true;
+  }
+
+  /* เขียนรายการที่เหลือกลับลงไปใหม่ทั้งชุด (ใบเดียวรายการไม่เยอะ ปลอดภัยกว่าไล่ลบทีละแถว) */
+  for (var r = v.length - 1; r >= 0; r--) if (norm_(v[r][0]) === docNo) d.items.deleteRow(r + 2);
+  if (keep.length){
+    var out = [];
+    for (var q = 0; q < keep.length; q++){
+      var row = keep[q].slice(0, HDR_ITEM.length);
+      row[1] = String(q + 1);
+      out.push(row);
+    }
+    d.items.getRange(d.items.getLastRow() + 1, 1, out.length, HDR_ITEM.length).setValues(out);
+  }
+
+  /* จัดการรูป — รูปของแถวที่ถูกลบ ต้องหายไปด้วย ไม่งั้นไปโผล่ผิดข้อที่สโตร์
+     รูปของแถวที่ยังอยู่ ต้องย้ายเลขข้อตามการเรียงใหม่ */
+  var pt = photoTabOf_(docNo), lp = pt.getLastRow();
+  if (lp > 1){
+    var vp = pt.getRange(2, 1, lp - 1, HDR_PHOTO.length).getDisplayValues();
+    for (var m = vp.length - 1; m >= 0; m--){
+      if (norm_(vp[m][0]) !== docNo) continue;
+      var sq = norm_(vp[m][1]);
+      if (sq.charAt(0) === 'S') continue;            // รูป STD ของใบตรวจ ไม่เกี่ยว
+      if (removed.indexOf(sq) >= 0){ pt.deleteRow(m + 2); continue; }
+      if (changed && renum[sq] && renum[sq] !== sq) pt.getRange(m + 2, 2).setValue(renum[sq]);
+    }
+  }
+  log_('cleanBlankItems', docNo, 'ลบแถวเปล่า ' + removed.length + ' แถว (ข้อ ' + removed.join(', ') + ')');
+  return { removed:removed, renum:renum };
+}
+
+/** หน้าเว็บเรียกได้เอง — ใช้ตอนกด "บันทึก" หรือก่อนส่งต่อ */
+function cleanClaimItems(docNo, auth){
+  requireAny_(auth, ['PRODUCTION','SALES','QC','DESIGN','STORE','PURCHASE','APPROVER']);
+  var d = dbOf_(docNo);
+  var res = cleanBlankItems_(d, norm_(docNo));
+  return { ok:true, removed:res.removed };
+}
+
+/** เช็คสด ๆ ว่า "ตอนนี้ส่งต่อได้หรือยัง" — หน้าเว็บเรียกทุกครั้งที่บันทึกอะไรเสร็จ
+ *  เบียร์ 8 ก.ย. 2569: "ข้อมูลมันใส่ครบแล้วมันก็กดส่งหาจัดซื้อไม่ได้ พอกดรีเฟรช ดันเป็นปุ่มสีแดงสดให้กดได้"
+ *  → ของเดิมคำนวณ "ขาดอะไรบ้าง" ตอนเปิดหน้าครั้งเดียว แก้ข้อมูลแล้วไม่คิดใหม่
+ *  ตัวนี้เบา ๆ ตอบเฉพาะสิ่งที่ปุ่มต้องใช้ ไม่ต้องโหลดทั้งใบใหม่ (เร็วกว่ามาก) */
+function claimGate(docNo, auth){
+  var me = requireLogin_(auth);
+  docNo = norm_(docNo);
+  var d = dbOf_(docNo), r = findClaimRow_(d.claims, docNo);
+  if (r < 0) throw new Error('ไม่พบใบเคลม ' + docNo);
+  var C = rowCache_(d, r);                      // แตะชีตครั้งเดียว ได้ทั้งแถว
+  var key = norm_(C['ขั้นตอน']) || 'REQUEST';
+  var received = stageDef_(key).needReceive ? !!norm_(C['รับเรื่องเมื่อ']) : true;
+  var miss = claimMissing_(d, docNo, key, C);
+  return { ok:!miss.length, missing:miss, stage:key,
+           canPrint: canPrintOut_(key, me, received), received:received,
+           printWhy: canPrintOut_(key, me, received) ? '' : printBlockWhy_(key, me, received) };
+}
+
+/** เช็คสด ๆ ของใบตรวจรับ — หลักการเดียวกัน */
+function inspGate(docNo, auth){
+  requireLogin_(auth);
+  var c = inspCheck(docNo, auth);
+  return { ok:!!c.ok, msg:c.msg || '' };
+}

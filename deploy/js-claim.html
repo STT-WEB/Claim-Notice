@@ -307,6 +307,33 @@ function missingFields(){
 }
 /** ใบที่บันทึกแล้ว: เปลี่ยนในประเทศ↔ต่างประเทศ ต้องให้คอลัมน์แปลอังกฤษเข้า/ออกตามด้วย
  *  เบียร์: "เปลี่ยนเป็นต่างประเทศ มันไม่มีช่องแปลภาษามาให้ ข้อมูลมันไม่ล้อกัน" */
+/* กด "บันทึกไว้ก่อน" — รีดทุกช่องที่ยังค้างอยู่ลงชีต แล้วเช็คว่าครบหรือยัง
+   ทำงานได้ทุกขั้น รวมทั้งตอนใบถูกตีกลับมาแก้ (เบียร์เจอว่าตอนตีกลับก็บันทึกไม่ได้) */
+function saveDraftNow(){
+  var b = $('saveNowBtn');
+  if (b){ b.disabled = true; b.textContent = '💾 กำลังบันทึก…'; }
+  /* ① รีดช่องที่กำลังพิมพ์ค้างอยู่ (blur = ยิงบันทึกทันที) */
+  var el = document.activeElement;
+  if (el && el.blur) el.blur();
+  /* ② ดันค่าจากตารางลงชีตให้ครบ ไม่ต้องรอ debounce */
+  if (typeof GEDIT !== 'undefined' && GEDIT) syncGrid(GEDIT.id);
+  setTimeout(function(){
+    /* ③ เก็บกวาดแถวเปล่าที่กด "เพิ่มแถว" ไว้แล้วไม่ได้กรอก */
+    srv('cleanClaimItems', [CURDOC, AUTH], function(r){
+      if (b){ b.disabled = false; b.textContent = '💾 บันทึกไว้ก่อน'; }
+      var bar = $('savebar');
+      if (bar){ bar.className = 'savebar ok';
+                bar.textContent = '✓ บันทึกแล้ว' +
+                  (r && r.removed && r.removed.length ? ' · เก็บแถวเปล่าออก ' + r.removed.length + ' แถว' : ''); }
+      if (r && r.removed && r.removed.length) return go('claim', CURDOC);   // เลขข้อเปลี่ยน ต้องวาดใหม่
+      refreshGate(true);
+    }, function(m){
+      if (b){ b.disabled = false; b.textContent = '💾 บันทึกไว้ก่อน'; }
+      var bar = $('savebar'); if (bar){ bar.className = 'savebar bad'; bar.textContent = '⚠️ ' + m; }
+    });
+  }, 700);
+}
+
 function areaChangedSaved(){
   /* กติกาเดียวกับหน้าเปิดใบใหม่ — ในประเทศ = ไม่มี CHASSIS ผู้ผลิต · ไม่มี E. No. · ไม่มีชนิดงาน ตปท. */
   var el = $('c_area'), isFor = el ? (el.value === 'for') : false;
@@ -579,6 +606,11 @@ function drawClaim(){
       claimTypeShort(h['ประเภทการเคลม']) + ' · ' +
       (h['สถานที่ผลิต'] === 'for' ? 'ต่างประเทศ' : 'ในประเทศ') + '</span>' +
     '<span class="savebar ok" id="savebar">✓ บันทึกอัตโนมัติ</span>' +
+    /* เบียร์ 8 ก.ย. 2569: "พอบันทึกร่าง ถ้ายังทำไม่เสร็จ แล้วไปใส่ข้อมูล มันเซฟไว้ก่อนไม่ได้หรอ
+       ต้องให้มันบันทึกร่างไปได้เรื่อย ๆ จนกว่าจะเสร็จ ค่อยกดส่งอนุมัติ"
+       ระบบบันทึกให้อัตโนมัติอยู่แล้ว แต่ไม่มีปุ่มให้กด คนเลยไม่มั่นใจว่าเซฟหรือยัง
+       → ใส่ปุ่มไว้ให้กดยืนยันได้ตลอด (กดแล้วรีดช่องที่ค้างอยู่ลงชีตทันที + เก็บกวาดแถวเปล่า) */
+    '<button class="btn" id="saveNowBtn" onclick="saveDraftNow()">💾 บันทึกไว้ก่อน</button>' +
     '<button class="btn" onclick="go(\'list\')">← ทะเบียน</button></div>';
   t += flowBar(FLOW);
 

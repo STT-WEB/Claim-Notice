@@ -11,7 +11,7 @@
    วิธีแก้: ฝังเลขเวอร์ชันไว้ในไฟล์หน้าเว็บเองด้วย (CLIENT_VER ข้างล่างนี้)
    ถ้า 2 ค่าไม่ตรงกัน = จอที่เห็นเป็นของเก่าแน่นอน ระบบจะขึ้นแถบแดงบอกให้กด Ctrl+Shift+R
    ⚠️ แก้ไฟล์หน้าเว็บทุกครั้ง ต้องเลื่อน CLIENT_VER ให้ตรงกับ VERSION ใน CLAIM-Hub.js */
-var CLIENT_VER = 'v1.5.0';
+var CLIENT_VER = 'v1.6.0';
 
 var AUTH = null;        // {emp, pin} — อยู่ในหน่วยความจำหน้าเว็บเท่านั้น ไม่เก็บลงเครื่อง
 var ME   = null;
@@ -54,6 +54,10 @@ function hasRole(r){
 var SAVET = {};      // ตัวจับเวลาแยกตามช่อง — พิมพ์รัว ๆ ส่งครั้งเดียว
 var SAVING = 0;
 
+/* บันทึกสำเร็จเมื่อไหร่ → ถามเซิร์ฟเวอร์ว่า "ตอนนี้ส่งต่อได้หรือยัง"
+   หน้าที่ไม่มี refreshGate (เช่นหน้าทะเบียน) ก็แค่ไม่ทำอะไร */
+function gateTouch(){ if (typeof refreshGate === 'function') refreshGate(); }
+
 function fieldMark(el, state, msg){
   if (!el) return;
   el.classList.remove('sv-wait','sv-ok','sv-bad');
@@ -66,7 +70,7 @@ function fieldMark(el, state, msg){
     else {
       SAVING = Math.max(0, SAVING - 1);
       if (state === 'bad'){ b.className = 'savebar bad'; b.textContent = '⚠️ ' + (msg || 'บันทึกไม่สำเร็จ'); }
-      else if (!SAVING){ b.className = 'savebar ok'; b.textContent = '✓ บันทึกแล้วทุกช่อง'; }
+      else if (!SAVING){ b.className = 'savebar ok'; b.textContent = '✓ บันทึกแล้วทุกช่อง'; gateTouch(); }
     }
   }
 }
