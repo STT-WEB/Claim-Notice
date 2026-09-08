@@ -806,3 +806,87 @@ table.grid tr.reson>td{background:#fff8e6}
 .pulsebar .btn{padding:5px 11px;font-size:12.5px}
 @media(max-width:640px){ .pulsebar{left:12px;right:12px;bottom:12px;flex-wrap:wrap} }
 </style>
+<style>
+/* ═══ Dashboard สถานะเอกสาร (v1.3.0) ═══════════════════════════════ */
+.dashbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 4px}
+.dsearch{flex:1;min-width:260px;border:1px solid var(--line);border-radius:9px;
+  padding:9px 13px;font-family:inherit;font-size:13.5px;background:#fff}
+.dsearch:focus{outline:none;border-color:var(--red)}
+
+/* การ์ดนับตามขั้นตอน — กดเพื่อกรอง เลือกได้หลายขั้น */
+.dcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:8px;margin:14px 0 6px}
+.dcard{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:10px;
+  padding:8px 11px;background:#fff;cursor:pointer;transition:.12s}
+.dcard:hover{border-color:var(--red);transform:translateY(-1px)}
+.dcard.on{border-color:var(--red);background:#fff4f3;box-shadow:0 0 0 1px var(--red) inset}
+.dcno{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:12.5px;color:#fff;background:#8a93a0;flex:none}
+.dcard.clm .dcno{background:#c0392b}
+.dcard.ins .dcno{background:#12806a}
+.dcbody{flex:1;min-width:0}
+.dckind{font-size:10.5px;color:#98a0ab;font-weight:700;letter-spacing:.02em}
+.dcname{font-size:12.6px;font-weight:600;line-height:1.32;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dcn{font-size:17px;font-weight:800;color:#22262b;flex:none;min-width:26px;text-align:right}
+.dcn.zero{color:#c9ced6;font-weight:600}
+
+/* แถบบอกว่ากรองอะไรอยู่ */
+.dchips{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:10px 0 2px}
+.dclbl{font-size:12px;color:var(--muted);font-weight:700}
+.dchip{display:inline-flex;align-items:center;gap:6px;background:#fff4f3;border:1px solid #e6b3ae;
+  color:#8f130c;border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600}
+.dchip b{cursor:pointer;font-weight:800;opacity:.7}
+.dchip b:hover{opacity:1}
+
+/* ตาราง — หัวตารางตรึงบน คอลัมน์แรกตรึงซ้าย เลื่อนดูข้อมูลเยอะ ๆ ยังรู้ว่าใบไหน */
+.dwrap{margin-top:12px;overflow:auto;max-height:70vh;border:1px solid #e2e5ea;border-radius:8px}
+table.t.dash{border-collapse:separate;border-spacing:0}
+table.t.dash th{position:sticky;top:0;z-index:3;background:#f4f5f7;white-space:nowrap}
+table.t.dash th.dpin{z-index:5}
+table.t.dash td.dpin{position:sticky;z-index:2;background:#fff}
+table.t.dash tbody tr:hover td{background:#fff7f6}
+table.t.dash tbody tr:hover td.dpin{background:#fff7f6}
+table.t.dash th.fon{background:#ffeceb;color:#8f130c}
+.dth{display:flex;align-items:center;gap:4px}
+.dtt{flex:1;cursor:pointer;user-select:none}
+.dtt:hover{color:var(--red)}
+.dfb{cursor:pointer;font-size:11px;color:#8a93a0;padding:0 3px;border-radius:4px;line-height:1.4}
+.dfb:hover{background:#e6e9ee;color:var(--red)}
+th.fon .dfb{color:#8f130c}
+.drj{font-size:11px;color:#8f130c;margin-top:2px;line-height:1.4}
+
+/* ป้ายสถานะใบ */
+.dst{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;border:1px solid}
+.dst.open{background:#eef5fd;border-color:#a9c7e6;color:#144a80}
+.dst.done{background:#eefaf1;border-color:#a9dcb8;color:#14612e}
+.dst.cancel{background:#f2f3f5;border-color:#d3d7dd;color:#767c86}
+.dst.warn{background:#fff6e6;border-color:#e8cb95;color:#8a5b06}
+
+/* กล่องตัวกรองของแต่ละคอลัมน์ — ติ๊กได้หลายค่า */
+.dfil{display:none;position:absolute;z-index:60;width:268px;background:#fff;
+  border:1px solid #cfd4dc;border-radius:10px;box-shadow:0 14px 34px rgba(16,20,26,.20);padding:10px}
+.dfhd{font-size:12px;font-weight:800;color:#333;margin-bottom:7px}
+.dfq{width:100%;border:1px solid var(--line);border-radius:7px;padding:6px 9px;
+  font-family:inherit;font-size:12.5px;box-sizing:border-box}
+.dfq:focus{outline:none;border-color:var(--red)}
+.dfact{display:flex;gap:12px;margin:7px 1px 5px}
+.dfact a{font-size:11.5px;color:var(--red);cursor:pointer;font-weight:600}
+.dfact a:hover{text-decoration:underline}
+.dflist{max-height:246px;overflow-y:auto;border-top:1px solid #eef0f3;padding-top:5px}
+.dfi{display:flex;align-items:center;gap:7px;padding:4px 3px;border-radius:6px;cursor:pointer;font-size:12.5px}
+.dfi:hover{background:#f6f7f9}
+.dfi input{width:14px;height:14px;flex:none;accent-color:#c0392b}
+.dfv{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dfn{font-size:11px;color:#98a0ab;font-weight:700;flex:none}
+.dfbtn{display:flex;gap:7px;margin-top:9px}
+.dfbtn .btn{flex:1;padding:7px 10px;font-size:12.5px}
+
+@media(max-width:820px){
+  .dcards{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+  .dwrap{max-height:64vh}
+}
+</style>
+<style>
+/* เส้นแบ่งให้รู้ว่าคอลัมน์ซ้ายมือถูกตรึงไว้ ตอนเลื่อนตารางไปทางขวา */
+table.t.dash th.dpend,table.t.dash td.dpend{box-shadow:3px 0 6px -3px rgba(16,20,26,.22)}
+</style>

@@ -941,6 +941,82 @@ T('ผู้ดูแลตั้ง PIN ให้คนอื่นได้จ
   if(!list.length) throw new Error('รายชื่อผู้ใช้ว่าง');
   return 'ผู้บริหารตั้งให้ได้ · คนอื่นกันไว้ · รายชื่อ '+list.length+' คน'; });
 
+
+/* ═══ ⑮ Dashboard สถานะเอกสาร (v1.3.0) ═══════════════════════════════
+   เบียร์ 7 ก.ย.: "สร้าง Dashboard สถานะเอกสารของเอกสารฉบับที่เปิดอยู่ทั้งหมด
+                   และทำให้หัวข้อ Filter ได้ทุกคอลัมน์ และเลือกได้มากกว่า 1"
+   ฝั่งเซิร์ฟเวอร์ต้องส่งข้อมูลครบพอให้หน้าเว็บกรองได้ทุกคอลัมน์ */
+console.log('\n⑮ Dashboard สถานะเอกสาร');
+
+T('รวมทั้งใบเคลมและใบตรวจรับไว้ในตารางเดียว', ()=>{
+  const d = call('dashDocs',[AUTH]);
+  if(!d || !d.rows || !d.rows.length) throw new Error('ไม่มีข้อมูลกลับมาเลย');
+  const kinds = Array.from(new Set(d.rows.map(r=>r.kind)));
+  if(kinds.indexOf('ใบเคลม')<0)     throw new Error('ไม่มีใบเคลมในตาราง');
+  if(kinds.indexOf('ใบตรวจรับ')<0) throw new Error('ไม่มีใบตรวจรับในตาราง');
+  return d.rows.length+' ฉบับ · '+kinds.join(' + '); });
+
+T('ทุกคอลัมน์ที่หน้าเว็บใช้กรอง ต้องมีค่าส่งมาครบทุกแถว', ()=>{
+  const need = ['kind','docNo','date','stageNo','stageName','waitWho','state','jobNo','jobName',
+                'model','area','docType','supplier','by','dept','nItem','nPhoto','photoOk','updated','age'];
+  const d = call('dashDocs',[AUTH]);
+  const miss = {};
+  d.rows.forEach(r=>need.forEach(k=>{ if(!(k in r)) miss[k]=(miss[k]||0)+1; }));
+  if(Object.keys(miss).length) throw new Error('ช่องที่ขาด: '+JSON.stringify(miss));
+  return 'ครบ '+need.length+' คอลัมน์ · '+d.rows.length+' แถว'; });
+
+T('สถานะใบต้องแยก เปิดอยู่ / ตีกลับ / ปิดแล้ว / ยกเลิก ให้กรองได้', ()=>{
+  const ok = ['เปิดอยู่','ตีกลับ · รอแก้','ปิดแล้ว','ยกเลิกแล้ว'];
+  const d = call('dashDocs',[AUTH]);
+  const bad = d.rows.filter(r=>ok.indexOf(r.state)<0).map(r=>r.docNo+'='+r.state);
+  if(bad.length) throw new Error('สถานะแปลกปลอม: '+bad.slice(0,3).join(', '));
+  const seen = Array.from(new Set(d.rows.map(r=>r.state)));
+  if(seen.indexOf('เปิดอยู่')<0) throw new Error('ไม่มีใบที่เปิดอยู่เลย ผิดปกติ');
+  return seen.join(' · '); });
+
+T('ใบที่ยกเลิกแล้วต้องส่งมาด้วย (ให้กรองเอง) ไม่ใช่ซ่อนทิ้ง', ()=>{
+  const all = call('dashDocs',[AUTH]).rows;
+  const reg = call('listClaims',[{},AUTH]);          // ทะเบียนปกติ = ซ่อนใบยกเลิก
+  const canc = all.filter(r=>r.state==='ยกเลิกแล้ว');
+  if(reg.some(r=>r.stage==='CANCELLED')) throw new Error('ทะเบียนปกติไม่ควรโชว์ใบยกเลิก');
+  return 'ใบยกเลิกใน Dashboard '+canc.length+' ฉบับ · ทะเบียนปกติซ่อนไว้เหมือนเดิม'; });
+
+T('การ์ดขั้นตอนต้องมีครบทุกขั้นของทั้ง 2 ชนิด และเรียงตาม flow จริง', ()=>{
+  const d = call('dashDocs',[AUTH]);
+  if(!d.stages || !d.stages.length) throw new Error('ไม่ส่งรายการขั้นตอนมา');
+  const clm = d.stages.filter(s=>s.kind==='ใบเคลม');
+  const ins = d.stages.filter(s=>s.kind==='ใบตรวจรับ');
+  if(clm.length < 10) throw new Error('ขั้นของใบเคลมไม่ครบ 10 ขั้น (ได้ '+clm.length+')');
+  if(ins.length < 3)  throw new Error('ขั้นของใบตรวจไม่ครบ 3 ขั้น (ได้ '+ins.length+')');
+  for(let i=1;i<clm.length;i++) if(clm[i].no < clm[i-1].no) throw new Error('ขั้นของใบเคลมเรียงผิด');
+  /* ชื่อขั้นบนการ์ดต้องตรงกับ stageName ในแถว ไม่งั้นกดการ์ดแล้วกรองไม่เจอ */
+  const names = d.stages.map(s=>s.name);
+  const orphan = d.rows.filter(r=>r.state!=='ยกเลิกแล้ว' && names.indexOf(r.stageName)<0);
+  if(orphan.length) throw new Error('ชื่อขั้นในแถวไม่ตรงกับการ์ด: '+orphan[0].stageName);
+  return clm.length+' ขั้น (เคลม) + '+ins.length+' ขั้น (ตรวจรับ)'; });
+
+T('เลข "ค้างมา (วัน)" ต้องเป็นตัวเลข ไม่ติดลบ และคิดจากวันที่แก้ล่าสุด', ()=>{
+  const d = call('dashDocs',[AUTH]);
+  const bad = d.rows.filter(r=>r.age !== '' && (typeof r.age !== 'number' || r.age < 0));
+  if(bad.length) throw new Error('ค่าค้างมาผิด: '+bad[0].docNo+'='+bad[0].age);
+  if(call('thDate_',['31/12/2569']) === null) throw new Error('อ่านวันที่ พ.ศ. ไม่ออก');
+  if(call('thDate_',['ไม่ใช่วันที่']) !== null) throw new Error('ข้อความมั่ว ๆ ควรได้ null ไม่ใช่วันที่มั่ว');
+  const n = d.rows.filter(r=>r.age !== '').length;
+  return 'คิดวันค้างได้ '+n+' จาก '+d.rows.length+' ฉบับ'; });
+
+T('Supplier ต้องมาจากรายการในใบ ไม่ใช่ช่องว่างทุกแถว', ()=>{
+  const d = call('dashDocs',[AUTH]);
+  const clm = d.rows.filter(r=>r.kind==='ใบเคลม');
+  const has = clm.filter(r=>r.supplier && r.supplier !== '(ยังไม่ระบุ)');
+  if(!has.length) throw new Error('ไม่มีใบเคลมใบไหนดึง Supplier ได้เลย');
+  return 'ใบเคลมที่รู้ Supplier '+has.length+'/'+clm.length+' ฉบับ'; });
+
+T('ยังไม่เข้าสู่ระบบ เปิด Dashboard ไม่ได้', ()=>{
+  let blocked=false;
+  try { call('dashDocs',[{emp:'6100030',pin:'ผิด'}]); } catch(e){ blocked=true; }
+  if(!blocked) throw new Error('PIN ผิดแต่ยังเปิด Dashboard ได้');
+  return 'กันไว้แล้ว'; });
+
 console.log('\n──────────────────────────────');
 console.log('ผ่าน '+pass+' · ไม่ผ่าน '+fail);
 console.log('เปิดไฟล์ '+G.STATS.openById+' ครั้ง · เขียนแคช '+G.STATS.cachePut+' ครั้ง · ไฟล์รูปใน Drive '+G.STATS.driveFiles);

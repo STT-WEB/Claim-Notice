@@ -8,7 +8,7 @@
  *
  *  ประวัติเวอร์ชันเต็มอยู่ที่ deploy/CHANGELOG.md
  */
-var VERSION = 'v1.2.6';
+var VERSION = 'v1.3.0';
 
 /* ─────────── ค่าคงที่ของระบบ ─────────── */
 var CFG = {
@@ -985,7 +985,10 @@ function listClaimsYear_(d, lr, full, filter, meL, pho, out){
       nPhoto:(pho.photo[o['เลขที่เอกสาร']] || 0),
       nNoPhoto:(pho.noPhoto[o['เลขที่เอกสาร']] === undefined
                   ? (pho.item[o['เลขที่เอกสาร']] || 0)
-                  : pho.noPhoto[o['เลขที่เอกสาร']])
+                  : pho.noPhoto[o['เลขที่เอกสาร']]),
+      /* เพิ่ม 7 ก.ย. 2569 — Dashboard สถานะเอกสารใช้ 3 ช่องนี้
+         (แผนกที่ขอเคลม · เวลาแก้ไขล่าสุด = เอาไปคิดว่าค้างกี่วัน · เวลาเปิดใบ) */
+      dept:o['แผนก'] || '', updatedAt:o['แก้ไขล่าสุด'] || '', createdAt:o['สร้างเมื่อ'] || ''
     });
     if (out.length >= 500) break;
   }

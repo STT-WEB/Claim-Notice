@@ -1,0 +1,339 @@
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+ * DASHBOARD สถานะเอกสาร  (เบียร์ 7 ก.ย. 2569)
+ *   "สร้าง Dashboard สถานะเอกสารของเอกสารฉบับที่เปิดอยู่ทั้งหมด
+ *    และทำให้หัวข้อ Filter ได้ทุกคอลัมน์ และเลือกได้มากกว่า 1"
+ *
+ * วิธีทำงาน (ทำไมออกแบบแบบนี้)
+ *   1. โหลดข้อมูล "ทุกใบ ทุกปี ทั้งใบเคลมและใบตรวจรับ" มาครั้งเดียว เก็บไว้ในหน้าเว็บ
+ *   2. กดตัวกรอง → กรองในหน้าเว็บเลย ไม่วิ่งกลับไปหาเซิร์ฟเวอร์ = กดแล้วเปลี่ยนทันที
+ *   3. ตัวกรองทำงานแบบ Excel: รายการค่าที่ให้เลือกในคอลัมน์หนึ่ง
+ *      คิดจากแถวที่ผ่านตัวกรองของ "คอลัมน์อื่น" แล้ว — เลือกซ้อนกันได้ไม่มั่ว
+ *   4. ตัวกรองเริ่มต้น สถานะใบ = เปิดอยู่ + ตีกลับ (ตามโจทย์ "ฉบับที่เปิดอยู่")
+ *      แต่กดเปลี่ยนเองได้ทุกเมื่อ เพราะเบียร์เลือกว่าให้ตัดสินจากตัวกรอง
+ * ═════════════════════════════════════════════════════════════════════ */
+
+var DASH = null;        /* { rows, stages, at } ที่โหลดมาจากเซิร์ฟเวอร์ */
+var DFIL = {};          /* { คีย์คอลัมน์: [ค่าที่เลือก...] }  ว่าง = ไม่กรอง */
+var DSORT = { k:'age', dir:-1 };   /* เริ่มต้น: ใบที่ค้างนานสุดอยู่บนสุด */
+var DQ = '';            /* ช่องค้นหารวม */
+var DOPEN = '';         /* คอลัมน์ที่กำลังเปิดกล่องตัวกรองอยู่ */
+
+/* คอลัมน์ทั้งหมด — ทุกคอลัมน์กรองได้หมดตามที่เบียร์ขอ
+   num:true = เรียงแบบตัวเลข · w = ความกว้าง · pin = ตรึงไว้ซ้ายมือตอนเลื่อนแนวนอน */
+var DCOL = [
+  { k:'kind',      t:'ชนิด',            w:86,  pin:1 },
+  { k:'docNo',     t:'เลขที่เอกสาร',     w:118, pin:1 },
+  { k:'date',      t:'วันที่',           w:88 },
+  { k:'stageNo',   t:'ขั้นที่',          w:56,  num:1, c:1 },
+  { k:'stageName', t:'ขั้นตอนตอนนี้',    w:186 },
+  { k:'waitWho',   t:'รอใครทำ',          w:150 },
+  { k:'state',     t:'สถานะใบ',          w:112 },
+  { k:'jobNo',     t:'เลขที่ JOB',       w:108 },
+  { k:'jobName',   t:'ชื่อลูกค้า',       w:170 },
+  { k:'model',     t:'MODEL',            w:160 },
+  { k:'area',      t:'สถานที่ผลิต',      w:96 },
+  { k:'docType',   t:'ประเภทงาน',        w:132 },
+  { k:'supplier',  t:'Supplier',         w:170 },
+  { k:'by',        t:'ผู้เปิดใบ',        w:120 },
+  { k:'dept',      t:'แผนก',             w:96 },
+  { k:'nItem',     t:'รายการ',           w:64,  num:1, c:1 },
+  { k:'nPhoto',    t:'รูป',              w:56,  num:1, c:1 },
+  { k:'photoOk',   t:'รูปครบไหม',        w:104 },
+  { k:'updated',   t:'แก้ไขล่าสุด',      w:118 },
+  { k:'age',       t:'ค้างมา (วัน)',     w:92,  num:1, c:1 }
+];
+
+function dcolOf(k){ for (var i = 0; i < DCOL.length; i++) if (DCOL[i].k === k) return DCOL[i]; return null; }
+function dval(r, k){ var v = r[k]; return (v === '' || v === null || v === undefined) ? '—' : String(v); }
+
+/* ─── โหลดข้อมูล ─── */
+function loadDash(force){
+  if (DASH && !force) return drawDash();
+  busy(true, 'กำลังรวบรวมสถานะเอกสารทุกใบ…');
+  srv('dashDocs', [AUTH], function(d){
+    DASH = d;
+    if (!Object.keys(DFIL).length) DFIL = { state:['เปิดอยู่', 'ตีกลับ · รอแก้'] };
+    drawDash();
+  }, function(m){
+    $('view').innerHTML = '<div class="card">' + repHead('Dashboard สถานะเอกสาร', '') +
+      '<div class="empty">' + esc(m) + '</div></div>';
+  });
+}
+
+/* ─── กรอง ─── */
+/* กรองทุกคอลัมน์ ยกเว้นคอลัมน์ที่ระบุใน skip
+   (ใช้ตอนคิดรายการค่าที่จะให้เลือกในคอลัมน์นั้น — เหมือน AutoFilter ของ Excel) */
+function dashPass(r, skip){
+  for (var k in DFIL){
+    if (k === skip) continue;
+    var sel = DFIL[k];
+    if (!sel || !sel.length) continue;
+    if (sel.indexOf(dval(r, k)) < 0) return false;
+  }
+  if (DQ){
+    var q = DQ.toLowerCase(), hit = false;
+    for (var i = 0; i < DCOL.length; i++){
+      if (dval(r, DCOL[i].k).toLowerCase().indexOf(q) >= 0){ hit = true; break; }
+    }
+    if (!hit) return false;
+  }
+  return true;
+}
+
+function dashRows(){
+  var out = [], all = (DASH && DASH.rows) || [];
+  for (var i = 0; i < all.length; i++) if (dashPass(all[i], null)) out.push(all[i]);
+  var c = dcolOf(DSORT.k) || {};
+  out.sort(function(a, b){
+    var x = a[DSORT.k], y = b[DSORT.k];
+    if (c.num){ x = num2(x); y = num2(y); }
+    else { x = String(x === undefined ? '' : x); y = String(y === undefined ? '' : y); }
+    if (x === y) return a.docNo < b.docNo ? 1 : -1;
+    return (x < y ? -1 : 1) * DSORT.dir;
+  });
+  return out;
+}
+function num2(v){ var n = parseFloat(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? -1 : n; }
+
+/* ค่าที่เลือกได้ในคอลัมน์หนึ่ง + จำนวนแถวของแต่ละค่า (นับหลังกรองคอลัมน์อื่นแล้ว) */
+function dashValues(k){
+  var m = {}, all = (DASH && DASH.rows) || [];
+  for (var i = 0; i < all.length; i++){
+    if (!dashPass(all[i], k)) continue;
+    var v = dval(all[i], k);
+    m[v] = (m[v] || 0) + 1;
+  }
+  var keys = Object.keys(m), c = dcolOf(k) || {};
+  keys.sort(function(a, b){
+    if (c.num) return num2(a) - num2(b);
+    return a < b ? -1 : (a > b ? 1 : 0);
+  });
+  return keys.map(function(v){ return { v:v, n:m[v] }; });
+}
+
+/* ─── วาดหน้า ─── */
+function drawDash(){
+  var rows = dashRows(), all = (DASH && DASH.rows) || [];
+  var t = '<div class="card">' + repHead('Dashboard สถานะเอกสาร',
+      'ทุกใบทุกปี ' + all.length + ' ฉบับ · ตรงเงื่อนไขที่กรองอยู่ ' + rows.length + ' ฉบับ' +
+      (DASH && DASH.at ? ' · ข้อมูล ณ ' + DASH.at : ''));
+
+  t += '<div class="dashbar">' +
+       '<input id="dq" class="dsearch" placeholder="🔍 ค้นหาทุกคอลัมน์ — เลขที่ · จ๊อบ · ลูกค้า · Supplier" ' +
+            'value="' + esc(DQ) + '" oninput="dashQ(this.value)">' +
+       '<button class="btn ghost" onclick="dashClear()">✕ ล้างตัวกรองทั้งหมด</button>' +
+       '<button class="btn ghost" onclick="dashCsv()">⬇ ออกเป็น CSV</button>' +
+       '<button class="btn ghost" onclick="loadDash(true)">🔄 โหลดใหม่</button>' +
+       '</div>';
+
+  t += dashCards();
+  t += dashChips();
+
+  if (!rows.length){
+    t += '<div class="empty">ไม่มีเอกสารที่ตรงกับตัวกรองนี้' +
+         '<br><span>กด “ล้างตัวกรองทั้งหมด” เพื่อดูใหม่ทั้งหมด</span></div></div>';
+    $('view').innerHTML = t; return;
+  }
+
+  t += '<div class="dwrap"><table class="t dash"><thead><tr>';
+  var left = 0;
+  for (var i = 0; i < DCOL.length; i++){
+    var c = DCOL[i];
+    var on = (DFIL[c.k] && DFIL[c.k].length) ? ' fon' : '';
+    var ar = DSORT.k === c.k ? (DSORT.dir > 0 ? ' ▲' : ' ▼') : '';
+    var sty = 'width:' + c.w + 'px;min-width:' + c.w + 'px';
+    var lastPin = c.pin && !(DCOL[i+1] && DCOL[i+1].pin);
+    if (c.pin){ sty += ';left:' + left + 'px'; left += c.w; }
+    t += '<th class="' + (c.pin ? 'dpin' : '') + (lastPin ? ' dpend' : '') + on + '" style="' + sty + '">' +
+         '<div class="dth">' +
+           '<span class="dtt" onclick="dashSort(\'' + c.k + '\')" title="กดเพื่อเรียง">' + esc(c.t) + ar + '</span>' +
+           '<span class="dfb" onclick="dashOpen(event,\'' + c.k + '\')" title="ตัวกรอง — เลือกได้หลายค่า">▾</span>' +
+         '</div></th>';
+  }
+  t += '</tr></thead><tbody>';
+
+  for (var r = 0; r < rows.length; r++){
+    var x = rows[r];
+    var goTo = (x.kind === 'ใบตรวจรับ' ? 'ins' : 'claim');
+    t += '<tr style="cursor:pointer" onclick="go(\'' + goTo + '\',\'' + esc(x.docNo) + '\')">';
+    var l2 = 0;
+    for (var j = 0; j < DCOL.length; j++){
+      var cc = DCOL[j], v = dval(x, cc.k), cls = [];
+      if (cc.pin){ cls.push('dpin'); if (!(DCOL[j+1] && DCOL[j+1].pin)) cls.push('dpend'); }
+      if (cc.c) cls.push('c');
+      var st = cc.pin ? ('left:' + l2 + 'px') : '';
+      if (cc.pin) l2 += cc.w;
+      var inner = esc(v);
+      if (cc.k === 'kind')    inner = '<span class="pill' + (v === 'ใบเคลม' ? ' red' : '') + '">' + esc(v) + '</span>';
+      if (cc.k === 'docNo')   inner = '<b>' + esc(v) + '</b>';
+      if (cc.k === 'state')   inner = '<span class="dst ' + dstCls(v) + '">' + esc(v) + '</span>';
+      if (cc.k === 'photoOk') inner = (v === 'รูปยังไม่ครบ')
+                                        ? '<span class="dst warn">' + esc(v) + '</span>' : esc(v);
+      if (cc.k === 'stageName' && x.rejectNote)
+        inner = esc(v) + '<div class="drj">↩︎ ' + esc(x.rejectNote) + '</div>';
+      t += '<td class="' + cls.join(' ') + '" style="' + st + '">' + inner + '</td>';
+    }
+    t += '</tr>';
+  }
+  t += '</tbody></table></div>';
+  t += '<div class="hint" style="margin-top:9px">กดที่<b>ชื่อคอลัมน์</b>เพื่อเรียง · กด <b>▾</b> ข้างชื่อคอลัมน์เพื่อกรอง (ติ๊กได้หลายค่า) · กดที่แถวเพื่อเปิดเอกสารใบนั้น</div>';
+  t += '</div>';
+  $('view').innerHTML = t;
+  if (DOPEN) dashOpen(null, DOPEN, true);
+}
+
+function dstCls(v){
+  if (v === 'เปิดอยู่') return 'open';
+  if (v === 'ปิดแล้ว') return 'done';
+  if (v === 'ยกเลิกแล้ว') return 'cancel';
+  return 'warn';
+}
+
+/* ─── การ์ดนับตามขั้นตอน — กดแล้วกรองตารางให้เลย ─── */
+function dashCards(){
+  var all = (DASH && DASH.rows) || [];
+  /* นับโดยไม่สนใจตัวกรองของคอลัมน์ stageName เอง จะได้เห็นทุกขั้นเสมอ */
+  var cnt = {};
+  for (var i = 0; i < all.length; i++){
+    if (!dashPass(all[i], 'stageName')) continue;
+    cnt[all[i].stageName] = (cnt[all[i].stageName] || 0) + 1;
+  }
+  var sel = DFIL.stageName || [];
+  var st = (DASH && DASH.stages) || [];
+  var t = '<div class="hint" style="margin:14px 0 5px">การ์ดขั้นตอน — ตัวเลขนับ<b>เฉพาะใบที่ผ่านตัวกรองอื่นที่เปิดอยู่</b> · กดการ์ดเพื่อกรอง กดได้หลายใบพร้อมกัน</div>';
+  t += '<div class="dcards">';
+  for (var k = 0; k < st.length; k++){
+    var s = st[k], n = cnt[s.name] || 0;
+    var on = sel.indexOf(s.name) >= 0 ? ' on' : '';
+    var kd = s.kind === 'ใบเคลม' ? 'clm' : 'ins';
+    t += '<div class="dcard ' + kd + on + '" onclick="dashCard(\'' + esc(s.name) + '\')">' +
+         '<div class="dcno">' + s.no + '</div>' +
+         '<div class="dcbody"><div class="dckind">' + esc(s.kind) + '</div>' +
+         '<div class="dcname">' + esc(s.name) + '</div></div>' +
+         '<div class="dcn' + (n ? '' : ' zero') + '">' + n + '</div></div>';
+  }
+  t += '</div>';
+  return t;
+}
+
+/* กดการ์ด = สลับเลือก/ไม่เลือกขั้นนั้น (เลือกได้หลายขั้นพร้อมกัน) */
+function dashCard(name){
+  var cur = DFIL.stageName || [];
+  var i = cur.indexOf(name);
+  if (i >= 0) cur = cur.slice(0, i).concat(cur.slice(i + 1));
+  else cur = cur.concat([name]);
+  if (cur.length) DFIL.stageName = cur; else delete DFIL.stageName;
+  drawDash();
+}
+
+/* ─── แถบบอกว่ากรองอะไรอยู่ กดกากบาทถอดทีละอันได้ ─── */
+function dashChips(){
+  var keys = Object.keys(DFIL).filter(function(k){ return DFIL[k] && DFIL[k].length; });
+  if (!keys.length && !DQ) return '';
+  var t = '<div class="dchips"><span class="dclbl">กำลังกรอง:</span>';
+  if (DQ) t += '<span class="dchip">ค้นหา “' + esc(DQ) + '” <b onclick="dashQ(\'\')">✕</b></span>';
+  for (var i = 0; i < keys.length; i++){
+    var k = keys[i], c = dcolOf(k) || { t:k }, v = DFIL[k];
+    var lbl = v.length > 2 ? (v.length + ' ค่า') : v.join(' , ');
+    t += '<span class="dchip">' + esc(c.t) + ' = ' + esc(lbl) +
+         ' <b onclick="dashDrop(\'' + k + '\')">✕</b></span>';
+  }
+  t += '</div>';
+  return t;
+}
+function dashDrop(k){ delete DFIL[k]; drawDash(); }
+function dashClear(){ DFIL = {}; DQ = ''; DOPEN = ''; drawDash(); }
+function dashQ(v){ DQ = v; drawDash(); var e = $('dq'); if (e){ e.focus(); e.setSelectionRange(v.length, v.length); } }
+function dashSort(k){
+  if (DSORT.k === k) DSORT.dir = -DSORT.dir; else DSORT = { k:k, dir:1 };
+  drawDash();
+}
+
+/* ─── กล่องตัวกรองของแต่ละคอลัมน์ (ติ๊กได้หลายค่า) ─── */
+function dashOpen(ev, k, keep){
+  if (ev) ev.stopPropagation();
+  if (!keep && DOPEN === k){ dashClose(); return; }
+  DOPEN = k;
+  var host = $('dfil') || document.createElement('div');
+  host.id = 'dfil'; host.className = 'dfil';
+  if (!host.parentNode) document.body.appendChild(host);
+
+  var c = dcolOf(k), vals = dashValues(k), sel = DFIL[k] || [];
+  var t = '<div class="dfhd">ตัวกรอง · ' + esc(c.t) + '</div>' +
+    '<input class="dfq" placeholder="พิมพ์เพื่อค้นหาในรายการ" oninput="dashFq(this.value)">' +
+    '<div class="dfact"><a onclick="dashAll(1)">เลือกทั้งหมด</a>' +
+    '<a onclick="dashAll(0)">ไม่เลือกเลย</a></div><div class="dflist" id="dflist">';
+  for (var i = 0; i < vals.length; i++){
+    var v = vals[i].v, on = sel.length ? (sel.indexOf(v) >= 0) : true;
+    t += '<label class="dfi" data-v="' + esc(v).toLowerCase() + '">' +
+         '<input type="checkbox" ' + (on ? 'checked' : '') + ' value="' + esc(v) + '">' +
+         '<span class="dfv">' + esc(v) + '</span><span class="dfn">' + vals[i].n + '</span></label>';
+  }
+  t += '</div><div class="dfbtn"><button class="btn" onclick="dashApply()">ตกลง</button>' +
+       '<button class="btn ghost" onclick="dashClose()">ปิด</button></div>';
+  host.innerHTML = t;
+  host.style.display = 'block';
+
+  /* วางกล่องใต้หัวคอลัมน์ที่กด — ถ้าชิดขอบขวาจอ ให้ดันเข้ามา ไม่ให้ล้นออกนอกจอ */
+  var th = null, ths = document.querySelectorAll('table.dash thead th');
+  for (var j = 0; j < DCOL.length; j++) if (DCOL[j].k === k) th = ths[j];
+  if (th){
+    var r = th.getBoundingClientRect();
+    var w = 268;
+    var x = Math.min(r.left + window.scrollX, window.scrollX + document.documentElement.clientWidth - w - 12);
+    host.style.left = Math.max(8, x) + 'px';
+    host.style.top  = (r.bottom + window.scrollY + 4) + 'px';
+  }
+}
+function dashClose(){ DOPEN = ''; var h = $('dfil'); if (h) h.style.display = 'none'; }
+function dashFq(q){
+  q = (q || '').toLowerCase();
+  var items = document.querySelectorAll('#dflist .dfi');
+  for (var i = 0; i < items.length; i++)
+    items[i].style.display = (!q || items[i].getAttribute('data-v').indexOf(q) >= 0) ? '' : 'none';
+}
+function dashAll(on){
+  var b = document.querySelectorAll('#dflist .dfi');
+  for (var i = 0; i < b.length; i++){
+    if (b[i].style.display === 'none') continue;
+    b[i].querySelector('input').checked = !!on;
+  }
+}
+function dashApply(){
+  var b = document.querySelectorAll('#dflist input[type=checkbox]');
+  var pick = [], total = b.length;
+  for (var i = 0; i < b.length; i++) if (b[i].checked) pick.push(b[i].value);
+  /* ติ๊กครบทุกค่า = ไม่ต้องกรองคอลัมน์นี้ (ให้เหมือน Excel) */
+  if (pick.length === total) delete DFIL[DOPEN];
+  else DFIL[DOPEN] = pick;
+  dashClose();
+  drawDash();
+}
+
+/* ─── ออกเป็น CSV ตามที่เห็นบนจอ (กรอง+เรียงแล้ว) ─── */
+function dashCsv(){
+  var rows = dashRows(), lines = [];
+  lines.push(DCOL.map(function(c){ return '"' + c.t + '"'; }).join(','));
+  for (var i = 0; i < rows.length; i++){
+    lines.push(DCOL.map(function(c){
+      return '"' + String(dval(rows[i], c.k)).split('"').join('""') + '"';
+    }).join(','));
+  }
+  var blob = new Blob(['﻿' + lines.join('\r\n')], { type:'text/csv;charset=utf-8;' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'สถานะเอกสาร-' + (DASH && DASH.at ? DASH.at.slice(0,10).split('/').join('-') : 'export') + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+/* เลื่อนตาราง/เลื่อนหน้า = ปิดกล่องตัวกรอง ไม่งั้นกล่องจะลอยค้างไม่ตรงหัวคอลัมน์ */
+document.addEventListener('scroll', function(){ if (DOPEN) dashClose(); }, true);
+
+/* คลิกที่อื่น = ปิดกล่องตัวกรอง */
+document.addEventListener('click', function(e){
+  if (!DOPEN) return;
+  var h = $('dfil');
+  if (h && !h.contains(e.target) && !(e.target.className === 'dfb')) dashClose();
+});
+</script>

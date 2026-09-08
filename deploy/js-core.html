@@ -11,7 +11,7 @@
    วิธีแก้: ฝังเลขเวอร์ชันไว้ในไฟล์หน้าเว็บเองด้วย (CLIENT_VER ข้างล่างนี้)
    ถ้า 2 ค่าไม่ตรงกัน = จอที่เห็นเป็นของเก่าแน่นอน ระบบจะขึ้นแถบแดงบอกให้กด Ctrl+Shift+R
    ⚠️ แก้ไฟล์หน้าเว็บทุกครั้ง ต้องเลื่อน CLIENT_VER ให้ตรงกับ VERSION ใน CLAIM-Hub.js */
-var CLIENT_VER = 'v1.2.6';
+var CLIENT_VER = 'v1.3.0';
 
 var AUTH = null;        // {emp, pin} — อยู่ในหน่วยความจำหน้าเว็บเท่านั้น ไม่เก็บลงเครื่อง
 var ME   = null;
@@ -286,6 +286,7 @@ function go(v, arg){
                                       openPrint();
                                     });
   /* ③ All Data and Report */
+  if (v === 'dash')       return loadDash();
   if (v === 'reports')    return loadReportHome();
   if (v === 'repmedia')   return loadRepMedia();
   if (v === 'repjob')     return loadRepJob();
@@ -375,6 +376,7 @@ function loadHome(){
   });
   /* ดึงรายชื่อขั้นตอน + ตัวเลขรวมมาเก็บไว้เงียบ ๆ ใช้ในหน้าอื่น */
   srv('getHome2', [AUTH], function(h){
+    if (!h) return;                       /* กันหน้าเด้ง alert ถ้าเซิร์ฟเวอร์ตอบว่างมา */
     KPI_LAST = h;
     if (h.stages && h.stages.length) STAGES_C = h.stages;
     if (h.insStages && h.insStages.length) STAGES_I = h.insStages;
@@ -442,6 +444,8 @@ var MODULES = [
  { id:0, ic:'📊', name:'รายงาน & ทะเบียน',
    ac:'#12a06f', acbg:'rgba(18,160,111,.14)', role:'ทุกคนเข้าดูได้',
    items:[
+    { k:'dash',    q:'', ic:'📊', t:'Dashboard สถานะเอกสาร',
+      d:'ใบที่เปิดค้างอยู่ทั้งหมด · กรองได้ทุกคอลัมน์ เลือกได้หลายค่า · กดการ์ดขั้นตอนเพื่อกรอง' },
     { k:'list',    q:'', ic:'🗂️', t:'ทะเบียนเอกสารทั้งหมด',
       d:'ใบเคลมทุกใบทุกจ๊อบ · สถานะล่าสุด · ยกเลิกใบได้ (ผู้บริหารเท่านั้น)' },
     { k:'inslist', q:'', ic:'🔍', t:'ทะเบียนใบตรวจรับสินค้า',

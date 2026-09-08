@@ -1181,3 +1181,122 @@ function translateCheck(pairs, auth){
   }
   return out;
 }
+
+
+/* ══════════════════════════════════════════════════════════════════════
+ * 3.9 · DASHBOARD สถานะเอกสาร  (เบียร์ 7 ก.ย. 2569)
+ *   "สร้าง Dashboard สถานะเอกสารของเอกสารฉบับที่เปิดอยู่ทั้งหมด
+ *    และทำให้หัวข้อ Filter ได้ทุกคอลัมน์ และเลือกได้มากกว่า 1"
+ *
+ *   หลักการ: ส่งข้อมูล "ทุกใบ ทุกปี ทั้ง 2 ชนิด" ไปให้หน้าเว็บครั้งเดียว
+ *   แล้วให้หน้าเว็บกรอง/สรุปเอง — กดตัวกรองแล้วไม่ต้องวิ่งกลับมาที่เซิร์ฟเวอร์
+ *   (ตัวกรองเริ่มต้นฝั่งหน้าเว็บตั้งไว้ที่ "ยังไม่ปิด" ตามที่เบียร์ขอ แต่เปลี่ยนเองได้)
+ * ════════════════════════════════════════════════════════════════════ */
+
+/** Supplier หลักของทุกใบเคลม — อ่านตาราง ITEMS ทีเดียวทุกปี แล้วแจกให้แต่ละใบ
+ *  ⚠️ ห้ามใช้ mainSupplier_ ทีละใบในลูป — มันอ่านทั้งชีตใหม่ทุกครั้ง (ช้าแบบ n²) */
+function supplierByDoc_(){
+  var out = {};
+  eachYear_(function(d){
+    var lr = d.items.getLastRow(); if (lr < 2) return;
+    var v = d.items.getRange(2, 1, lr - 1, HDR_ITEM.length).getDisplayValues();
+    for (var i = 0; i < v.length; i++){
+      var dn = norm_(v[i][0]); if (!dn || out[dn]) continue;
+      var sp = norm_(v[i][9]); if (sp) out[dn] = sp;
+    }
+  });
+  return out;
+}
+
+/** วันที่ในชีตเป็นข้อความ dd/MM/yyyy (พ.ศ.) หรือมีเวลาต่อท้าย — แปลงเป็น Date ให้ได้ก่อน
+ *  คืน null ถ้าอ่านไม่ออก จะได้ไม่เอาเลขมั่ว ๆ ไปโชว์ว่าค้างกี่วัน */
+function thDate_(s){
+  s = norm_(s); if (!s) return null;
+  var m = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[ ,]+(\d{1,2}):(\d{2}))?/);
+  if (!m) return null;
+  var y = parseInt(m[3], 10);
+  if (y > 2400) y -= 543;                       // พ.ศ. → ค.ศ.
+  var dt = new Date(y, parseInt(m[2], 10) - 1, parseInt(m[1], 10),
+                    m[4] ? parseInt(m[4], 10) : 0, m[5] ? parseInt(m[5], 10) : 0);
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+/** ค้างมากี่วันแล้ว นับจากวันที่แก้ไขล่าสุด (ถ้าไม่มี ใช้วันที่เปิดใบ) */
+function ageDays_(updated, created){
+  var dt = thDate_(updated) || thDate_(created);
+  if (!dt) return '';
+  var ms = new Date().getTime() - dt.getTime();
+  var dd = Math.floor(ms / 86400000);
+  return dd < 0 ? 0 : dd;
+}
+
+/** สถานะใบแบบเข้าใจง่าย ใช้เป็นตัวกรองหลักของ Dashboard
+ *  แยก "ตีกลับ" ออกมาเป็นสถานะของตัวเอง เพราะเบียร์ต้องเห็นว่าใบไหนวิ่งย้อนกลับมา */
+function docState_(stage, rejected, closedKeys){
+  if (stage === 'CANCELLED') return 'ยกเลิกแล้ว';
+  if (closedKeys.indexOf(stage) >= 0) return 'ปิดแล้ว';
+  if (rejected) return 'ตีกลับ · รอแก้';
+  return 'เปิดอยู่';
+}
+
+function dashDocs(auth){
+  requireLogin_(auth);
+
+  var sup   = supplierByDoc_();
+  var claims = listClaims({ showCancelled:true }, auth);
+  var insp   = listInspections({}, auth);
+  var rows   = [];
+
+  for (var i = 0; i < claims.length; i++){
+    var c = claims[i];
+    rows.push({
+      kind:'ใบเคลม', docNo:c.docNo, date:c.date,
+      stage:c.stage, stageNo:c.stageNo, stageName:c.stageName, waitWho:c.waitWho || '—',
+      state:docState_(c.stage, c.rejected, ['CLOSED']),
+      jobNo:c.jobNo || '(ไม่ระบุจ๊อบ)', jobName:c.jobName || '(ไม่ระบุ)', model:c.model || '—',
+      area:(c.area === 'for' ? 'ต่างประเทศ' : 'ในประเทศ'),
+      docType:(c.claimType === 'pre' ? 'ก่อนส่งมอบ' : 'หลังส่งมอบ'),
+      supplier:sup[c.docNo] || '(ยังไม่ระบุ)',
+      by:c.by || '—', dept:c.dept || '—',
+      nItem:c.nItem || 0, nPhoto:c.nPhoto || 0,
+      photoOk:(c.nItem ? (c.nNoPhoto ? 'รูปยังไม่ครบ' : 'รูปครบ') : '—'),
+      rejectNote:c.rejectNote || '',
+      updated:c.updatedAt || c.date,
+      age:ageDays_(c.updatedAt, c.createdAt || c.date)
+    });
+  }
+
+  for (var k = 0; k < insp.length; k++){
+    var s = insp[k];
+    rows.push({
+      kind:'ใบตรวจรับ', docNo:s.docNo, date:s.date,
+      stage:s.stage, stageNo:s.stageNo, stageName:s.stageName, waitWho:insStage_(s.stage).who || '—',
+      state:docState_(s.stage, s.rejected, ['IDONE']),
+      jobNo:s.jobNo || '(ไม่ระบุจ๊อบ)', jobName:s.jobName || '(ไม่ระบุ)', model:s.model || '—',
+      area:(s.area === 'for' ? 'ต่างประเทศ' : 'ในประเทศ'),
+      docType:(s.template || s.kind || '—'),
+      supplier:s.supplier || '(ยังไม่ระบุ)',
+      by:s.by || '—', dept:'QC',
+      nItem:s.n || 0, nPhoto:s.nPhoto || 0,
+      /* กติกาใบตรวจ: ข้อที่ไม่ผ่าน ต้องมีรูปอย่างน้อยข้อละ 1 รูป
+         รูปน้อยกว่าจำนวนข้อที่ไม่ผ่าน = ยังไม่ครบแน่นอน */
+      photoOk:(s.un ? (s.nPhoto < s.un ? 'รูปยังไม่ครบ' : 'รูปครบ') : '—'),
+      rejectNote:s.rejectNote || '',
+      updated:s.updatedAt || s.date,
+      age:ageDays_(s.updatedAt, s.createdAt || s.date)
+    });
+  }
+
+  rows.sort(function(a, b){ return a.docNo < b.docNo ? 1 : -1; });
+
+  /* ส่งลำดับขั้นไปด้วย จะได้เรียงการ์ดบนหน้าเว็บให้ตรงกับ flow จริง ไม่ใช่เรียงตามตัวอักษร */
+  var stages = [];
+  for (var a = 0; a < STAGES.length; a++){
+    if (STAGES[a].hidden) continue;        /* ยกเลิกแล้ว ไม่ใช่ "ขั้นที่รออยู่" — ไปดูที่ตัวกรองสถานะใบแทน */
+    stages.push({ kind:'ใบเคลม', key:STAGES[a].key, no:STAGES[a].no, name:STAGES[a].name });
+  }
+  for (var b = 0; b < INS_STAGES.length; b++)
+    stages.push({ kind:'ใบตรวจรับ', key:INS_STAGES[b].key, no:INS_STAGES[b].no, name:INS_STAGES[b].name });
+
+  return { rows:rows, stages:stages, at:nowStamp_() };
+}

@@ -300,7 +300,9 @@ function listInspections(filter, auth){
 }
 
 function listInspYear_(d, lr, full, filter, meL, pho, out){
-  var hdr = d.head.getRange(1,1,1,HDR_INSP.length).getDisplayValues()[0];
+  /* ⚠️ ต้องอ่านหัวตาราง "เต็มความยาว" เหมือนฝั่งใบเคลม — ไม่งั้นคอลัมน์สายงาน
+     (เหตุผลที่ตีกลับ · แก้ไขล่าสุด) จะหลุดหายไปเงียบ ๆ ตอนเอาไปทำ Dashboard */
+  var hdr = d.head.getRange(1,1,1,full.length).getDisplayValues()[0];
   var rows = d.head.getRange(2,1,lr-1,full.length).getDisplayValues();
   var iSt = colOfI_('ขั้นตอน') - 1;
 
@@ -321,7 +323,7 @@ function listInspYear_(d, lr, full, filter, meL, pho, out){
 
   for (var i = rows.length - 1; i >= 0; i--){
     var o = {};
-    for (var j = 0; j < hdr.length; j++) o[hdr[j]] = norm_(rows[i][j]);
+    for (var j = 0; j < hdr.length; j++) if (hdr[j]) o[hdr[j]] = norm_(rows[i][j]);
     var stg = norm_(rows[i][iSt]) || 'IDRAFT';
     /* ใบตรวจที่ยังเป็นร่าง เห็นเฉพาะคนตรวจ · แผนกเดียวกัน · ผู้บังคับบัญชา · ผู้บริหาร */
     if (insStage_(stg).draft && !canSeeDraft_(meL, o['สร้างโดย'], 'QC')) continue;
@@ -340,7 +342,10 @@ function listInspYear_(d, lr, full, filter, meL, pho, out){
       claimNo:o['ใบเคลมที่ออกจากใบนี้'], by:o['สร้างโดย'],
       stage:o.stage, stageNo:o.stageNo, stageName:o.stageName,
       n:c.n, acc:c.acc, un:c.un, todo:c.todo,
-      nPhoto:(pho[o['เลขที่เอกสาร']] || 0)
+      nPhoto:(pho[o['เลขที่เอกสาร']] || 0),
+      /* เพิ่ม 7 ก.ย. 2569 — Dashboard สถานะเอกสารใช้ (ตีกลับไหม · แก้ล่าสุดเมื่อไหร่) */
+      rejected: !!o['เหตุผลที่ตีกลับ'], rejectNote:o['เหตุผลที่ตีกลับ'] || '',
+      updatedAt:o['แก้ไขล่าสุด'] || '', createdAt:o['สร้างเมื่อ'] || ''
     });
     if (out.length >= 500) break;
   }
