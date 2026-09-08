@@ -22,7 +22,7 @@ function loadTplList(){
   srv('listTemplates', [true, AUTH], function(rows){
     TPLLIST = rows || [];
     var nOn = TPLLIST.filter(function(x){ return x.active; }).length;
-    var t = '<div class="card">' + repHead('แม่แบบเช็คลิสต์ตรวจรับ',
+    var t = '<div class="card">' + repHead('สร้างแม่แบบเช็คลิสต์ตรวจรับ',
         'แม่แบบทั้งหมด ' + TPLLIST.length + ' ชุด · เปิดใช้อยู่ ' + nOn + ' ชุด');
     t += '<div class="modtag">แม่แบบคือ<b>หัวข้อมาตรฐานที่ต้องตรวจของแต่ละรุ่น</b> ' +
          'แนบรูป STD ไว้ทีละข้อได้ · เปิดใบตรวจจากแม่แบบไหน หัวข้อกับรูป STD ตามไปให้ทั้งชุด</div>';
@@ -65,7 +65,7 @@ function loadTplList(){
     t += '</tbody></table></div></div>';
     $('view').innerHTML = t;
   }, function(m){
-    $('view').innerHTML = '<div class="card">' + repHead('แม่แบบเช็คลิสต์ตรวจรับ', '') +
+    $('view').innerHTML = '<div class="card">' + repHead('สร้างแม่แบบเช็คลิสต์ตรวจรับ', '') +
       '<div class="empty">' + esc(m) + '</div></div>';
   });
 }
